@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++ -Wall -Werror -Wextra -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.3.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/test_algo_trader.dir/test_test.cpp.o -o test_algo_trader  ../src/data_access/libdata_access_lib.a ../lib/libgtest_main.a ../lib/libgtest.a 

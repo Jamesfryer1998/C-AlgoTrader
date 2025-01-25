@@ -1,0 +1,2 @@
+/Library/Developer/CommandLineTools/usr/bin/ar qc libdata_access_lib.a CMakeFiles/data_access_lib.dir/data_access_test.cpp.o
+/Library/Developer/CommandLineTools/usr/bin/ranlib libdata_access_lib.a
