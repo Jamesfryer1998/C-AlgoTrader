@@ -1,5 +1,0 @@
-if(EXISTS "/Users/james/Projects/C++AlgoTrader/build/tests/test_algo_trader[1]_tests.cmake")
-  include("/Users/james/Projects/C++AlgoTrader/build/tests/test_algo_trader[1]_tests.cmake")
-else()
-  add_test(test_algo_trader_NOT_BUILT test_algo_trader_NOT_BUILT)
-endif()

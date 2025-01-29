@@ -1,3 +1,0 @@
-/Users/james/Projects/C++AlgoTrader/build/_deps/googletest-subbuild/CMakeFiles/googletest-populate.dir
-/Users/james/Projects/C++AlgoTrader/build/_deps/googletest-subbuild/CMakeFiles/edit_cache.dir
-/Users/james/Projects/C++AlgoTrader/build/_deps/googletest-subbuild/CMakeFiles/rebuild_cache.dir
