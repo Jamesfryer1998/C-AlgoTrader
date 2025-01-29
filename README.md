@@ -9,7 +9,10 @@ Architecture:
 ### System Overview
 ![](./doc/system_overview.drawio.png)
 
-### Data flow
+### Data Reader
+![](./doc/data_reader.drawio.png)
+
+### Data Flow
 ![](./doc/data_flow.drawio.png)
 
 ### Order Management System (OMS)
