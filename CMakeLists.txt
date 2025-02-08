@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.3)
 
 project(algo_trader)
-set(CMAKE_CXX_FLAGS "-Wall -Werror -Wextra")
+set(CMAKE_CXX_FLAGS "-Wall -Werror -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 set(CMAKE_CXX_STANDARD 23)
 
 # Install gtest which now lives on head.
