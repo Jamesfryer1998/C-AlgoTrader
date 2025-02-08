@@ -1,1 +1,2 @@
 add_subdirectory(data_access_tests)
+add_subdirectory(util_tests)

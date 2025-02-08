@@ -1,8 +1,10 @@
 #include "MarketData.hpp"
+#include <unistd.h>
 
 
 MarketData::MarketData() 
 {
+    
 }
 
 
@@ -16,8 +18,11 @@ MarketData::process()
     std::cout << "Processing Market Data" << std::endl;
 
     std::cout << "Collecting data every 10 seconds" << std::endl;
-
-    
+    while (true)
+    {
+        usleep(10 * 1000);
+        loadData(FILE_PATH);
+    }
 }
 
 

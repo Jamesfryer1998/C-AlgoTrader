@@ -1,0 +1,4 @@
+{
+    "run_interval": 10,
+    "base_market_data_dir": "C++AlgoTrader/data/"
+}

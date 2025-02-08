@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.3)
 
 project(algo_trader)
-set(CMAKE_CXX_FLAGS "-Wall -Werror -Wextra -Wno-unused-parameter -Wno-unused-private-field")
+set(CMAKE_CXX_FLAGS "-g -Wall -Werror -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 set(CMAKE_CXX_STANDARD 23)
 
 # Install gtest which now lives on head.
@@ -14,6 +14,15 @@ FetchContent_Declare(
   FIND_PACKAGE_ARGS NAMES GTest
 )
 FetchContent_MakeAvailable(googletest)
+
+# Declare and fetch the json library
+FetchContent_Declare(
+    json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+)
+
+# Make json available
+FetchContent_MakeAvailable(json)
 
 # Setup CMAKE Module path for other conda packages
 SET(CMAKE_MODULE_PATH $ENV{$CONDA_PREFIX}/lib/cmake)

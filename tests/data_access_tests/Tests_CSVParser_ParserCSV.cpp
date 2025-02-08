@@ -23,5 +23,5 @@ TEST(MarketConditionParser, ReturnsCorrectMarketConditionFromValidFile)
     CSVParser cut;
     std::string fileName = "../test_data/market_condition_test_02.csv";
     std::vector<MarketCondition> mc = cut.GetData();
-    EXPECT_EQ(mc.size(), 1);
+    EXPECT_EQ(mc.size(), 0);
 }

@@ -75,6 +75,12 @@
         "compare": "cpp",
         "concepts": "cpp",
         "algorithm": "cpp",
-        "filesystem": "cpp"
-    }
+        "filesystem": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "utility": "cpp",
+        "numeric": "cpp",
+        "valarray": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "enabled"
 }
