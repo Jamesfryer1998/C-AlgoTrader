@@ -8,20 +8,22 @@ class MarketCondition
         std::string _ticker,
         float _open,
         float _close,
-        std::string  _timeInterval);
+        int _volume,
+        std::string _timeInterval);
 
        ~MarketCondition();
 
         bool IsValid() const
         {
-            return !TimeStamp.empty() && !Ticker.empty() && Open >= 0 && Close >= 0 && !TimeInterval.empty();
+            return !DateTime.empty() && !Ticker.empty() && Open >= 0 && Close >= 0 && Volume >= 0 && !TimeInterval.empty();
         }
 
     public:
         // Add members here
-        std::string TimeStamp;
+        std::string DateTime;
         std::string Ticker;
         float Open;
         float Close;
+        int Volume;
         std::string TimeInterval;
 };

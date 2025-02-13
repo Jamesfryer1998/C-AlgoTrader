@@ -2,7 +2,9 @@
 
 #include "MarketData.hpp"
 #include "../util/Config.hpp"
+#include "../util/DateTimeConversion.hpp"
 
+using namespace std;
 
 MarketData::MarketData() 
 {
@@ -21,10 +23,9 @@ MarketData::process()
     Config config;
     json configData = config.getJson();
     int runInterval = configData["run_interval"];
-    std::string filePath = configData["marketDataBasePath"];
+    string filePath = generateFilePath(configData);
 
     // Add the datetime to the end of the file name path here
-
     std::cout << "Collecting data every " << runInterval << " seconds" << std::endl;
     while (true)
     {
@@ -51,4 +52,15 @@ std::vector<MarketCondition>
 MarketData::getData() const
 {
     return data;
+}
+
+string
+MarketData::generateFilePath(json configData)
+{
+    string fileBasePath = configData["marketDataBasePath"];
+    string fileBaseName = configData["baseDataFileName"];
+    string ticker = configData["ticker"];
+    string date = DateTimeConversion().timeNowToDate();
+    string filePath = fileBasePath + fileBaseName + "_" + ticker + "_" + date + ".csv";
+    return filePath;
 }

@@ -1,4 +1,7 @@
 {
     "run_interval": 10,
-    "marketDataBasePath": "data/"
+    "collectInterval": "1m",
+    "marketDataBasePath": "data/",
+    "baseDataFileName": "marketData",
+    "ticker": "NVDA"
 }

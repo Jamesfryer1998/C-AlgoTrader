@@ -42,16 +42,17 @@ CSVParser::ParseToMarketCondition(std::string line)
     // We are using comma separated values in CSV
     std::vector<std::string> tokens = tokenise(line, ',');
 
-    if (tokens.size() != 5) {
+    if (tokens.size() != 6) {
         throw std::runtime_error("Not enough CSV Tokens");
     }
 
     return MarketCondition(
-        tokens[0],
-        tokens[1],
-        std::stof(tokens[2]),
-        std::stof(tokens[3]),
-        tokens[4]
+        tokens[0],              // Datetime
+        tokens[1],              // Ticker
+        std::stof(tokens[2]),   // Open
+        std::stof(tokens[3]),   // Close
+        std::stoi(tokens[4]),   // Volume
+        tokens[5]               // TimeInterval
     );
 }
 
