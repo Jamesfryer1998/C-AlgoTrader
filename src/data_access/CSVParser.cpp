@@ -19,7 +19,7 @@ CSVParser::Read(const std::string& filePath)
 
     if (!std::filesystem::exists(filePath)) 
     {
-        throw std::runtime_error(std::string("File not found: [") + filePath + "]");
+        throw std::runtime_error("File not found: " + filePath);
         return;
     }
 

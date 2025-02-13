@@ -1,0 +1,4 @@
+{
+    "run_interval": 10,
+    "marketDataBasePath": "data/"
+}

@@ -6,10 +6,7 @@ include(FetchContent)
 add_library(util_lib ${SOURCES})
 
 # Link the nlohmann JSON library to your util_lib
-target_link_libraries(util_lib PRIVATE nlohmann_json)
-
-target_include_directories(util_lib PRIVATE ${json_SOURCE_DIR}/single_include)
-
+target_link_libraries(util_lib PRIVATE nlohmann_json::nlohmann_json)
 
 # And cerate libaries for testing
 #add_executable(util ${SOURCES})
