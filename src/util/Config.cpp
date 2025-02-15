@@ -1,8 +1,6 @@
 #include "Config.hpp"
 #include <fstream>
 
-using json = nlohmann::json;
-
 Config::Config() 
 {
     loadJson(JSON_CONFIG_PATH);

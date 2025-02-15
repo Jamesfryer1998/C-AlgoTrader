@@ -24,11 +24,13 @@ class DataDownload:
         :info: Defaults to 1h interval
         :return: Pandas DataFrame with historical stock data.
         """
+        print(f"About to fetch data for {ticker}...")
         end_date = datetime.today().strftime('%Y-%m-%d')
         start_date = (datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
 
         stock = yf.Ticker(ticker)
         data = stock.history(interval=self.interval, start=start_date, end=end_date)
+        print(f"Retrieved [{len(data)}] rows for {ticker} with [{self.interval}] interval.")
         return data
     
     def save_csv(self):
@@ -44,6 +46,7 @@ class DataDownload:
         data.index = pd.to_datetime(data.index).tz_localize(None) 
         data.fillna(0) 
         data.to_csv(self.date_file_path, index=True, sep=",")
+        print(f"Data saved to {self.date_file_path}")
             
     def load_json(self, file_path):
         """
@@ -62,8 +65,3 @@ class DataDownload:
         except json.JSONDecodeError:
             print(f"Error: Failed to decode JSON in '{file_path}'.")
             return None        
-
-# Example Usage
-if __name__ == "__main__":
-    downloader = DataDownload()
-    df = downloader.save_csv()

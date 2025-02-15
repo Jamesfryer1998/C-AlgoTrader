@@ -34,13 +34,13 @@ DateTimeConversion::setTime(std::time_t epochTime)
 std::string DateTimeConversion::timeNowToString()
 {
     char buffer[32];
-    std::strftime(buffer, sizeof(buffer), "%Y_%m_%d %H:%M:%S", &t);
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &t);
     return std::string(buffer);
 }
 
 std::string DateTimeConversion::timeNowToDate()
 {
     char buffer[32];
-    std::strftime(buffer, sizeof(buffer), "%Y_%m_%d", &t);
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d", &t);
     return std::string(buffer);
 }

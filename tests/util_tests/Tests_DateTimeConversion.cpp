@@ -21,41 +21,41 @@ TEST(DateTimeConversion, ReturnsCorrectEpochTime)
 TEST(DateTimeConversion, ReturnsCorrectDateStringEpoch0)
 {
     DateTimeConversion cut;
-    // 1970_01_01 epoch date
+    // 1970-01-01 epoch date
     std::time_t epochTime = 0;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("1970_01_01", cut.timeNowToDate());
+    EXPECT_EQ("1970-01-01", cut.timeNowToDate());
 }
 
 TEST(DateTimeConversion, ReturnsCorrectDateStringFor2025)
 {
     DateTimeConversion cut;
-    // 2025_06_15 epoch date
+    // 2025-06-15 epoch date
     std::time_t epochTime = 1750000000;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("2025_06_15", cut.timeNowToDate());
+    EXPECT_EQ("2025-06-15", cut.timeNowToDate());
 }
 
 TEST(DateTimeConversion, ReturnsCorrectStringTimeEpoch0)
 {
     DateTimeConversion cut;
-    // 2025_06_15 15:06:40 epoch time
+    // 2025-06-15 15:06:40 epoch time
     std::time_t epochTime = 0;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("1970_01_01 00:00:00", cut.timeNowToString());
+    EXPECT_EQ("1970-01-01 00:00:00", cut.timeNowToString());
 }
 
 TEST(DateTimeConversion, ReturnsCorrectStringTime)
 {
     DateTimeConversion cut;
-    // 2025_06_15 15:06:40 epoch time
+    // 2025-06-15 15:06:40 epoch time
     std::time_t epochTime = 1750000000;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("2025_06_15 15:06:40", cut.timeNowToString());
+    EXPECT_EQ("2025-06-15 15:06:40", cut.timeNowToString());
 }
 
 TEST(DateTimeConversion, HandlesNegativeEpochTime_Before1970)
@@ -65,8 +65,8 @@ TEST(DateTimeConversion, HandlesNegativeEpochTime_Before1970)
     std::time_t epochTime = -1;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("1969_12_31", cut.timeNowToDate());
-    EXPECT_EQ("1969_12_31 23:59:59", cut.timeNowToString());
+    EXPECT_EQ("1969-12-31", cut.timeNowToDate());
+    EXPECT_EQ("1969-12-31 23:59:59", cut.timeNowToString());
 }
 
 TEST(DateTimeConversion, HandlesLeapYear_Feb29_2024)
@@ -76,7 +76,7 @@ TEST(DateTimeConversion, HandlesLeapYear_Feb29_2024)
     std::time_t epochTime = 1709164800;  // 2024-02-29 00:00:00 UTC
     cut.setTime(epochTime);
 
-    EXPECT_EQ("2024_02_29", cut.timeNowToDate());
+    EXPECT_EQ("2024-02-29", cut.timeNowToDate());
 }
 
 TEST(DateTimeConversion, HandlesEndOfYearBoundary)
@@ -86,8 +86,8 @@ TEST(DateTimeConversion, HandlesEndOfYearBoundary)
     std::time_t epochTime = 1735689599;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("2024_12_31", cut.timeNowToDate());
-    EXPECT_EQ("2024_12_31 23:59:59", cut.timeNowToString());
+    EXPECT_EQ("2024-12-31", cut.timeNowToDate());
+    EXPECT_EQ("2024-12-31 23:59:59", cut.timeNowToString());
 }
 
 TEST(DateTimeConversion, HandlesStartOfYearBoundary)
@@ -97,8 +97,8 @@ TEST(DateTimeConversion, HandlesStartOfYearBoundary)
     std::time_t epochTime = 1735689600;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("2025_01_01", cut.timeNowToDate());
-    EXPECT_EQ("2025_01_01 00:00:00", cut.timeNowToString());
+    EXPECT_EQ("2025-01-01", cut.timeNowToDate());
+    EXPECT_EQ("2025-01-01 00:00:00", cut.timeNowToString());
 }
 
 TEST(DateTimeConversion, HandlesFarFutureDate_Year2100)
@@ -108,7 +108,7 @@ TEST(DateTimeConversion, HandlesFarFutureDate_Year2100)
     std::time_t epochTime = 4102444800;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("2100_01_01", cut.timeNowToDate());
+    EXPECT_EQ("2100-01-01", cut.timeNowToDate());
 }
 
 TEST(DateTimeConversion, HandlesFarPastDate_Year1900)
@@ -118,5 +118,5 @@ TEST(DateTimeConversion, HandlesFarPastDate_Year1900)
     std::time_t epochTime = -2208988800;
     cut.setTime(epochTime);
 
-    EXPECT_EQ("1900_01_01", cut.timeNowToDate());
+    EXPECT_EQ("1900-01-01", cut.timeNowToDate());
 }

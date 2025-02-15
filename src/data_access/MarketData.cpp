@@ -1,10 +1,11 @@
 #include <unistd.h>
-
+#include <filesystem>
+#include <chrono>
+#include <thread>
 #include "MarketData.hpp"
 #include "../util/Config.hpp"
 #include "../util/DateTimeConversion.hpp"
 
-using namespace std;
 
 MarketData::MarketData() 
 {
@@ -25,13 +26,9 @@ MarketData::process()
     int runInterval = configData["run_interval"];
     string filePath = generateFilePath(configData);
 
-    // Add the datetime to the end of the file name path here
     std::cout << "Collecting data every " << runInterval << " seconds" << std::endl;
-    while (true)
-    {
-        usleep(runInterval * 1000);
-        loadData(filePath);
-    }
+    loadData(filePath);
+    std::this_thread::sleep_for(std::chrono::seconds(runInterval));
 }
 
 void
@@ -48,7 +45,7 @@ MarketData::update(std::vector<MarketCondition>& marketData)
     data = marketData;
 }
 
-std::vector<MarketCondition>
+vector<MarketCondition>
 MarketData::getData() const
 {
     return data;
@@ -57,10 +54,18 @@ MarketData::getData() const
 string
 MarketData::generateFilePath(json configData)
 {
+    string projectRoot = getProjectRoot() + "/";
     string fileBasePath = configData["marketDataBasePath"];
     string fileBaseName = configData["baseDataFileName"];
     string ticker = configData["ticker"];
     string date = DateTimeConversion().timeNowToDate();
-    string filePath = fileBasePath + fileBaseName + "_" + ticker + "_" + date + ".csv";
+    string filePath = projectRoot + fileBasePath + fileBaseName + "_" + ticker + "_" + date + ".csv";
     return filePath;
+}
+
+string 
+MarketData::getProjectRoot()
+{
+    std::filesystem::path exePath = std::filesystem::current_path();
+    return exePath.string();  // Returns the directory where the executable is run
 }

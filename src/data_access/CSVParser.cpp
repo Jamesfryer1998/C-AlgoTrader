@@ -24,13 +24,17 @@ CSVParser::Read(const std::string& filePath)
     }
 
     if (csvFile.is_open())
-    {
-        std::cout << "File open." << std::endl;
+    {        
+        // Skip first line
+        std::getline(csvFile, line);
+
         while (std::getline(csvFile, line))
         {
             MarketCondition recentLine = ParseToMarketCondition(line);
             data.push_back(recentLine);
         }
+
+        std::cout << data.size() << " lines read from file" << std::endl;
     }
 
     csvFile.close();
