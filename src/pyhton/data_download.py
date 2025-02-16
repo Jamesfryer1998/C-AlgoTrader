@@ -30,6 +30,10 @@ class DataDownload:
 
         stock = yf.Ticker(ticker)
         data = stock.history(interval=self.interval, start=start_date, end=end_date)
+
+        if (len(data) == 0):
+            raise Exception(f"No data found for {self.ticker} in the past week. (May have no wifi)")
+
         print(f"Retrieved [{len(data)}] rows for {ticker} with [{self.interval}] interval.")
         return data
     
