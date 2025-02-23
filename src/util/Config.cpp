@@ -3,11 +3,17 @@
 
 Config::Config() 
 {
-    loadJson(JSON_CONFIG_PATH);
 }
 
 Config::~Config() 
 {
+}
+
+json
+Config::loadConfig()
+{
+    loadJson(formConfigPath());
+    return configData;
 }
 
 void 
@@ -24,4 +30,19 @@ Config::loadJson(const std::string& path)
     json j;
     file >> j;  
     configData = j;
+}
+
+string
+Config::formConfigPath()
+{
+    string projectRoot = getProjectRoot();
+    string configPath = projectRoot + JSON_CONFIG_NAME;
+    return configPath;
+}
+
+string
+Config::getProjectRoot()
+{
+    std::filesystem::path exePath = std::filesystem::current_path();
+    return exePath.string();
 }

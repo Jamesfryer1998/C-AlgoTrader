@@ -15,6 +15,8 @@ class DataDownload:
         date = datetime.now().date()
         self.date_file_path = f"{self.base_data_dir}{self.data_base_file_name}_{self.ticker}_{date}.csv"
 
+        print("DataDownload initialised")
+
     def get_stock_data(self, ticker):
         """
         Fetches historical stock data for the past week.
@@ -62,6 +64,7 @@ class DataDownload:
         try:
             with open(file_path, "r") as file:
                 data = json.load(file)
+                print(f"{file_path} loaded successfully!")
             return data
         except FileNotFoundError:
             print(f"Error: File '{file_path}' not found.")

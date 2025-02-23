@@ -22,13 +22,12 @@ MarketData::process()
 
     // Get Config data
     Config config;
-    json configData = config.getJson();
+    json configData = config.loadConfig();
     int runInterval = configData["run_interval"];
     string filePath = generateFilePath(configData);
 
     std::cout << "Collecting data every " << runInterval << " seconds" << std::endl;
     loadData(filePath);
-    std::this_thread::sleep_for(std::chrono::seconds(runInterval));
 }
 
 void
