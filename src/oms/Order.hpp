@@ -4,6 +4,7 @@ using namespace std;
 
 class Order {
     public:
+        Order(){};
         Order(
             int _id,
             string _type, 
@@ -12,6 +13,8 @@ class Order {
             float _price
         );
         ~Order();
+
+        int getId(){ return id;};
 
     private:
         int id;

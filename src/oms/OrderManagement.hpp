@@ -17,6 +17,8 @@ class OrderManagement
         void addPosition(Position &position);
         vector<Order> getOrders(){ return orders; };
         vector<Position> getPositions(){ return positions; };
+        void removeOrder(int id);
+        void removePosition(int id);
 
     private:
         vector<Order> orders;

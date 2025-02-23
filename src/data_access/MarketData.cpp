@@ -66,5 +66,5 @@ string
 MarketData::getProjectRoot()
 {
     std::filesystem::path exePath = std::filesystem::current_path();
-    return exePath.string();  // Returns the directory where the executable is run
+    return exePath.string();
 }
