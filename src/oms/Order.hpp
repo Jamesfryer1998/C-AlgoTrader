@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 
 using namespace std;
@@ -14,9 +15,6 @@ class Order {
         );
         ~Order();
 
-        int getId(){ return id;};
-
-    private:
         int id;
         string type;
         string ticker;

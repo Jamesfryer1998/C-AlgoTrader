@@ -1,10 +1,19 @@
 #include <iostream>
 #include "../src/data_access/MarketData.hpp"
+#include "../src/strategy_engine/StrategyEngine.hpp"
 
 int main()
 {
     std::cout << "This is a test line" << std::endl;
-    MarketData().process();
+    MarketData marketData;
+    StrategyEngine stratEngine;
+
+    stratEngine.setUp();
+
+    marketData.process();
+    stratEngine.inputMarketData(marketData);
+    stratEngine.run();
+
 
     return 0;
 }

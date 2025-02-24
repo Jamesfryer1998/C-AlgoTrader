@@ -1,4 +1,6 @@
+#pragma once
 #include <iostream>
+
 
 using namespace std;
 
@@ -15,7 +17,6 @@ class Position
 
         int getId(){ return id;};
 
-    private:
         int id;
         string ticker;
         float quantity;

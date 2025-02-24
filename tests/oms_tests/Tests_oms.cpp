@@ -120,8 +120,8 @@ TEST_F(OrderManagementTests, RemoveCorrectOrderById)
 
     auto orders = cut->getOrders();
     
-    EXPECT_EQ(orders[0].getId(), 1);
-    EXPECT_EQ(orders[1].getId(), 3);
+    EXPECT_EQ(orders[0].id, 1);
+    EXPECT_EQ(orders[1].id, 3);
 }
 
 TEST_F(OrderManagementTests, RemoveCorrectPositionById) 
@@ -134,6 +134,25 @@ TEST_F(OrderManagementTests, RemoveCorrectPositionById)
 
     auto positions = cut->getPositions();
     
-    EXPECT_EQ(positions[0].getId(), 1);
-    EXPECT_EQ(positions[1].getId(), 3);
+    EXPECT_EQ(positions[0].id, 1);
+    EXPECT_EQ(positions[1].id, 3);
+}
+
+TEST_F(OrderManagementTests, ResetWorksCorrectly) 
+{
+    GeneratePosition(1);
+    GeneratePosition(2);
+    GeneratePosition(3);
+
+    GenerateOrder(1);
+    GenerateOrder(2);
+    GenerateOrder(3);
+
+    cut->reset();
+
+    auto orders = cut->getOrders();
+    auto positions = cut->getPositions();
+    
+    EXPECT_EQ(orders.size(), 0);
+    EXPECT_EQ(positions.size(), 0);
 }

@@ -1,3 +1,4 @@
+#pragma once
 #include "CSVParser.hpp"
 #include "../util/Config.hpp"
 
