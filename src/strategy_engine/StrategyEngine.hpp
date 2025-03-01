@@ -3,7 +3,6 @@
 #include "../oms/OrderManagement.hpp"
 #include "../data_access/MarketData.hpp"
 
-#define JSON_STRATEGY_CONFIG "/src/config/strategies.json"
 
 class StrategyEngine
 {
@@ -20,8 +19,6 @@ class StrategyEngine
     private:
 
         void addStrategy(StrategyBase strat);
-        void jsonToStrategy(json json);
-        void loadStrategies();
 
         OrderManagement oms;
         std::vector<MarketCondition> marketData;
