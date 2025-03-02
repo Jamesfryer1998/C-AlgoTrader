@@ -3,24 +3,32 @@
 #include "../oms/Order.hpp"
 #include "../oms/Position.hpp"
 
-class StrategyBase
-{
+
+
+class StrategyBase {
 public:
-    StrategyBase(std::string strategyName) : name(strategyName), isLive(false) {};
-    ~StrategyBase() {};
+    virtual ~StrategyBase() = default;
+    virtual void execute() = 0;  // Pure virtual function
 
-    // Pure virtual methods - must be implemented by derived strategies
-    // virtual void onMarketData(const MarketData& data) = 0;
-    // virtual Order generateSignal() = 0;
-
-    // Shared functionality
-    void setLive(bool live) { isLive = live; }
+    // Factory method for dynamic creation
+    static std::unique_ptr<StrategyBase> create(const std::string& name);
 
 protected:
-    std::string name;
-    std::vector<Order> orders;
-    std::vector<Position> positions;
-    double capital;
-    bool isLive;
-    // RiskManager riskManager;
+    // Register a strategy name with a factory function
+    static void registerStrategy(const std::string& name, std::function<std::unique_ptr<StrategyBase>()> creator);
 };
+
+// class StrategyBase
+// {
+// public:
+//     virtual ~StrategyBase() = default;
+//     virtual void getName() = 0;
+
+// protected:
+//     std::string name;
+//     std::vector<Order> orders;
+//     std::vector<Position> positions;
+//     double capital;
+//     bool isLive;
+//     // RiskManager riskManager;
+// };

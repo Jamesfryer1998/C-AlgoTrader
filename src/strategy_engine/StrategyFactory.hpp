@@ -1,4 +1,5 @@
 #include "../util/Config.hpp"
+#include "StrategyBase.hpp"
 
 
 #define JSON_STRATEGY_CONFIG "/src/config/strategies.json"
@@ -6,18 +7,18 @@
 class StrategyFactory
 {
     public: 
-        StrategyFactory(){};
+        StrategyFactory();
+        StrategyFactory(string filePath);
         ~StrategyFactory(){};
 
         void loadJson(string filePath);
-        void jsonToStrategy(json stratJson);
         void loadStrategies();
-        void generatetrategies();
+        std::vector<std::unique_ptr<StrategyBase>> generateStrategies();
+        json getJson(){ return strategyData;};
 
     private:
 
         string formatStrategyPath();
-        string filePath;
         json strategyData;
         Config config;
 };  

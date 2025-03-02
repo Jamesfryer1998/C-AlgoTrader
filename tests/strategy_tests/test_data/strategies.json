@@ -2,7 +2,13 @@
     "strategies": 
     [
         {
-            "name": "test_strategy"
+            "name": "test_strategy_1"
+        },
+        {
+            "name": "test_strategy_2"
+        },
+        {
+            "name": "test_strategy_3"
         }
     ]
 }

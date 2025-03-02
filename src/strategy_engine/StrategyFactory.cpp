@@ -4,6 +4,20 @@
 // Parse Strategies into StratFactory
 // StartBase will be the base for each strat
 // Strat factory will form out json into strategies
+
+
+// Default constructor
+StrategyFactory::StrategyFactory()
+{
+    loadJson(formatStrategyPath());
+}
+
+// Constructor for testing
+StrategyFactory::StrategyFactory(string filePath)
+{
+    loadJson(filePath);
+}
+
 void
 StrategyFactory::loadJson(string filePath)
 {
@@ -25,14 +39,20 @@ StrategyFactory::loadStrategies()
     loadJson(formatStrategyPath());
 }
 
-void
-StrategyFactory::generatetrategies()
+std::vector<std::unique_ptr<StrategyBase>> 
+StrategyFactory::generateStrategies() 
 {
-    int numStrats = strategyData["strategy"].size();
+    std::vector<std::unique_ptr<StrategyBase>> strategies;
+    int numStrats = strategyData["strategies"].size();
 
-    for (int i = 0; i < numStrats; ++i) 
-    {
-        json strat = strategyData["strategy"][i];
-        std::cout << strat << std::endl;
+    for (int i = 0; i < numStrats; ++i) {
+        std::string name = strategyData["strategies"][i]["name"];
+        auto strategy = StrategyBase::create(name);
+        if (strategy) {
+            strategies.push_back(std::move(strategy));
+        } else {
+            std::cerr << "Failed to create strategy: " << name << std::endl;
+        }
     }
+    return strategies;
 }

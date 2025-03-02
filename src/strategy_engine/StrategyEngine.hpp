@@ -18,9 +18,9 @@ class StrategyEngine
 
     private:
 
-        void addStrategy(StrategyBase strat);
+        void addStrategy(std::unique_ptr<StrategyBase> strat);
 
         OrderManagement oms;
         std::vector<MarketCondition> marketData;
-        std::vector<StrategyBase> strategyList;
+        // std::vector<std::unique_ptr<StrategyBase>> strategyList;
 };  

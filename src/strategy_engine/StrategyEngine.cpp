@@ -34,7 +34,7 @@ StrategyEngine::onNewOrder(Order& order)
 }
 
 void
-StrategyEngine::addStrategy(StrategyBase strat)
+StrategyEngine::addStrategy(std::unique_ptr<StrategyBase> strat)
 {
-    strategyList.push_back(strat);
+    // strategyList.push_back(strat);
 }
