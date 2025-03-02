@@ -1,34 +1,30 @@
+#pragma once
+
 #include <iostream>
-#include "../data_access/MarketData.hpp"
-#include "../oms/Order.hpp"
-#include "../oms/Position.hpp"
+#include "StrategyAttribute.hpp"
 
 
-
-class StrategyBase {
-public:
-    virtual ~StrategyBase() = default;
-    virtual void execute() = 0;  // Pure virtual function
-
-    // Factory method for dynamic creation
-    static std::unique_ptr<StrategyBase> create(const std::string& name);
-
-protected:
-    // Register a strategy name with a factory function
-    static void registerStrategy(const std::string& name, std::function<std::unique_ptr<StrategyBase>()> creator);
-};
-
-// class StrategyBase
-// {
+// class StrategyBase {
 // public:
 //     virtual ~StrategyBase() = default;
-//     virtual void getName() = 0;
+//     virtual void execute() = 0;  // Pure virtual function
+//     static std::unique_prt<StrategyBase> create(const std::string& name);
 
 // protected:
-//     std::string name;
-//     std::vector<Order> orders;
-//     std::vector<Position> positions;
-//     double capital;
-//     bool isLive;
-//     // RiskManager riskManager;
+    // Register a strategy name with a factory function
+    // static void registerStrategy(const std::string& name, std::function<std::unique_ptr<StrategyBase>()> creator);
+
 // };
+
+class StrategyBase
+{
+public:
+    StrategyBase(StrategyAttribute strategyAttribute):
+       _strategyAttribute(strategyAttribute)
+    {};
+    virtual ~StrategyBase() = default;
+    virtual void execute() = 0;
+
+protected:
+    StrategyAttribute _strategyAttribute;
+};

@@ -1,17 +1,12 @@
 #include "StrategyBase.hpp"
 
-class RSIStrategy : public StrategyBase {
-    public:
-        void execute() override {
-            std::cout << "Executing Concrete Strategy A" << std::endl;
-        }
+class RSI : public StrategyBase {
+public:
+    RSI(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
-    private:
-        static bool registered;
+    void execute() override {
+        std::cout << "Executing RSI" << std::endl;
+    }
+
+    StrategyAttribute getAttributes() { return _strategyAttribute; }
 };
-
-// Self-register the class when the file is included
-bool RSIStrategy::registered = [] {
-    StrategyBase::registerStrategy("RSI", []() { return std::make_unique<RSIStrategy>(); });
-    return true;
-}();

@@ -1,5 +1,9 @@
 #include <fstream>
 #include "StrategyFactory.hpp"
+#include "StrategyAttribute.hpp"
+#include "RSI.hpp"
+#include "MACD.hpp"
+#include "MEANREV.hpp"
 
 // Parse Strategies into StratFactory
 // StartBase will be the base for each strat
@@ -39,6 +43,26 @@ StrategyFactory::loadStrategies()
     loadJson(formatStrategyPath());
 }
 
+// std::vector<std::unique_ptr<StrategyBase>> 
+// StrategyFactory::generateStrategies() 
+// {
+    
+//     std::vector<std::unique_ptr<StrategyBase>> strategies;
+//     int numStrats = strategyData["strategies"].size();
+
+//     for (int i = 0; i < numStrats; ++i) {
+//         std::string name = strategyData["strategies"][i]["name"];
+//         auto strategy = StrategyBase::create(name);
+//         if (strategy) {
+//             strategies.push_back(std::move(strategy));
+//         } else {
+//             std::cerr << "Failed to create strategy: " << name << std::endl;
+//         }
+//     }
+//     return strategies;
+// }
+
+
 std::vector<std::unique_ptr<StrategyBase>> 
 StrategyFactory::generateStrategies() 
 {
@@ -47,12 +71,14 @@ StrategyFactory::generateStrategies()
 
     for (int i = 0; i < numStrats; ++i) {
         std::string name = strategyData["strategies"][i]["name"];
-        auto strategy = StrategyBase::create(name);
-        if (strategy) {
-            strategies.push_back(std::move(strategy));
-        } else {
-            std::cerr << "Failed to create strategy: " << name << std::endl;
-        }
+        StrategyAttribute attributes{strategyData["strategies"][i]};
+
+        if(name == "RSI")
+            strategies.push_back(std::make_unique<RSI>(attributes));
+        else if (name == "MACD")
+           strategies.push_back(std::make_unique<MACD>(attributes));
+        else if (name == "MEANREV")
+            strategies.push_back(std::make_unique<MEANREV>(attributes));
     }
     return strategies;
 }

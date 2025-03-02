@@ -2,13 +2,13 @@
     "strategies": 
     [
         {
-            "name": "test_strategy_1"
+            "name": "RSI"
         },
         {
-            "name": "test_strategy_2"
+            "name": "MACD"
         },
         {
-            "name": "test_strategy_3"
+            "name": "MEANREV"
         }
     ]
 }
