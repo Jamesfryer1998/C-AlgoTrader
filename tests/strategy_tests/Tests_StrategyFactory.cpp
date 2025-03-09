@@ -47,5 +47,7 @@ TEST_F(StrategyFactoryTests, StrategyFactory_GenerateStrategies)
     ASSERT_EQ(strats.size(), 3);
 
     // Check the types of strategies
-    // EXPECT_EQ();
+    EXPECT_EQ("RSI", strats[0].get()->_strategyAttribute.name);
+    EXPECT_EQ("MACD", strats[1].get()->_strategyAttribute.name);
+    EXPECT_EQ("MEANREV", strats[2].get()->_strategyAttribute.name);
 }

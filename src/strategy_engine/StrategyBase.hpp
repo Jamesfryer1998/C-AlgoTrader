@@ -18,13 +18,17 @@
 
 class StrategyBase
 {
-public:
-    StrategyBase(StrategyAttribute strategyAttribute):
-       _strategyAttribute(strategyAttribute)
-    {};
-    virtual ~StrategyBase() = default;
-    virtual void execute() = 0;
+    public:
+        StrategyBase(StrategyAttribute strategyAttribute):
+        _strategyAttribute(strategyAttribute)
+        {
+        };
+        virtual ~StrategyBase() = default;
+        virtual void execute() = 0;
+        virtual void validate() = 0;
 
-protected:
-    StrategyAttribute _strategyAttribute;
+        // Base strats take in entire list of strat params
+        // Specific strats pic and choose from this list
+        StrategyAttribute _strategyAttribute;
+
 };

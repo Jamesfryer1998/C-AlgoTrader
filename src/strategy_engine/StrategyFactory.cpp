@@ -43,6 +43,7 @@ StrategyFactory::loadStrategies()
     loadJson(formatStrategyPath());
 }
 
+// Strat factory
 // std::vector<std::unique_ptr<StrategyBase>> 
 // StrategyFactory::generateStrategies() 
 // {
@@ -71,12 +72,12 @@ StrategyFactory::generateStrategies()
 
     for (int i = 0; i < numStrats; ++i) {
         std::string name = strategyData["strategies"][i]["name"];
-        StrategyAttribute attributes{strategyData["strategies"][i]};
+        StrategyAttribute attributes(strategyData["strategies"][i]);
 
         if(name == "RSI")
             strategies.push_back(std::make_unique<RSI>(attributes));
         else if (name == "MACD")
-           strategies.push_back(std::make_unique<MACD>(attributes));
+            strategies.push_back(std::make_unique<MACD>(attributes));
         else if (name == "MEANREV")
             strategies.push_back(std::make_unique<MEANREV>(attributes));
     }
