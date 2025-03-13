@@ -31,13 +31,16 @@ class StrategyBase
 
         virtual bool onNewOrder()
         {
-            return (NewOrder = true);
+            return (NewOrder == true);
         };
 
         virtual Order getOrder()
         { 
-            NewOrder = false;
-            return order; 
+            // if (order != NULL)
+            // {
+                NewOrder = false;
+                return order; 
+            // }
         };
 
         // Base strats take in entire list of strat params

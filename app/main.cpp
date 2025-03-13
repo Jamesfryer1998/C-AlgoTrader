@@ -4,7 +4,6 @@
 
 int main()
 {
-    std::cout << "This is a test line" << std::endl;
     MarketData marketData;
     StrategyEngine stratEngine;
 

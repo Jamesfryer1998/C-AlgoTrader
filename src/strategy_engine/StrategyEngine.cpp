@@ -15,7 +15,6 @@ StrategyEngine::setUp()
 {
     std::cout << "Setting up Strategy Engine..." << std::endl;
     generateAndLoadStrategies();
-
     std::cout << strategyList.size() << " strategies loaded" << std::endl;
 }
 
@@ -47,6 +46,8 @@ void
 StrategyEngine::executeStrategies()
 {
     // Maybe thread this
+    std::cout << "Executing strategies..." << std::endl;
+
     for (auto& strat : strategyList) 
     {
         strat->execute();
@@ -57,5 +58,6 @@ StrategyEngine::executeStrategies()
             // Give Order to OMS
             oms->onNewOrder(order);
         }
+
     }
 }
