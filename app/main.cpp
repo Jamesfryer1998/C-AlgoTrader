@@ -9,11 +9,8 @@ int main()
     StrategyEngine stratEngine;
 
     stratEngine.setUp();
-
-    marketData.process();
     stratEngine.inputMarketData(marketData);
     stratEngine.run();
-
 
     return 0;
 }

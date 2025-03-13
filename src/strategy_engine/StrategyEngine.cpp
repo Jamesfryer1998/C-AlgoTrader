@@ -1,4 +1,5 @@
 #include "StrategyEngine.hpp"
+#include "StrategyFactory.hpp"
 
 StrategyEngine::StrategyEngine()
 {
@@ -12,13 +13,21 @@ StrategyEngine::~StrategyEngine()
 void 
 StrategyEngine::setUp()
 {
+    std::cout << "Setting up Strategy Engine..." << std::endl;
+    generateAndLoadStrategies();
 
+    std::cout << strategyList.size() << " strategies loaded" << std::endl;
 }
 
+// This will run in a continuious loop somewhere, every min maybe?
 void
 StrategyEngine::run()
 {
-    
+    MarketData marketData;
+    marketData.process();
+
+    inputMarketData(marketData);
+    executeStrategies();
 }
 
 void
@@ -28,13 +37,25 @@ StrategyEngine::inputMarketData(MarketData& inputData)
 }
 
 void
-StrategyEngine::onNewOrder(Order& order)
+StrategyEngine::generateAndLoadStrategies()
 {
-    oms.addOrder(order);
+    StrategyFactory stratFactory;
+    strategyList = stratFactory.generateStrategies();
 }
 
 void
-StrategyEngine::addStrategy(std::unique_ptr<StrategyBase> strat)
+StrategyEngine::executeStrategies()
 {
-    // strategyList.push_back(strat);
+    // Maybe thread this
+    for (auto& strat : strategyList) 
+    {
+        strat->execute();
+        if(strat->onNewOrder())
+        {
+            Order order = strat->getOrder();
+
+            // Give Order to OMS
+            oms->onNewOrder(order);
+        }
+    }
 }

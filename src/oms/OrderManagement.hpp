@@ -20,9 +20,6 @@ class OrderManagement
         void removeOrder(int id);
         void removePosition(int id);
         void reset() { orders.clear(); positions.clear(); };
-
-    private:
-
         void onNewOrder(Order& order);
         void onOrderExecuted(Order& order);
 
@@ -30,4 +27,5 @@ class OrderManagement
         int latestPositionId = 1;
         vector<Order> orders;
         vector<Position> positions;
+        // BrokerAPI = broker;
 };

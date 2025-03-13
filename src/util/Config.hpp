@@ -22,4 +22,5 @@ class Config
 
     private:
         json configData;
+        bool loaded = false;
 };

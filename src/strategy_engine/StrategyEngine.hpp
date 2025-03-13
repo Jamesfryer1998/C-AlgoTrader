@@ -13,14 +13,14 @@ class StrategyEngine
         void run();
         void setUp();
 
-        void onNewOrder(Order& order);
         void inputMarketData(MarketData& inputData);
 
     private:
 
-        void addStrategy(std::unique_ptr<StrategyBase> strat);
+        void generateAndLoadStrategies();
+        void executeStrategies();
 
-        OrderManagement oms;
+        OrderManagement* oms;
         std::vector<MarketCondition> marketData;
-        // std::vector<std::unique_ptr<StrategyBase>> strategyList;
+        std::vector<std::unique_ptr<StrategyBase>> strategyList;
 };  

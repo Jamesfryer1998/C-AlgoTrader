@@ -12,8 +12,18 @@ Config::~Config()
 json
 Config::loadConfig()
 {
-    loadJson(formConfigPath());
-    return configData;
+    if(!loaded)
+    {
+        loadJson(formConfigPath());
+        loaded = true;
+        return configData;
+    }
+    else
+    {
+        return configData;
+    }
+    
+
 }
 
 void 

@@ -66,7 +66,7 @@ StrategyFactory::loadStrategies()
 
 std::vector<std::unique_ptr<StrategyBase>> 
 StrategyFactory::generateStrategies() 
-{
+{   
     std::vector<std::unique_ptr<StrategyBase>> strategies;
     int numStrats = strategyData["strategies"].size();
 

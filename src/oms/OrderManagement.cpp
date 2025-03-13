@@ -10,6 +10,11 @@ OrderManagement::~OrderManagement()
 {
 }
 
+// OrderManagement::setBroker(BrokerAPI brokerApi)
+// {
+//     broker = brokerApi;
+// }
+
 void
 OrderManagement::addOrder(Order &order)
 {
@@ -44,6 +49,7 @@ void OrderManagement::onNewOrder(Order& order)
     // connect with Broker API to place order here
 
     // BrokerAPI api;
+
 }
 
         

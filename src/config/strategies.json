@@ -1,3 +1,14 @@
 {
-    
+    "strategies": 
+    [
+        {
+            "name": "RSI"
+        },
+        {
+            "name": "MACD"
+        },
+        {
+            "name": "MEANREV"
+        }
+    ]
 }

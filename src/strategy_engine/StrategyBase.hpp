@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include "../oms/Order.hpp"
 #include "StrategyAttribute.hpp"
 
 
@@ -23,12 +24,29 @@ class StrategyBase
         _strategyAttribute(strategyAttribute)
         {
         };
+
         virtual ~StrategyBase() = default;
         virtual void execute() = 0;
         virtual void validate() = 0;
 
+        virtual bool onNewOrder()
+        {
+            return (NewOrder = true);
+        };
+
+        virtual Order getOrder()
+        { 
+            NewOrder = false;
+            return order; 
+        };
+
         // Base strats take in entire list of strat params
-        // Specific strats pic and choose from this list
+        // Specific strats pick and choose from this list
         StrategyAttribute _strategyAttribute;
+
+    private:
+
+        Order order;
+        bool NewOrder = false;
 
 };

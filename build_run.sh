@@ -26,11 +26,11 @@ echo "✅ All builds and tests successful!"
 echo "\n==========================================Python==========================================\n"
 
 # Maybe run this from within C++ code every minute (time interval)?
-# python src/pyhton/main.py
-# if [ $? -ne 0 ]; then
-#     echo "❌ No Data found"
-#     exit 1
-# fi
+python src/pyhton/main.py
+if [ $? -ne 0 ]; then
+    echo "❌ No Data found"
+    exit 1
+fi
 
 echo "\n===========================================C++============================================\n"
 

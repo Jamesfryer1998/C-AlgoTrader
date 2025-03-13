@@ -4,3 +4,4 @@ file(GLOB SOURCES *.cpp)
 add_library(strategy_lib ${SOURCES})
 
 target_link_libraries(strategy_lib nlohmann_json)
+target_link_libraries(strategy_lib oms_lib)
