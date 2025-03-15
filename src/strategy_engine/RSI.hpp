@@ -10,7 +10,7 @@ class RSI : public StrategyBase {
         void execute() override 
         {
             validate();
-            std::cout << "Executing RSI" << std::endl;
+            std::cout << "  -> RSI" << std::endl;
         }
 
         void validate() override

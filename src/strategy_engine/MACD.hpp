@@ -7,7 +7,7 @@ class MACD : public StrategyBase {
 
         void execute() override 
         {
-            std::cout << "Executing MACD" << std::endl;
+            std::cout << "  -> MACD" << std::endl;
             validate();
         }
 

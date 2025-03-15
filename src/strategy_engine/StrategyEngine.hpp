@@ -19,6 +19,7 @@ class StrategyEngine
 
         void generateAndLoadStrategies();
         void executeStrategies();
+        void printStategies();
 
         OrderManagement* oms;
         std::vector<MarketCondition> marketData;

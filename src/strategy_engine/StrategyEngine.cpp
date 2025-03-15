@@ -15,7 +15,7 @@ StrategyEngine::setUp()
 {
     std::cout << "Setting up Strategy Engine..." << std::endl;
     generateAndLoadStrategies();
-    std::cout << strategyList.size() << " strategies loaded" << std::endl;
+    printStategies();
 }
 
 // This will run in a continuious loop somewhere, every min maybe?
@@ -58,6 +58,16 @@ StrategyEngine::executeStrategies()
             // Give Order to OMS
             oms->onNewOrder(order);
         }
+    }
+}
 
+void
+StrategyEngine::printStategies()
+{
+    std::cout << "Loades strategies:" << std::endl;
+
+    for (auto& strat : strategyList) 
+    {
+        std::cout << "  -> "  << strat->_strategyAttribute.name << std::endl;
     }
 }

@@ -35,12 +35,9 @@ class StrategyBase
         };
 
         virtual Order getOrder()
-        { 
-            // if (order != NULL)
-            // {
-                NewOrder = false;
-                return order; 
-            // }
+        {
+            NewOrder = false;
+            return order; 
         };
 
         // Base strats take in entire list of strat params

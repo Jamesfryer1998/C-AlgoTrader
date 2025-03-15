@@ -6,7 +6,7 @@ class MEANREV : public StrategyBase {
 
         void execute() override 
         {
-            std::cout << "Executing MEANREV" << std::endl;
+            std::cout << "  -> MEANREV" << std::endl;
             validate();
         }
 
