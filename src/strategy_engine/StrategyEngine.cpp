@@ -1,6 +1,8 @@
 #include "StrategyEngine.hpp"
 #include "StrategyFactory.hpp"
 
+OrderManagement* StrategyEngine::oms = new OrderManagement();
+
 StrategyEngine::StrategyEngine()
 {
 }
@@ -11,9 +13,11 @@ StrategyEngine::~StrategyEngine()
 
 
 void 
-StrategyEngine::setUp()
-{
+StrategyEngine::setUp(json configdata)
+{    
     std::cout << "Setting up Strategy Engine..." << std::endl;
+    configData = configdata;
+    oms->setConfig(configData);
     generateAndLoadStrategies();
     printStategies();
 }
@@ -23,14 +27,14 @@ void
 StrategyEngine::run()
 {
     MarketData marketData;
-    marketData.process();
-
-    inputMarketData(marketData);
+    marketData.process(configData);
+    setMarketData(marketData);
+    oms->setMarketData(marketData);
     executeStrategies();
 }
 
 void
-StrategyEngine::inputMarketData(MarketData& inputData)
+StrategyEngine::setMarketData(MarketData& inputData)
 {
     marketData = inputData.getData();
 }
@@ -64,7 +68,7 @@ StrategyEngine::executeStrategies()
 void
 StrategyEngine::printStategies()
 {
-    std::cout << "Loades strategies:" << std::endl;
+    std::cout << "Loaded strategies:" << std::endl;
 
     for (auto& strat : strategyList) 
     {

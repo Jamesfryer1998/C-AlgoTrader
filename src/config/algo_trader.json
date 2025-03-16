@@ -3,5 +3,8 @@
     "collectInterval": "1m",
     "marketDataBasePath": "data/",
     "baseDataFileName": "marketData",
-    "ticker": "NVDA"
+    "ticker": "NVDA",
+    "max_position_size": 10.0,
+    "max_exposure": 5.0,
+    "slippage_tolerance": 2.0
 }

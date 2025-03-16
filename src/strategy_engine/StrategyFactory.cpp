@@ -72,7 +72,10 @@ StrategyFactory::generateStrategies()
 
     for (int i = 0; i < numStrats; ++i) {
         std::string name = strategyData["strategies"][i]["name"];
+        int active = strategyData["strategies"][i]["active"].get<int>();
         StrategyAttribute attributes(strategyData["strategies"][i]);
+        if(!active)
+            continue;
 
         if(name == "RSI")
             strategies.push_back(std::make_unique<RSI>(attributes));

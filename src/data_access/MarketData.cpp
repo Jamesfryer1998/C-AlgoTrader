@@ -16,13 +16,9 @@ MarketData::~MarketData()
 }
 
 void
-MarketData::process()
+MarketData::process(json configData)
 {
     std::cout << "Processing Market Data" << std::endl;
-
-    // Get Config data
-    Config config;
-    json configData = config.loadConfig();
     string filePath = generateFilePath(configData);
     loadData(filePath);
 }
@@ -64,4 +60,10 @@ MarketData::getProjectRoot()
 {
     std::filesystem::path exePath = std::filesystem::current_path();
     return exePath.string();
+}
+
+float
+MarketData::getLastPrice()
+{
+    return data[-1].Close;
 }

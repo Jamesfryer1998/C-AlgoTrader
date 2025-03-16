@@ -17,10 +17,9 @@ class OrderManagementTests : public ::testing::Test
         delete cut;
     }
 
-    void GenerateOrder(int id)
+    void GenerateOrder()
     {
         Order order{
-                id,
                 "Filled",
                 "AAPL",
                 100.0,
@@ -29,10 +28,9 @@ class OrderManagementTests : public ::testing::Test
         cut->addOrder(order);
     }
 
-    void GeneratePosition(int id)
+    void GeneratePosition()
     {
         Position position{
-                id,
                 "AAPL",
                 100.0,
                 120.0};
@@ -51,14 +49,14 @@ TEST_F(OrderManagementTests, CanBeInstantiated)
 
 TEST_F(OrderManagementTests, AddOrder) 
 {
-    GenerateOrder(1);
+    GenerateOrder();
 
     EXPECT_EQ(1, cut->getOrders().size());
 }
 
 TEST_F(OrderManagementTests, AddPosition) 
 {
-    GeneratePosition(1);
+    GeneratePosition();
 
     EXPECT_EQ(1, cut->getPositions().size());
 }
@@ -69,9 +67,28 @@ TEST_F(OrderManagementTests, AddMultipleOrders)
 
     for(int i=0; i < numberOfOrders; ++i)
     {
-        GenerateOrder(i);
+        GenerateOrder();
     }
     
+    EXPECT_EQ(numberOfOrders, cut->getOrders().size());
+}
+
+TEST_F(OrderManagementTests, GenerateCorrectOrderId) 
+{
+    int numberOfOrders = 3;
+
+    for(int i=0; i < numberOfOrders; ++i)
+    {
+        GenerateOrder();
+    }
+    
+    auto orders = cut->getOrders();
+
+    for (int i = 0; i < numberOfOrders; ++i)
+    {   
+        EXPECT_EQ(orders[i].getId(), i+1);
+    }
+
     EXPECT_EQ(numberOfOrders, cut->getOrders().size());
 }
 
@@ -81,18 +98,38 @@ TEST_F(OrderManagementTests, AddMultiplePositions)
 
     for(int i=0; i < numberOfPositions; ++i)
     {
-        GeneratePosition(i);
+        GeneratePosition();
     }
     
     EXPECT_EQ(numberOfPositions, cut->getPositions().size());
 }
 
+TEST_F(OrderManagementTests, GenerateCorrectPositionId) 
+{
+    int numberOfPositions = 3;
+
+    for(int i=0; i < numberOfPositions; ++i)
+    {
+        GeneratePosition();
+    }
+    
+    auto positions = cut->getPositions();
+
+    for (int i = 0; i < numberOfPositions; ++i)
+    {   
+        EXPECT_EQ(positions[i].getId(), i+1);
+    }
+
+    EXPECT_EQ(numberOfPositions, cut->getPositions().size());
+}
+
+
 
 TEST_F(OrderManagementTests, RemoveOrders) 
 {
-    GenerateOrder(1);
-    GenerateOrder(2);
-    GenerateOrder(3);
+    GenerateOrder();
+    GenerateOrder();
+    GenerateOrder();
 
     cut->removeOrder(1);
     
@@ -101,9 +138,9 @@ TEST_F(OrderManagementTests, RemoveOrders)
 
 TEST_F(OrderManagementTests, RemovePositions) 
 {
-    GeneratePosition(1);
-    GeneratePosition(2);
-    GeneratePosition(3);
+    GeneratePosition();
+    GeneratePosition();
+    GeneratePosition();
 
     cut->removePosition(1);
     
@@ -112,41 +149,41 @@ TEST_F(OrderManagementTests, RemovePositions)
 
 TEST_F(OrderManagementTests, RemoveCorrectOrderById) 
 {
-    GenerateOrder(1);
-    GenerateOrder(2);
-    GenerateOrder(3);
+    GenerateOrder();
+    GenerateOrder();
+    GenerateOrder();
 
     cut->removeOrder(2);
 
     auto orders = cut->getOrders();
     
-    EXPECT_EQ(orders[0].id, 1);
-    EXPECT_EQ(orders[1].id, 3);
+    EXPECT_EQ(orders[0].getId(), 1);
+    EXPECT_EQ(orders[1].getId(), 3);
 }
 
 TEST_F(OrderManagementTests, RemoveCorrectPositionById) 
 {
-    GeneratePosition(1);
-    GeneratePosition(2);
-    GeneratePosition(3);
+    GeneratePosition();
+    GeneratePosition();
+    GeneratePosition();
 
     cut->removePosition(2);
 
     auto positions = cut->getPositions();
     
-    EXPECT_EQ(positions[0].id, 1);
-    EXPECT_EQ(positions[1].id, 3);
+    EXPECT_EQ(positions[0].getId(), 1);
+    EXPECT_EQ(positions[1].getId(), 3);
 }
 
 TEST_F(OrderManagementTests, ResetWorksCorrectly) 
 {
-    GeneratePosition(1);
-    GeneratePosition(2);
-    GeneratePosition(3);
+    GeneratePosition();
+    GeneratePosition();
+    GeneratePosition();
 
-    GenerateOrder(1);
-    GenerateOrder(2);
-    GenerateOrder(3);
+    GenerateOrder();
+    GenerateOrder();
+    GenerateOrder();
 
     cut->reset();
 

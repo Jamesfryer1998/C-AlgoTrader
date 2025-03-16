@@ -51,3 +51,18 @@ TEST_F(StrategyFactoryTests, StrategyFactory_GenerateStrategies)
     EXPECT_EQ("MACD", strats[1].get()->_strategyAttribute.name);
     EXPECT_EQ("MEANREV", strats[2].get()->_strategyAttribute.name);
 }
+
+TEST_F(StrategyFactoryTests, StrategyFactory_CheckActiveFlag) 
+{
+    StrategyFactory cut{"/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies_active_test.json"};
+
+    
+    auto strats = cut.generateStrategies();
+
+    // Check number of strategies created
+    ASSERT_EQ(strats.size(), 2);
+
+    // Check the types of strategies
+    EXPECT_EQ("RSI", strats[0].get()->_strategyAttribute.name);
+    EXPECT_EQ("MACD", strats[1].get()->_strategyAttribute.name);
+}

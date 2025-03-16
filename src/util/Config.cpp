@@ -16,14 +16,13 @@ Config::loadConfig()
     {
         loadJson(formConfigPath());
         loaded = true;
+        std::cout << "JSON Data: " << configData.dump(4) << std::endl;
         return configData;
     }
     else
     {
         return configData;
     }
-    
-
 }
 
 void 

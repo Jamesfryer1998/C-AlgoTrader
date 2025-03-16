@@ -11,9 +11,9 @@ class StrategyEngine
         ~StrategyEngine();
 
         void run();
-        void setUp();
+        void setUp(json configData);
 
-        void inputMarketData(MarketData& inputData);
+        void setMarketData(MarketData& inputData);
 
     private:
 
@@ -21,7 +21,8 @@ class StrategyEngine
         void executeStrategies();
         void printStategies();
 
-        OrderManagement* oms;
+        json configData;
+        static OrderManagement* oms;
         std::vector<MarketCondition> marketData;
         std::vector<std::unique_ptr<StrategyBase>> strategyList;
 };  

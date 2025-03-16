@@ -2,13 +2,21 @@
     "strategies": 
     [
         {
-            "name": "RSI"
+            "name": "RSI",
+            "active": 1,
+            "period": 30,
+            "overbought_threshold": 75.0,
+            "oversold_threshold": 25.0,
+            "stop_loss": 10,
+            "take_profit": 10
         },
         {
-            "name": "MACD"
+            "name": "MACD",
+            "active": 1
         },
         {
-            "name": "MEANREV"
+            "name": "MEANREV",
+            "active": 0
         }
     ]
 }
