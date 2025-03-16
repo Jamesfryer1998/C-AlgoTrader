@@ -74,6 +74,8 @@ StrategyFactory::generateStrategies()
         std::string name = strategyData["strategies"][i]["name"];
         int active = strategyData["strategies"][i]["active"].get<int>();
         StrategyAttribute attributes(strategyData["strategies"][i]);
+
+        // Leave if strat not active
         if(!active)
             continue;
 

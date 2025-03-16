@@ -12,7 +12,7 @@
         },
         {
             "name": "MACD",
-            "active": 1
+            "active": 0
         },
         {
             "name": "MEANREV",

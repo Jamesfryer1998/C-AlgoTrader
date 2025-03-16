@@ -12,18 +12,21 @@ class StrategyAttribute
 
         // Load from JSON constructor
         StrategyAttribute(const json& stratJson) {
+            std::cout << "Raw JSON for Strategy: " << stratJson.dump(4) << std::endl;
+
             if (stratJson.contains("period")) period = stratJson["period"];
             if (stratJson.contains("overbought_threshold")) overbought_threshold = stratJson["overbought_threshold"];
             if (stratJson.contains("oversold_threshold")) oversold_threshold = stratJson["oversold_threshold"];
 
-            if (stratJson.contains("short_period")) short_period = stratJson["short_period"];
-            if (stratJson.contains("long_period")) long_period = stratJson["long_period"];
-            if (stratJson.contains("signal_period")) signal_period = stratJson["signal_period"];
+            short_period = stratJson.contains("short_period") ? stratJson["short_period"].get<int>() : 0;
+            long_period = stratJson.contains("long_period") ? stratJson["long_period"].get<int>() : 0;
+            signal_period = stratJson.contains("signal_period") ? stratJson["signal_period"].get<int>() : 0;
 
-            if (stratJson.contains("lookback_period")) lookback_period = stratJson["lookback_period"];
-            if (stratJson.contains("entry_threshold")) entry_threshold = stratJson["entry_threshold"];
-            if (stratJson.contains("exit_threshold")) exit_threshold = stratJson["exit_threshold"];
-            if (stratJson.contains("moving_average_period")) moving_average_period = stratJson["moving_average_period"];
+            // MEANREV
+            lookback_period = stratJson.contains("lookback_period") ? stratJson["lookback_period"].get<int>() : 0;
+            entry_threshold = stratJson.contains("entry_threshold") ? stratJson["entry_threshold"].get<double>() : 0;
+            exit_threshold = stratJson.contains("exit_threshold") ? stratJson["exit_threshold"].get<double>() : 0;
+            moving_average_period = stratJson.contains("moving_average_period") ? stratJson["moving_average_period"].get<int>() : 0;
 
             if (stratJson.contains("name")) name = stratJson["name"];
             if (stratJson.contains("price_type")) price_type = stratJson["price_type"];
