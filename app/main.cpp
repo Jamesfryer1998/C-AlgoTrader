@@ -2,6 +2,7 @@
 #include <unistd.h> 
 #include "../src/data_access/MarketData.hpp"
 #include "../src/strategy_engine/StrategyEngine.hpp"
+#include "../src/strategy_engine/StrategyFactory.hpp"
 
 #define MIN_PER_RUN 1
 
@@ -12,10 +13,10 @@ int main()
     Config config;
     json algoConfig = config.loadConfig();
     MarketData marketData;
+    StrategyFactory stratFactory;
     StrategyEngine stratEngine;
 
-    stratEngine.setUp(algoConfig);
-    stratEngine.setMarketData(marketData);
+    stratEngine.setUp(algoConfig, stratFactory, marketData);
     while (true)
     {
         stratEngine.run();

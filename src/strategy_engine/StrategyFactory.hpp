@@ -1,3 +1,5 @@
+#pragma once
+
 #include "../util/Config.hpp"
 #include "StrategyBase.hpp"
 

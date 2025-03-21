@@ -15,7 +15,6 @@ Config::loadConfig()
     if(!loaded)
     {
         loadJson(formConfigPath());
-        loaded = true;
         std::cout << "JSON Data: " << configData.dump(4) << std::endl;
         return configData;
     }
@@ -39,6 +38,7 @@ Config::loadJson(const std::string& path)
     json j;
     file >> j;  
     configData = j;
+    loaded = true;
 }
 
 string

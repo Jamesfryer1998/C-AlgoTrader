@@ -12,8 +12,6 @@ class StrategyAttribute
 
         // Load from JSON constructor
         StrategyAttribute(const json& stratJson) {
-            std::cout << "Raw JSON for Strategy: " << stratJson.dump(4) << std::endl;
-
             if (stratJson.contains("period")) period = stratJson["period"];
             if (stratJson.contains("overbought_threshold")) overbought_threshold = stratJson["overbought_threshold"];
             if (stratJson.contains("oversold_threshold")) oversold_threshold = stratJson["oversold_threshold"];

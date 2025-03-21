@@ -13,12 +13,13 @@ StrategyEngine::~StrategyEngine()
 
 
 void 
-StrategyEngine::setUp(json configdata)
+StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData &marketdata)
 {    
     std::cout << "Setting up Strategy Engine..." << std::endl;
     configData = configdata;
     oms->setConfig(configData);
-    generateAndLoadStrategies();
+    strategyList = stratFactory.generateStrategies();
+    marketData = marketdata;
     printStategies();
 }
 
@@ -26,7 +27,6 @@ StrategyEngine::setUp(json configdata)
 void
 StrategyEngine::run()
 {
-    MarketData marketData;
     marketData.process(configData);
     setMarketData(marketData);
     oms->setMarketData(marketData);
@@ -36,14 +36,7 @@ StrategyEngine::run()
 void
 StrategyEngine::setMarketData(MarketData& inputData)
 {
-    marketData = inputData.getData();
-}
-
-void
-StrategyEngine::generateAndLoadStrategies()
-{
-    StrategyFactory stratFactory;
-    strategyList = stratFactory.generateStrategies();
+    marketConditions = inputData.getData();
 }
 
 void
