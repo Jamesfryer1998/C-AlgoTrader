@@ -19,7 +19,7 @@ OrderValidator::setParams(json configData)
     maxExposure = configData["max_exposure"];
     slippageTolerance = configData["slippage_tolerance"];
 
-    std::cout << "Params set: " 
+    std::cout << "  --> Params set: " 
                 << "maxPositionSize=" << maxPositionSize << ", "
                 << "maxExposure=" << maxExposure << ", "
                 << "slippageTolerance=" << slippageTolerance << std::endl;

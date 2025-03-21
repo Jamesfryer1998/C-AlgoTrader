@@ -2,7 +2,7 @@
 
 #include "OrderManagement.hpp"
 
-OrderValidator* OrderManagement::validator = new OrderValidator();
+// OrderValidator* OrderManagement::validator = new OrderValidator();
 
 OrderManagement::OrderManagement() 
 {
@@ -46,7 +46,7 @@ void OrderManagement::removePosition(int id)
 void OrderManagement::onNewOrder(Order& order)
 {
     // Wait for new order to be added to orders from strat engine
-    bool orderValid = validator->validateOrder(order, marketData);
+    bool orderValid = validator.validateOrder(order, marketData);
     if(orderValid)
     {
         addOrder(order);

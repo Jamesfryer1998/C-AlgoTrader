@@ -13,12 +13,6 @@ class OrderValidator
 
         void setParams(json configData);
 
-    private:
-        // Risk constraints
-        double maxPositionSize;
-        double maxExposure;
-        double slippageTolerance;
-
         // Validation methods
         bool isValidOrderType(const Order& order);
         bool isValidPrice(const Order& order, MarketData& marketData);
@@ -27,4 +21,10 @@ class OrderValidator
         bool checkStopLoss(const Order& order, MarketData& marketData);
         bool checkTickSize(const Order& order, MarketData& marketData);
         bool checkSlippage(const Order& order, MarketData& marketData);
+
+    private:
+        // Risk constraints
+        double maxPositionSize;
+        double maxExposure;
+        double slippageTolerance;
 };

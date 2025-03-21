@@ -20,6 +20,12 @@ StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData
     oms->setConfig(configData);
     strategyList = stratFactory.generateStrategies();
     marketData = marketdata;
+
+    std::cout << "  --> Config Data set" << std::endl;
+    std::cout << "  --> OMS set" << std::endl;
+    std::cout << "  --> Strategies generates" << std::endl;
+    std::cout << "  --> MarketData set\n" << std::endl;
+
     printStategies();
 }
 

@@ -25,7 +25,7 @@ class OrderManagement
         void onOrderExecuted(Order& order);
         void setConfig(json configdata) 
         {
-            validator->setParams(configdata);
+            validator.setParams(configdata);
         };
         void setMarketData(MarketData marketdata) { marketData = marketdata;};
 
@@ -34,6 +34,7 @@ class OrderManagement
         vector<Order> orders;
         vector<Position> positions;
         MarketData marketData;
-        static OrderValidator* validator;
+        OrderValidator validator;
+        // OrderValidator* validator;
         // BrokerAPI = broker;
 };
