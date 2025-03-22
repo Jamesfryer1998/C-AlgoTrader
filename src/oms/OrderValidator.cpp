@@ -56,13 +56,15 @@ OrderValidator::isValidPrice(const Order& order, MarketData& marketData)
 bool
 OrderValidator::isValidQuantity(const Order& order)
 {
-    return (order.getQuantity() > 0);
+        return (order.getQuantity() > 0 &&
+                order.getQuantity() <= maxPositionSize);
 }
 
 bool
 OrderValidator::checkMaxPositionSize(const Order& order)
 {
     return true; // TODO: Implement
+    // Will need oms here
 }
 
 bool
@@ -71,8 +73,28 @@ OrderValidator::checkStopLoss(const Order& order, MarketData& marketData)
     // Add stop loss into strategy config
     // When creating a order from a strategy, set the stop loss, this will be a %
     // E.g. price of 100, stop loss of 10%, stop_loss_price = 90
+
+    // TODO: Decide
+    // Maybe need to have some user input here
+    // If price has fallen too far maybe we dont want to do the trade?
+
+    // This also forces us to use stoploss and take profit values which is probs a good thing
+
+    
     return (order.getStopLossPrice() == 0 ||
-            order.getStopLossPrice()!= marketData.getLastClosePrice());
+            order.getStopLossPrice() != marketData.getLastClosePrice() ||
+            order.getStopLossPrice() < marketData.getLastClosePrice());
+}
+
+bool
+OrderValidator::checkTakeProfit(const Order& order, MarketData& marketData)
+{
+    // TODO: Decide
+    // Maybe need to have some user input here
+    // If price has rises too far maybe we dont want to do the trade?
+    return (order.getTakeProfitPrice() == 0 ||
+            order.getTakeProfitPrice() != marketData.getLastClosePrice() ||
+            order.getTakeProfitPrice() > marketData.getLastClosePrice());
 }
 
 bool

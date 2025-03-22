@@ -19,6 +19,7 @@ class OrderValidator
         bool isValidQuantity(const Order& order);
         bool checkMaxPositionSize(const Order& order);
         bool checkStopLoss(const Order& order, MarketData& marketData);
+        bool checkTakeProfit(const Order& order, MarketData& marketData);
         bool checkTickSize(const Order& order, MarketData& marketData);
         bool checkSlippage(const Order& order, MarketData& marketData);
 

@@ -12,6 +12,8 @@ public:
     {
         config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
         algoTestConfig = config.loadConfig();
+        cut.setParams(algoTestConfig);
+
     }
 
     void TearDown() override 
@@ -24,8 +26,11 @@ public:
         order = Order{
                 "BUY",
                 "AAPL",
-                100.0,
+                10,
                 109.0};
+
+        order.setStopLoss(10);
+        order.setTakeProfit(10);
     }
 
     void GivenWeHaveASellOrder()
@@ -33,7 +38,7 @@ public:
         order = Order{
                 "SELL",
                 "AAPL",
-                100.0,
+                10,
                 109.0};
     }
 
@@ -42,8 +47,11 @@ public:
         order = Order{
                 "SELLING",
                 "AAPL",
-                100.0,
+                20,
                 120.0};
+
+        order.setStopLoss(10);
+        order.setTakeProfit(10);
     }
 
     void GivenWeHaveMarketData()
@@ -102,4 +110,30 @@ TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidPrice_WeValidateCorrectly)
 
     EXPECT_EQ(marketData.getData().size(), 10);
     EXPECT_EQ(cut.isValidPrice(order, marketData), false);
+}
+
+TEST_F(OrderValidatorTests, GivenWeHaveAValidQuantity_WeValidateCorrectly)
+{
+    GivenWeHaveABuyOrder();
+    EXPECT_EQ(cut.isValidQuantity(order), true);
+}
+
+TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidQuantity_WeValidateCorrectly)
+{
+    GivenWeHaveAnInvalidOrder();
+    EXPECT_EQ(cut.isValidQuantity(order), false);
+}
+
+TEST_F(OrderValidatorTests, GivenPriceAboveStopLoss_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveABuyOrder();
+    EXPECT_EQ(cut.checkStopLoss(order, marketData), true);
+}
+
+TEST_F(OrderValidatorTests, GivenPriceBelowStopLoss_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveAnInvalidOrder();
+    EXPECT_EQ(cut.checkStopLoss(order, marketData), false);
 }
