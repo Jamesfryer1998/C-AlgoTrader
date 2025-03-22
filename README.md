@@ -10,6 +10,13 @@ This script builds and runs the trading system. Ensure all dependencies are inst
 
 ---
 
+## **To Debug Crash**  
+```sh
+lldb ./build/app/algo_trader_app
+run
+bt
+```  
+
 ## **Architecture**  
 
 ### **System Overview**  

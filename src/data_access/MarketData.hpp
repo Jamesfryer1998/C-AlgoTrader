@@ -15,7 +15,7 @@ class MarketData
         std::vector<MarketCondition> getData() const;
         string generateFilePath(json configData);
         string getProjectRoot();
-        float getLastPrice();
+        float getLastClosePrice();
 
     private:
         std::vector<MarketCondition> data;

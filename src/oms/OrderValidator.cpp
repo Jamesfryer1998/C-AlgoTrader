@@ -27,6 +27,8 @@ OrderValidator::setParams(json configData)
 
 bool OrderValidator::validateOrder(const Order& order, MarketData& marketData)
 {
+    
+    
     if (!isValidOrderType(order)) return false;
     if (!isValidPrice(order, marketData)) return false;
     if (!isValidQuantity(order)) return false;
@@ -38,7 +40,7 @@ bool OrderValidator::validateOrder(const Order& order, MarketData& marketData)
     return true;  // Passes all checks
 }
 
-bool 
+bool
 OrderValidator::isValidOrderType(const Order& order)
 {
     return (order.getType() == "BUY" ||
@@ -48,7 +50,7 @@ OrderValidator::isValidOrderType(const Order& order)
 bool
 OrderValidator::isValidPrice(const Order& order, MarketData& marketData)
 {
-    return (order.getPrice()!= 0);
+    return (order.getPrice() == marketData.getLastClosePrice());
 }
 
 bool
@@ -70,7 +72,7 @@ OrderValidator::checkStopLoss(const Order& order, MarketData& marketData)
     // When creating a order from a strategy, set the stop loss, this will be a %
     // E.g. price of 100, stop loss of 10%, stop_loss_price = 90
     return (order.getStopLossPrice() == 0 ||
-            order.getStopLossPrice()!= marketData.getLastPrice());
+            order.getStopLossPrice()!= marketData.getLastClosePrice());
 }
 
 bool

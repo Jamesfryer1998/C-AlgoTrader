@@ -63,7 +63,7 @@ MarketData::getProjectRoot()
 }
 
 float
-MarketData::getLastPrice()
+MarketData::getLastClosePrice()
 {
-    return data[-1].Close;
+    return data.back().Close;
 }

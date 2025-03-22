@@ -25,7 +25,7 @@ public:
                 "BUY",
                 "AAPL",
                 100.0,
-                120.0};
+                109.0};
     }
 
     void GivenWeHaveASellOrder()
@@ -34,7 +34,7 @@ public:
                 "SELL",
                 "AAPL",
                 100.0,
-                120.0};
+                109.0};
     }
 
     void GivenWeHaveAnInvalidOrder()
@@ -46,8 +46,15 @@ public:
                 120.0};
     }
 
+    void GivenWeHaveMarketData()
+    {
+        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/data_access_tests/test_data/market_data_test_1.csv";
+        marketData.loadData(dataFilePath);
+    }
+
     Order order;
     json algoTestConfig;
+    MarketData marketData;
 
 };
 
@@ -79,8 +86,20 @@ TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidOrderType_WeValidateCorrectly)
     EXPECT_EQ(cut.isValidOrderType(order), false);
 }
 
-// TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidOrderType_WeValidateCorrectly)
-// {
-//     GivenWeHaveABuyOrder();
-//     EXPECT_EQ(cut.isValidPrice(order), false);
-// }
+TEST_F(OrderValidatorTests, GivenWeHaveAValidPrice_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveABuyOrder();
+
+    EXPECT_EQ(marketData.getData().size(), 10);
+    EXPECT_EQ(cut.isValidPrice(order, marketData), true);
+}
+
+TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidPrice_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveAnInvalidOrder();
+
+    EXPECT_EQ(marketData.getData().size(), 10);
+    EXPECT_EQ(cut.isValidPrice(order, marketData), false);
+}
