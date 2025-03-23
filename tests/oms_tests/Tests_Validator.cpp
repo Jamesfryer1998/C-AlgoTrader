@@ -28,9 +28,6 @@ public:
                 "AAPL",
                 10,
                 109.0};
-
-        order.setStopLoss(10);
-        order.setTakeProfit(10);
     }
 
     void GivenWeHaveASellOrder()
@@ -48,10 +45,7 @@ public:
                 "SELLING",
                 "AAPL",
                 20,
-                120.0};
-
-        order.setStopLoss(10);
-        order.setTakeProfit(10);
+                111.23};
     }
 
     void GivenWeHaveMarketData()
@@ -128,12 +122,64 @@ TEST_F(OrderValidatorTests, GivenPriceAboveStopLoss_WeValidateCorrectly)
 {
     GivenWeHaveMarketData();
     GivenWeHaveABuyOrder();
+    order.setStopLoss(10);
+    
     EXPECT_EQ(cut.checkStopLoss(order, marketData), true);
 }
 
-TEST_F(OrderValidatorTests, GivenPriceBelowStopLoss_WeValidateCorrectly)
+TEST_F(OrderValidatorTests, GivenPriceAboveTakeProfit_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveABuyOrder();
+    order.setTakeProfit(10);
+    
+    EXPECT_EQ(cut.checkTakeProfit(order, marketData), true);
+}
+
+TEST_F(OrderValidatorTests, GivenPriceWithinSlippageTollerance_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveABuyOrder();
+    
+    EXPECT_EQ(cut.checkSlippage(order, marketData), true);
+}
+
+TEST_F(OrderValidatorTests, GivenPriceOutOfSlippageTollerance_WeValidateCorrectly)
 {
     GivenWeHaveMarketData();
     GivenWeHaveAnInvalidOrder();
-    EXPECT_EQ(cut.checkStopLoss(order, marketData), false);
+    
+    EXPECT_EQ(cut.checkSlippage(order, marketData), false);
+}
+
+TEST_F(OrderValidatorTests, GivenWeHaveValidPositionSize_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveABuyOrder();
+    
+    EXPECT_EQ(cut.checkMaxPositionSize(order), true);
+}
+
+TEST_F(OrderValidatorTests, GivenWeHaveInvalidPositionSize_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveAnInvalidOrder();
+    
+    EXPECT_EQ(cut.checkMaxPositionSize(order), false);
+}
+
+TEST_F(OrderValidatorTests, GivenWeHaveAValidOrder_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveABuyOrder();
+    
+    EXPECT_EQ(cut.validateOrder(order, marketData), true);
+}
+
+TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidOrder_WeValidateCorrectly)
+{
+    GivenWeHaveMarketData();
+    GivenWeHaveAnInvalidOrder();
+    
+    EXPECT_EQ(cut.validateOrder(order, marketData), false);
 }
