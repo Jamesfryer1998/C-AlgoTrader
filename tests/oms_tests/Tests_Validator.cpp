@@ -45,7 +45,7 @@ public:
                 "SELLING",
                 "AAPL",
                 20,
-                111.23};
+                120.00};
     }
 
     void GivenWeHaveMarketData()
