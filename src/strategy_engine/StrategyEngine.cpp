@@ -13,17 +13,18 @@ StrategyEngine::~StrategyEngine()
 
 
 void 
-StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData &marketdata)
+StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData &marketdata, BrokerBase* broker)
 {    
     std::cout << "Setting up Strategy Engine..." << std::endl;
     configData = configdata;
-    oms->setConfig(configData);
+    oms->setUp(configData, broker);
     strategyList = stratFactory.generateStrategies();
     marketData = marketdata;
 
     std::cout << "  --> Config Data set" << std::endl;
     std::cout << "  --> OMS set" << std::endl;
-    std::cout << "  --> Strategies generates" << std::endl;
+    std::cout << "  --> Broker set" << broker->brokerName << std::endl;
+    std::cout << "  --> Strategies generated" << std::endl;
     std::cout << "  --> MarketData set\n" << std::endl;
 
     printStategies();

@@ -13,6 +13,7 @@ class MarketCondition
         int _volume,
         std::string _timeInterval);
 
+       MarketCondition(){};
        ~MarketCondition();
 
         bool IsValid() const

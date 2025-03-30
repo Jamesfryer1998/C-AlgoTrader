@@ -4,6 +4,7 @@
 #include "Position.hpp"
 #include "../data_access/MarketData.hpp"
 #include "OrderValidator.hpp"
+#include "../broker/BrokerBase.hpp"
 
 using namespace std;
 
@@ -23,9 +24,10 @@ class OrderManagement
         void reset() { orders.clear(); positions.clear(); };
         void onNewOrder(Order& order);
         void onOrderExecuted(Order& order);
-        void setConfig(json configdata) 
+        void setUp(json configdata, BrokerBase* Broker) 
         {
             validator.setParams(configdata);
+            broker = Broker;
         };
         void setMarketData(MarketData marketdata) { marketData = marketdata;};
 
@@ -35,6 +37,5 @@ class OrderManagement
         vector<Position> positions;
         MarketData marketData;
         OrderValidator validator;
-        // OrderValidator* validator;
-        // BrokerAPI = broker;
+        BrokerBase* broker;
 };

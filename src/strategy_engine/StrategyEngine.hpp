@@ -3,6 +3,7 @@
 #include "../oms/OrderManagement.hpp"
 #include "../data_access/MarketData.hpp"
 #include "StrategyFactory.hpp"
+#include "../broker/BrokerBase.hpp"
 
 
 class StrategyEngine
@@ -12,7 +13,7 @@ class StrategyEngine
         ~StrategyEngine();
 
         void run();
-        void setUp(json configData, StrategyFactory &stratFilePath, MarketData &marketdata);
+        void setUp(json configData, StrategyFactory &stratFilePath, MarketData &marketdata, BrokerBase* broker);
 
         void setMarketData(MarketData& inputData);
         OrderManagement* getOms() { return oms;};

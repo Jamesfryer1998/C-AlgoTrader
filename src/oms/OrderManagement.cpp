@@ -52,7 +52,11 @@ void OrderManagement::onNewOrder(Order& order)
         addOrder(order);
 
         // connect with Broker API to place order here
-        // BrokerAPI api;
+        // if (broker->placeOrder(order))
+        // {
+        //     Position newPosition = broker->getLatestPosition(order.getTicker());
+        //     addPosition(newPosition);
+        // }
     }
 }
 

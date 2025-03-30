@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../../src/strategy_engine/StrategyEngine.hpp"
+#include "../../src/broker/SimulatedBroker.hpp"
 
 
 class StrategyEngineTests : public ::testing::Test {
@@ -32,7 +33,8 @@ TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
     string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies.json";
     MarketData marketData;
     StrategyFactory stratFactory(stratFilePath);
-    cut.setUp(jsonConfig, stratFactory, marketData);
+    SimulatedBroker broker(marketData);
+    cut.setUp(jsonConfig, stratFactory, marketData, &broker);
 }
 
 

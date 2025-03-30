@@ -15,11 +15,11 @@ class BrokerBase
         virtual int disconnect() = 0;
         virtual float getLatestPrice(std::string ticker) = 0;
         virtual void placeOrder(Order order) = 0;
-        virtual void getLatestPosition(std::string ticker) = 0;
-        virtual Position returnPosition(std::string ticker) = 0;
+        virtual Position getLatestPosition(std::string ticker) = 0;
+
+        std::string brokerName;
 
     private:
-
         bool connected;
 
 };

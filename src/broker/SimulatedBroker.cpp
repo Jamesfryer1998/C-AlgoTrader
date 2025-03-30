@@ -1,13 +1,25 @@
 #include "SimulatedBroker.hpp"
 
-SimulatedBroker::SimulatedBroker()
+SimulatedBroker::SimulatedBroker(MarketData marketdata)
+: marketData(marketdata)
 {
-
+    connect();
+    step = 30;
 }
 
 SimulatedBroker::~SimulatedBroker()
 {
     disconnect();
+}
+
+void
+SimulatedBroker::process()
+{
+    currentCondition = marketData.getData()[step];
+    std::cout<<"before"<< std::endl;
+
+    simulationTime = currentCondition.DateTime;  // Set to first market data time
+    std::cout<<"after"<< std::endl;
 }
 
 int
@@ -27,23 +39,43 @@ SimulatedBroker::disconnect()
 float 
 SimulatedBroker::getLatestPrice(std::string ticker)
 {
-    return 0;
+    return currentCondition.Close;
 }
 
 void 
 SimulatedBroker::placeOrder(Order order)
 {
+    float latestPrice = getLatestPrice(order.getTicker());
+    orders.push_back(order);
 
+    Position position{
+        order.getTicker(),
+        order.getQuantity(),
+        latestPrice
+    };
+
+    positions.push_back(position);
 }
 
-void
+Position
 SimulatedBroker::getLatestPosition(std::string ticker)
 {
-    return;
+    return positions.back();
 }
 
-Position 
-SimulatedBroker::returnPosition(std::string ticker)
+void SimulatedBroker::nextStep()
 {
-    return Position();
+    process();
+    
+    if (static_cast<size_t>(step+1) >= marketData.getData().size()) {
+        std::cout << "Simulation finished." << std::endl;
+        return;
+    }
+
+    // Move to the next market condition
+    step++;
+    currentCondition = marketData.getData()[step];
+
+    // Advance the simulation time to match market data
+    simulationTime = currentCondition.DateTime;
 }
