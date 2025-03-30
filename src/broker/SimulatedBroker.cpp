@@ -3,6 +3,7 @@
 SimulatedBroker::SimulatedBroker(MarketData marketdata)
 : marketData(marketdata)
 {
+    brokerName = "Simulated";
     connect();
     step = 30;
 }
@@ -15,13 +16,15 @@ SimulatedBroker::~SimulatedBroker()
 void
 SimulatedBroker::process()
 {
+    if(marketData.getData().size() == 0)
+    {
+        throw std::runtime_error("No market data found");
+        return;
+    }
+
     currentCondition = marketData.getData()[step];
-    std::cout<<"before"<< std::endl;
-
-    simulationTime = currentCondition.DateTime;  // Set to first market data time
-    std::cout<<"after"<< std::endl;
+    simulationTime = currentCondition.DateTime;
 }
-
 int
 SimulatedBroker::connect()
 {

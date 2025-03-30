@@ -23,7 +23,7 @@ StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData
 
     std::cout << "  --> Config Data set" << std::endl;
     std::cout << "  --> OMS set" << std::endl;
-    std::cout << "  --> Broker set" << broker->brokerName << std::endl;
+    std::cout << "  --> Broker set " << broker->brokerName << std::endl;
     std::cout << "  --> Strategies generated" << std::endl;
     std::cout << "  --> MarketData set\n" << std::endl;
 

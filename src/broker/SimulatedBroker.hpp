@@ -15,11 +15,8 @@ class SimulatedBroker : public BrokerBase {
         std::string getBrokerName() { return brokerName; };
         void process();
 
-        std::string brokerName = "Simulated";
-
     private:
         MarketCondition currentCondition;
-    
         MarketData marketData;
         std::vector<Order> orders;
         std::vector<Position> positions;
