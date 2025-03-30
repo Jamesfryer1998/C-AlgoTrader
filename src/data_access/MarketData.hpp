@@ -16,8 +16,14 @@ class MarketData
         string generateFilePath(json configData);
         string getProjectRoot();
         float getLastClosePrice();
+        void rewind();
+        bool hasNext();
+        void next();
 
     private:
         std::vector<MarketCondition> data;
+        std::vector<MarketCondition> backtestData;
+        MarketCondition currentData;
+        int currentIndex;
         static std::string const FILE_PATH;
 };

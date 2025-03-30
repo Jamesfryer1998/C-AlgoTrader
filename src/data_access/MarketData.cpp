@@ -67,3 +67,24 @@ MarketData::getLastClosePrice()
 {
     return data.back().Close;
 }
+
+void 
+MarketData::rewind() 
+{
+    currentIndex = 0;
+}
+
+bool 
+MarketData::hasNext() 
+{
+    return static_cast<size_t>(currentIndex) < backtestData.size();
+}
+
+void 
+MarketData::next() 
+{
+    if (hasNext()) {
+        currentData = backtestData[currentIndex];
+        currentIndex++;
+    }
+}
