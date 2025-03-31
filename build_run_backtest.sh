@@ -37,7 +37,13 @@ echo -e "${GREEN}✅ Build successful!${NC}"
 
 echo -e "\n${BLUE}==================== Running Backtester ====================\n${NC}"
 
-# Run the backtester with any command line arguments passed to this script
-./build/app/backtest_app $@
+# Add default arguments to use all cores if no threads are specified
+ARGS=$@
+if [[ ! $ARGS =~ "--threads" ]]; then
+    ARGS="$ARGS --threads $NUM_CORES"
+fi
+
+# Run the backtester with command line arguments
+./build/app/backtest_app $ARGS
 
 echo -e "\n${GREEN}✅ Backtester execution complete!${NC}"

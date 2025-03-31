@@ -81,7 +81,9 @@
         "utility": "cpp",
         "numeric": "cpp",
         "valarray": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "regex": "cpp",
+        "future": "cpp"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }

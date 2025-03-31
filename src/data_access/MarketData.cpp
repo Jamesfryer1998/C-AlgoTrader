@@ -2,12 +2,15 @@
 #include <filesystem>
 #include <chrono>
 #include <thread>
+#include <future>
+#include <iomanip>
+#include <sstream>
 #include "MarketData.hpp"
 #include "../util/Config.hpp"
 #include "../util/DateTimeConversion.hpp"
 
-
 MarketData::MarketData() 
+: currentIndex(0)
 {
 }
 
@@ -21,6 +24,145 @@ MarketData::process(json configData)
     std::cout << "Processing Market Data" << std::endl;
     string filePath = generateFilePath(configData);
     loadData(filePath);
+}
+
+void
+MarketData::processForBacktest(json configData, const std::string& startDate, const std::string& endDate)
+{
+    std::cout << "Processing Market Data for backtesting from " << startDate << " to " << endDate << std::endl;
+    
+    // Get ticker from config
+    std::string ticker = configData["ticker"];
+    
+    // Get data directory
+    std::string dataDir = getDataDirectory();
+    
+    // Create a data stitcher
+    DataStitcher stitcher(dataDir, ticker);
+    
+    // Get stitched data
+    std::vector<MarketCondition> stitchedData = stitcher.getStitchedData(startDate, endDate);
+    
+    // Update our data with the stitched data
+    update(stitchedData);
+    
+    // If no data was found, try loading a single file as fallback
+    if (data.empty()) {
+        std::cout << "No stitched data found, falling back to single file" << std::endl;
+        string filePath = generateFilePath(configData);
+        loadData(filePath);
+    }
+    
+    // Sort data by datetime
+    std::sort(data.begin(), data.end(), 
+              [](const MarketCondition& a, const MarketCondition& b) {
+                  return a.DateTime < b.DateTime;
+              });
+    
+    std::cout << "Loaded " << data.size() << " market data points for backtesting" << std::endl;
+}
+
+void
+MarketData::processParallel(json configData, int numThreads)
+{
+    // If numThreads is 0, use the number of hardware threads available
+    if (numThreads <= 0) {
+        numThreads = std::thread::hardware_concurrency();
+    }
+    
+    std::cout << "Processing Market Data in parallel using " << numThreads << " threads" << std::endl;
+    
+    // Get ticker and date range from config
+    std::string ticker = configData["ticker"];
+    
+    // Default to last 7 days if not specified
+    std::string endDate = DateTimeConversion().timeNowToDate();
+    
+    // Calculate start date (7 days before end date)
+    auto now = std::chrono::system_clock::now();
+    auto startTime = now - std::chrono::hours(24 * 7);
+    auto startTimeT = std::chrono::system_clock::to_time_t(startTime);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
+    std::string startDate = ss.str();
+    
+    // Check if date range is specified in config
+    if (configData.contains("backtest_start_date") && configData.contains("backtest_end_date")) {
+        startDate = configData["backtest_start_date"];
+        endDate = configData["backtest_end_date"];
+    }
+    
+    // Get data directory
+    std::string dataDir = getDataDirectory();
+    
+    // Create a data stitcher
+    DataStitcher stitcher(dataDir, ticker);
+    
+    // Find all files in the date range
+    std::vector<std::string> files = stitcher.findFilesInRange(startDate, endDate);
+    
+    if (files.empty()) {
+        std::cerr << "No data files found for ticker " << ticker 
+                  << " between " << startDate << " and " << endDate << std::endl;
+        return;
+    }
+    
+    // Distribute files across threads
+    std::vector<std::vector<std::string>> fileGroups(numThreads);
+    for (size_t i = 0; i < files.size(); ++i) {
+        fileGroups[i % numThreads].push_back(files[i]);
+    }
+    
+    // Create thread pool
+    std::vector<std::future<std::vector<MarketCondition>>> futures;
+    
+    // Launch threads
+    for (int i = 0; i < numThreads; ++i) {
+        futures.push_back(std::async(std::launch::async, [this, fileGroups, i]() {
+            std::vector<MarketCondition> threadData;
+            
+            for (const auto& file : fileGroups[i]) {
+                CSVParser parser;
+                parser.Read(file);
+                auto fileData = parser.GetData();
+                
+                // Append this file's data to thread's data
+                threadData.insert(threadData.end(), fileData.begin(), fileData.end());
+            }
+            
+            return threadData;
+        }));
+    }
+    
+    // Collect results
+    std::vector<MarketCondition> allData;
+    for (auto& future : futures) {
+        auto threadData = future.get();
+        allData.insert(allData.end(), threadData.begin(), threadData.end());
+    }
+    
+    // Remove duplicates by creating a map keyed by datetime
+    std::map<std::string, MarketCondition> uniqueData;
+    for (const auto& condition : allData) {
+        uniqueData[condition.DateTime] = condition;
+    }
+    
+    // Convert back to vector
+    allData.clear();
+    for (const auto& pair : uniqueData) {
+        allData.push_back(pair.second);
+    }
+    
+    // Sort by datetime
+    std::sort(allData.begin(), allData.end(), 
+              [](const MarketCondition& a, const MarketCondition& b) {
+                  return a.DateTime < b.DateTime;
+              });
+    
+    // Update our data
+    update(allData);
+    
+    std::cout << "Loaded " << data.size() << " market data points in parallel" << std::endl;
 }
 
 void
@@ -62,9 +204,18 @@ MarketData::getProjectRoot()
     return exePath.string();
 }
 
+string
+MarketData::getDataDirectory()
+{
+    return getProjectRoot() + "/data";
+}
+
 float
 MarketData::getLastClosePrice()
 {
+    if (data.empty()) {
+        throw std::runtime_error("No market data available");
+    }
     return data.back().Close;
 }
 
@@ -78,19 +229,20 @@ MarketData::rewind()
 bool 
 MarketData::hasNext() 
 {
-    std::cout << "Checking if we have more data..." << std::endl;
-    std::cout << "we have " << data.size()  << std::endl;
     return static_cast<size_t>(currentIndex) < data.size();
 }
 
 void 
 MarketData::next() 
 {
-    std::cout << "Processing next data..." << std::endl;
-
     if (hasNext()) {
         currentData = data[currentIndex];
         currentIndex++;
-        std::cout << "On timestamp: " << currentData.DateTime <<  std::endl;
+        
+        // Only output every 100th message to avoid console spam
+        if (currentIndex % 100 == 0 || currentIndex == 1) {
+            std::cout << "Processing data point " << currentIndex << "/" << data.size() 
+                      << " - " << currentData.DateTime << std::endl;
+        }
     }
 }

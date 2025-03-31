@@ -43,6 +43,8 @@ public:
     void setDataTimeframe(const std::string& timeframe);
     void enableDetailedLogging(bool enable);
     void saveResultsToFile(const std::string& filename);
+    void setDateRange(const std::string& startDate, const std::string& endDate);
+    void setNumThreads(int threads);
     
     // Result access methods
     const PerformanceMetrics& getPerformanceMetrics() const;
@@ -58,6 +60,9 @@ private:
     json algoConfig;
     bool detailedLogging;
     std::string resultsFilename;
+    std::string startDate;
+    std::string endDate;
+    int numThreads;
     
     // Performance tracking
     PerformanceMetrics metrics;

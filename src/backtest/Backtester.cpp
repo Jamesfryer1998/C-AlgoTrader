@@ -10,21 +10,30 @@ Backtester::Backtester(const json& algoConfig)
           stratEngine(),
           algoConfig(algoConfig),
           detailedLogging(false),
-          resultsFilename("")
+          resultsFilename(""),
+          numThreads(0) // 0 means use all available cores
 {
     // Initialize the performance metrics
     metrics = PerformanceMetrics();
-    
-    // Process market data
-    marketData.process(algoConfig);
-    
-    // Set up strategy engine
-    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
     
     // Configure the broker with default settings
     broker.setStartingCapital(100000.0);
     broker.setCommission(1.0);
     broker.setSlippage(0.0005);
+    
+    // Default date range (last 7 days)
+    auto now = std::chrono::system_clock::now();
+    auto endTimeT = std::chrono::system_clock::to_time_t(now);
+    auto startTimeT = endTimeT - (7 * 24 * 60 * 60); // 7 days earlier
+    
+    std::stringstream ssEnd, ssStart;
+    ssEnd << std::put_time(std::localtime(&endTimeT), "%Y-%m-%d");
+    ssStart << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
+    
+    endDate = ssEnd.str();
+    startDate = ssStart.str();
+    
+    std::cout << "Default date range: " << startDate << " to " << endDate << std::endl;
 }
 
 void Backtester::setStartingCapital(double capital) {
@@ -47,13 +56,35 @@ void Backtester::saveResultsToFile(const std::string& filename) {
     resultsFilename = filename;
 }
 
+void Backtester::setDateRange(const std::string& start, const std::string& end) {
+    startDate = start;
+    endDate = end;
+    std::cout << "Set backtest date range: " << startDate << " to " << endDate << std::endl;
+}
+
+void Backtester::setNumThreads(int threads) {
+    numThreads = threads;
+}
+
 void 
 Backtester::run() 
 {
-    std::cout << "Starting backtest..." << std::endl;
+    std::cout << "Starting backtest from " << startDate << " to " << endDate << "..." << std::endl;
     
     // Record start time
     auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Process market data with date range and parallel processing
+    if (numThreads > 0) {
+        std::cout << "Using " << numThreads << " threads for processing" << std::endl;
+        marketData.processParallel(algoConfig, numThreads);
+    } else {
+        std::cout << "Using all available cores for processing" << std::endl;
+        marketData.processForBacktest(algoConfig, startDate, endDate);
+    }
+    
+    // Set up strategy engine
+    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
     
     // Initialize backtest
     initializeBacktest();
@@ -61,11 +92,35 @@ Backtester::run()
     // Main backtest loop
     marketData.rewind(); // Start at the beginning of historical data
     
+    if (marketData.getData().empty()) {
+        std::cerr << "Error: No market data available for backtesting" << std::endl;
+        return;
+    }
+    
     // Log initial state
     equityCurve.push_back({marketData.getData()[0].DateTime, broker.getCurrentEquity()});
     
+    // Count how many data points we'll process
+    size_t totalDataPoints = marketData.getData().size();
+    std::cout << "Processing " << totalDataPoints << " market data points" << std::endl;
+    
+    // Progress tracking
+    size_t lastProgress = 0;
+    size_t progressStep = totalDataPoints / 20; // Show progress in 5% increments
+    if (progressStep == 0) progressStep = 1;
+    
     while (marketData.hasNext()) { // Ensure historical data exists
         executeTimeStep();
+        
+        // Show progress
+        size_t currentIndex = marketData.getCurrentIndex();
+        if (currentIndex - lastProgress >= progressStep) {
+            int progressPercent = static_cast<int>((static_cast<double>(currentIndex) / totalDataPoints) * 100);
+            std::cout << "Progress: " << progressPercent << "% ("
+                      << currentIndex << "/" << totalDataPoints << " data points)"
+                      << std::endl;
+            lastProgress = currentIndex;
+        }
     }
     
     // Record end time and calculate duration
@@ -115,7 +170,7 @@ Backtester::executeTimeStep()
     logPerformance();
     
     // Add to equity curve using current timestamp
-    std::string timestamp = marketData.getData()[broker.getStep()].DateTime;
+    std::string timestamp = marketData.getCurrentData().DateTime;
     equityCurve.push_back({timestamp, broker.getCurrentEquity()});
     
     // Calculate daily return and add to returns vector (if equity has changed)
