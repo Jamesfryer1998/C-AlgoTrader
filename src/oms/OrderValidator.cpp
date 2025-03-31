@@ -25,6 +25,7 @@ bool OrderValidator::validateOrder(const Order& order, MarketData& marketData)
     if(!isValidQuantity(order)) return false;
     if(!checkMaxPositionSize(order)) return false;
     if(!checkStopLoss(order, marketData)) return false;
+    if(!checkTakeProfit(order, marketData)) return false;
     // if(!checkTickSize(order, marketData))) return false;
     if(!checkSlippage(order, marketData)) return false;
 

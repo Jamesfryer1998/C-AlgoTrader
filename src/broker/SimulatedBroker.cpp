@@ -18,7 +18,18 @@ SimulatedBroker::SimulatedBroker(MarketData& marketdata)
     totalTrades = 0;
     step = 0;
     
+    // Random seed initialization
+    useFixedSeed = false;
+    randomSeed = 42; // Default seed
+    
     connect();
+}
+
+void SimulatedBroker::enableFixedRandomSeed(unsigned int seed)
+{
+    useFixedSeed = true;
+    randomSeed = seed;
+    std::cout << "Using fixed random seed: " << seed << " for deterministic testing" << std::endl;
 }
 
 SimulatedBroker::~SimulatedBroker()
@@ -137,11 +148,24 @@ SimulatedBroker::executeOrder(Order& order)
     float basePrice = getLatestPrice(order.getTicker());
     
     // Apply random slippage based on configuration
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> slippageDist(-slippagePercentage, slippagePercentage);
+    double slippageMultiplier = 1.0;
     
-    double slippageMultiplier = 1.0 + slippageDist(gen);
+    if (slippagePercentage > 0.0) {
+        std::mt19937 gen;
+        
+        if (useFixedSeed) {
+            // Use fixed seed for tests
+            gen.seed(randomSeed);
+        } else {
+            // Use random seed for real trading
+            std::random_device rd;
+            gen.seed(rd());
+        }
+        
+        std::uniform_real_distribution<> slippageDist(-slippagePercentage, slippagePercentage);
+        slippageMultiplier = 1.0 + slippageDist(gen);
+    }
+    
     double executionPrice = basePrice * slippageMultiplier;
     
     // For limit orders, check price constraints
@@ -278,7 +302,7 @@ SimulatedBroker::checkStopLosses()
                               << " at $" << currentPrice << std::endl;
                     
                     // Create stop loss order
-                    Order stopOrder("sell", ticker, position.getQuantity(), currentPrice);
+                    Order stopOrder(OrderType::SELL, ticker, position.getQuantity(), currentPrice);
                     placeOrder(stopOrder);
                     
                     // Break after creating the first stop loss order for this position
@@ -308,7 +332,7 @@ SimulatedBroker::checkTakeProfits()
                               << " at $" << currentPrice << std::endl;
                     
                     // Create take profit order
-                    Order tpOrder("sell", ticker, position.getQuantity(), currentPrice);
+                    Order tpOrder(OrderType::SELL, ticker, position.getQuantity(), currentPrice);
                     placeOrder(tpOrder);
                     
                     // Break after creating the first take profit order for this position

@@ -10,6 +10,9 @@ class SimulatedBroker : public BrokerBase {
     public:
         SimulatedBroker(MarketData& marketdata); 
         ~SimulatedBroker();
+        
+        // For testing - allows setting a fixed random seed for deterministic tests
+        void enableFixedRandomSeed(unsigned int seed);
 
         // BrokerBase interface implementation
         int connect() override;
@@ -50,6 +53,11 @@ class SimulatedBroker : public BrokerBase {
         void checkStopLosses();
         void checkTakeProfits();
         void updatePortfolioValue();
+        
+        // For testing
+        void setRandomSeed(unsigned int seed);
+        bool useFixedSeed;
+        unsigned int randomSeed;
         
         // Market data
         MarketCondition currentCondition;
