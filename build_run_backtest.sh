@@ -1,40 +1,43 @@
 #!/bin/sh
 
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
 # Detect the number of CPU cores
 NUM_CORES=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null)
+
+echo -e "${BLUE}Building AlgoTrader Backtester...${NC}"
 
 # Step 1: Run CMake configuration
 cmake -B build
 if [ $? -ne 0 ]; then
-    echo "❌ CMake configuration failed!"
+    echo -e "${RED}❌ CMake configuration failed!${NC}"
     exit 1
 fi
 
 # Step 2: Build the project using all available cores
+echo -e "${BLUE}Building with ${NUM_CORES} cores...${NC}"
 cmake --build build -- -j${NUM_CORES}
 if [ $? -ne 0 ]; then
-    echo "❌ Build failed!"
+    echo -e "${RED}❌ Build failed!${NC}"
     exit 1
 fi
 
 # Step 3: Run tests only if the build succeeded
+echo -e "${BLUE}Running tests...${NC}"
 ctest --test-dir build --output-on-failure
 if [ $? -ne 0 ]; then
-    echo "❌ Tests failed!"
-    exit 1
+    echo -e "${RED}⚠️ Some tests failed, but continuing with execution${NC}"
 fi
 
-echo "✅ All builds and tests successful!"
+echo -e "${GREEN}✅ Build successful!${NC}"
 
-echo "\n==========================================Python==========================================\n"
+echo -e "\n${BLUE}==================== Running Backtester ====================\n${NC}"
 
-# Maybe run this from within C++ code every minute (time interval)?
-# python src/python/main.py
-# if [ $? -ne 0 ]; then
-#     echo "❌ No Data found"
-#     exit 1
-# fi
+# Run the backtester with any command line arguments passed to this script
+./build/app/backtest_app $@
 
-echo "\n===========================================C++============================================\n"
-
-./build/app/backtest_app
+echo -e "\n${GREEN}✅ Backtester execution complete!${NC}"

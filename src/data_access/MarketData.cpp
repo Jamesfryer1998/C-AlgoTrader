@@ -89,7 +89,7 @@ MarketData::next()
     std::cout << "Processing next data..." << std::endl;
 
     if (hasNext()) {
-        currentData = backtestData[currentIndex];
+        currentData = data[currentIndex];
         currentIndex++;
         std::cout << "On timestamp: " << currentData.DateTime <<  std::endl;
     }
