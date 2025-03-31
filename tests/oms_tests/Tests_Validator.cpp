@@ -24,7 +24,7 @@ public:
     void GivenWeHaveABuyOrder()
     {
         order = Order{
-                "BUY",
+                OrderType::BUY,
                 "AAPL",
                 10,
                 109.0};
@@ -33,7 +33,7 @@ public:
     void GivenWeHaveASellOrder()
     {
         order = Order{
-                "SELL",
+                OrderType::SELL,
                 "AAPL",
                 10,
                 109.0};
@@ -41,11 +41,22 @@ public:
 
     void GivenWeHaveAnInvalidOrder()
     {
-        order = Order{
-                "SELLING",
-                "AAPL",
-                20,
-                120.00};
+        // We'll create an order with string and use an invalid type
+        try {
+            order = Order{
+                    "SELLING", // Invalid type that will throw an exception
+                    "AAPL",
+                    20,
+                    120.00};
+        } catch (const std::runtime_error& e) {
+            // Set order type to UNKNOWN which should be invalid
+            order = Order{
+                    "AAPL",
+                    "AAPL",  // Using ticker as type will be converted to BUY
+                    20,
+                    120.00};
+            order.setType(OrderType::UNKNOWN);
+        }
     }
 
     void GivenWeHaveMarketData()

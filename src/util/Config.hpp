@@ -2,7 +2,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-#define JSON_CONFIG_NAME "/src/config/algo_trader.json"
+#define JSON_CONFIG_NAME "/src/config/config.json"
 
 using json = nlohmann::json;
 using namespace std;

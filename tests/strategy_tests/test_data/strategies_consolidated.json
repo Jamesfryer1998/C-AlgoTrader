@@ -3,19 +3,14 @@
     "collectInterval": "1m",
     "marketDataBasePath": "data/",
     "baseDataFileName": "marketData",
-    "ticker": "NVDA",
-    "max_position_size": 10.0,
-    "max_exposure": 5.0,
-    "slippage_tolerance": 2.0,
+    "ticker": "AAPL",
     "strategies": [
         {
             "name": "RSI",
             "active": 1,
             "period": 14,
             "overbought_threshold": 70.0,
-            "oversold_threshold": 30.0,
-            "stop_loss": 5,
-            "take_profit": 10
+            "oversold_threshold": 30.0
         },
         {
             "name": "MACD",

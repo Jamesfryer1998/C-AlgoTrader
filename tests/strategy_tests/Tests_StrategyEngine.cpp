@@ -30,7 +30,8 @@ TEST_F(StrategyEngineTests, CanInstantiate)
 
 TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
 {
-    string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies.json";
+    // Use consolidated config file
+    string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies_consolidated.json";
     MarketData marketData;
     StrategyFactory stratFactory(stratFilePath);
     SimulatedBroker broker(marketData);
@@ -40,11 +41,12 @@ TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
 
 // When it comes to testing strat engine correclty makes orders
 
-// TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
+// TEST_F(StrategyEngineTests, CanGetOmsFromStrategyEngine)
 // {
-//     string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies.json";
+//     string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies_consolidated.json";
 //     MarketData marketData;
 //     StrategyFactory stratFactory(stratFilePath);
-//     cut.setUp(jsonConfig, stratFactory, marketData);
+//     SimulatedBroker broker(marketData);
+//     cut.setUp(jsonConfig, stratFactory, marketData, &broker);
 //     auto oms = cut.getOms();
 // }

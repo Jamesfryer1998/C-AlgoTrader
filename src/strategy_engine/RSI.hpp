@@ -10,7 +10,8 @@ class RSI : public StrategyBase {
         void execute() override 
         {
             validate();
-            std::cout << "  -> RSI" << std::endl;
+            // std::cout << "  -> RSI" << std::endl;
+            // createOrder(order);
         }
 
         void validate() override
@@ -22,6 +23,12 @@ class RSI : public StrategyBase {
             if(!_strategyAttribute.oversold_threshold)
                 throw std::runtime_error("RSI oversold threshold not set");
         }  
+
+        Order createOrder(Order& order)
+        {
+            NewOrder = true;
+            return order;
+        }
 
         StrategyAttribute getAttributes() { return _strategyAttribute; }
 };

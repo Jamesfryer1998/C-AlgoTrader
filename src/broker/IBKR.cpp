@@ -35,10 +35,10 @@ IBKR::getLatestPrice(std::string ticker)
     return 0;
 }
 
-void 
+int 
 IBKR::placeOrder(Order order)
 {
-
+    return 0;
 }
 
 Position

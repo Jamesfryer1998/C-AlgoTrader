@@ -11,22 +11,22 @@
         {
             "name": "RSI",
             "active": 1,
-            "period": 14,
-            "overbought_threshold": 70.0,
-            "oversold_threshold": 30.0,
-            "stop_loss": 5,
+            "period": 30,
+            "overbought_threshold": 75.0,
+            "oversold_threshold": 25.0,
+            "stop_loss": 10,
             "take_profit": 10
         },
         {
             "name": "MACD",
-            "active": 1,
+            "active": 0,
             "short_period": 12,
             "long_period": 26,
             "signal_period": 9
         },
         {
             "name": "MEANREV",
-            "active": 1,
+            "active": 0,
             "lookback_period": 20,
             "entry_threshold": 2.0,
             "exit_threshold": 0.5,

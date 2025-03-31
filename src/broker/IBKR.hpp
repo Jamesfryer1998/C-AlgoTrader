@@ -8,7 +8,7 @@ class IBKR : public BrokerBase
     int connect();
     int disconnect();
     float getLatestPrice(std::string ticker);
-    void placeOrder(Order order);
+    int placeOrder(Order order);
     Position getLatestPosition(std::string ticker);
 
 };

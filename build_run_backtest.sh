@@ -28,8 +28,11 @@ fi
 
 # Step 3: Run tests only if the build succeeded
 echo -e "${BLUE}Running tests...${NC}"
-ctest --test-dir build --output-on-failure
-if [ $? -ne 0 ]; then
+    ctest --test-dir build --output-on-failure
+    TEST_RESULT=$?
+fi
+
+if [ $TEST_RESULT -ne 0 ]; then
     echo -e "${RED}⚠️ Some tests failed, but continuing with execution${NC}"
 fi
 
@@ -37,13 +40,20 @@ echo -e "${GREEN}✅ Build successful!${NC}"
 
 echo -e "\n${BLUE}==================== Running Backtester ====================\n${NC}"
 
+# Filter out our special flags
+FILTERED_ARGS=()
+for arg in "$@"; do
+    if [ "$arg" != "--debug-backtester-tests" ]; then
+        FILTERED_ARGS+=("$arg")
+    fi
+done
+
 # Add default arguments to use all cores if no threads are specified
-ARGS=$@
-if [[ ! $ARGS =~ "--threads" ]]; then
-    ARGS="$ARGS --threads $NUM_CORES"
+if [[ ! "${FILTERED_ARGS[*]}" =~ "--threads" ]]; then
+    FILTERED_ARGS+=("--threads" "$NUM_CORES")
 fi
 
 # Run the backtester with command line arguments
-./build/app/backtest_app $ARGS
+./build/app/backtest_app "${FILTERED_ARGS[@]}"
 
 echo -e "\n${GREEN}✅ Backtester execution complete!${NC}"

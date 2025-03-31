@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include "StrategyBase.hpp"
 #include "../oms/OrderManagement.hpp"
@@ -13,7 +15,7 @@ class StrategyEngine
         ~StrategyEngine();
 
         void run();
-        void setUp(json configData, StrategyFactory &stratFilePath, MarketData &marketdata, BrokerBase* broker);
+        void setUp(json configData, StrategyFactory &stratFilePath, MarketData &marketdata, BrokerBase* broker, bool backtest=false);
 
         void setMarketData(MarketData& inputData);
         OrderManagement* getOms() { return oms;};
@@ -24,6 +26,7 @@ class StrategyEngine
         void executeStrategies();
         void printStategies();
 
+        bool backtest;
         json configData;
         MarketData marketData;
         static OrderManagement* oms;

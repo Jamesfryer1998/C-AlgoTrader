@@ -14,8 +14,6 @@ class MACD : public StrategyBase {
         void validate() override
         {
             
-            std::cout << "short_period" << _strategyAttribute.short_period<< std::endl;
-
             if(!_strategyAttribute.short_period)
                 throw std::runtime_error("MACD short_period not set");
             if(!_strategyAttribute.long_period)

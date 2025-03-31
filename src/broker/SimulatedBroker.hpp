@@ -1,3 +1,5 @@
+#pragma once
+
 #include "BrokerBase.hpp"
 #include "../data_access/MarketData.hpp"
 #include <map>
@@ -13,7 +15,7 @@ class SimulatedBroker : public BrokerBase {
         int connect() override;
         int disconnect() override;
         float getLatestPrice(std::string ticker) override;
-        void placeOrder(Order order) override;
+        int placeOrder(Order order) override;
         Position getLatestPosition(std::string ticker) override;
         
         // Simulation specific methods
@@ -25,10 +27,14 @@ class SimulatedBroker : public BrokerBase {
         // Performance metrics
         double getPnL() const;
         double getCurrentEquity() const;
+        double getCurrentCash() const { return currentCash; }
         double getStartingCapital() const;
         double getDrawdown() const;
         int getNumTrades() const;
         const std::vector<Order>& getFilledOrders() const;
+        size_t getPendingOrdersCount() const { return pendingOrders.size(); }
+        double getSlippagePercentage() const { return slippagePercentage; }
+        double getCommissionPerTrade() const { return commissionPerTrade; }
         
         // Custom order handling
         void setSlippage(double slippagePerc);

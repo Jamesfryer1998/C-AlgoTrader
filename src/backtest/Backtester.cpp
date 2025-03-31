@@ -6,12 +6,13 @@
 Backtester::Backtester(const json& algoConfig)
         : marketData(), 
           broker(marketData),
-          stratFactory(), 
+          stratFactory(algoConfig), 
           stratEngine(),
           algoConfig(algoConfig),
           detailedLogging(false),
           resultsFilename(""),
-          numThreads(0) // 0 means use all available cores
+          numThreads(0), // 0 means use all available cores
+          useDirectData(false) // Default to file-based data
 {
     // Initialize the performance metrics
     metrics = PerformanceMetrics();
@@ -66,6 +67,31 @@ void Backtester::setNumThreads(int threads) {
     numThreads = threads;
 }
 
+void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
+    std::cout << "Setting mock market data with " << mockData.size() << " data points" << std::endl;
+    
+    // Verify the mock data is not empty
+    if (mockData.empty()) {
+        std::cerr << "ERROR: Attempted to set empty mock data in Backtester::setMarketData!" << std::endl;
+        return;
+    }
+    
+    marketData.update(mockData);
+    
+    // Auto-enable direct data mode when mock data is provided
+    useDirectData = true;
+    
+    // Verify the data was set and reset the current index to the beginning
+    marketData.rewind();
+    std::cout << "Verified market data size: " << marketData.getData().size() << " data points" << std::endl;
+    std::cout << "First data point: " << (marketData.getData().empty() ? "N/A" : marketData.getData()[0].DateTime) << std::endl;
+    std::cout << "Current index after rewind: " << marketData.getCurrentIndex() << std::endl;
+}
+
+void Backtester::useDirectMarketData(bool useDirect) {
+    useDirectData = useDirect;
+}
+
 void 
 Backtester::run() 
 {
@@ -74,31 +100,44 @@ Backtester::run()
     // Record start time
     auto startTime = std::chrono::high_resolution_clock::now();
     
-    // Process market data with date range and parallel processing
-    if (numThreads > 0) {
-        std::cout << "Using " << numThreads << " threads for processing" << std::endl;
-        marketData.processParallel(algoConfig, numThreads);
+    // Only process market data if not using direct data mode
+    if (!useDirectData) {
+        // Process market data with date range and parallel processing
+        if (numThreads > 0) {
+            std::cout << "Using " << numThreads << " threads for processing" << std::endl;
+            marketData.processParallel(algoConfig, numThreads);
+        } else {
+            std::cout << "Using all available cores for processing" << std::endl;
+            marketData.processForBacktest(algoConfig, startDate, endDate);
+        }
     } else {
-        std::cout << "Using all available cores for processing" << std::endl;
-        marketData.processForBacktest(algoConfig, startDate, endDate);
+        std::cout << "Using directly provided market data (" << marketData.getData().size() << " data points)" << std::endl;
     }
     
+    
+    // Verify we have data before proceeding
+    if (marketData.getData().empty()) {
+        std::cerr << "ERROR: No market data available for backtesting. Exiting run()." << std::endl;
+        return;
+    }
+    
+    // Ensure we're at the beginning of the data
+    marketData.rewind();
+    
     // Set up strategy engine
-    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
+    bool backtest = true;
+    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker, backtest);
     
     // Initialize backtest
     initializeBacktest();
     
-    // Main backtest loop
-    marketData.rewind(); // Start at the beginning of historical data
-    
-    if (marketData.getData().empty()) {
-        std::cerr << "Error: No market data available for backtesting" << std::endl;
+    // Log initial state - ensure we have data before trying to access it
+    if (!marketData.getData().empty()) {
+        equityCurve.push_back({marketData.getData()[0].DateTime, broker.getCurrentEquity()});
+    } else {
+        std::cerr << "ERROR: Market data is empty after initialization. Exiting run()." << std::endl;
         return;
     }
-    
-    // Log initial state
-    equityCurve.push_back({marketData.getData()[0].DateTime, broker.getCurrentEquity()});
     
     // Count how many data points we'll process
     size_t totalDataPoints = marketData.getData().size();
@@ -108,9 +147,14 @@ Backtester::run()
     size_t lastProgress = 0;
     size_t progressStep = totalDataPoints / 20; // Show progress in 5% increments
     if (progressStep == 0) progressStep = 1;
-    
-    while (marketData.hasNext()) { // Ensure historical data exists
+        
+    // Add explicit counter to detect infinite loops
+    int loopCount = 0;
+    const int MAX_LOOPS = totalDataPoints * 2; // Safety limit
+        
+    while (marketData.hasNext() && loopCount < MAX_LOOPS) {         
         executeTimeStep();
+        loopCount++;
         
         // Show progress
         size_t currentIndex = marketData.getCurrentIndex();
@@ -123,6 +167,11 @@ Backtester::run()
         }
     }
     
+    // Check if we exited due to the safety limit
+    if (loopCount >= MAX_LOOPS) {
+        std::cerr << "WARNING: Loop safety limit reached. Possible infinite loop detected." << std::endl;
+    }
+        
     // Record end time and calculate duration
     auto endTime = std::chrono::high_resolution_clock::now();
     metrics.executionTime = endTime - startTime;
@@ -213,7 +262,7 @@ Backtester::calculateMetrics()
     std::vector<Order> sellOrders;
     
     for (const auto& order : filledOrders) {
-        if (order.getType() == "buy" || order.getType() == "limit_buy") {
+        if (order.getType() == OrderType::BUY || order.getType() == OrderType::LIMIT_BUY) {
             buyOrders.push_back(order);
         } else {
             sellOrders.push_back(order);
@@ -316,7 +365,12 @@ Backtester::calculateSharpeRatio()
     double riskFreeRate = 0.0;
     
     // Calculate daily Sharpe ratio
-    double dailySharpe = (meanReturn - riskFreeRate) / stddev;
+    double dailySharpe;
+    if (stddev == 0.0) {
+        dailySharpe = 0.0;
+    } else {
+        dailySharpe = (meanReturn - riskFreeRate) / stddev;
+    }
     
     // Annualize the Sharpe ratio (assuming 252 trading days per year)
     return dailySharpe * std::sqrt(252);

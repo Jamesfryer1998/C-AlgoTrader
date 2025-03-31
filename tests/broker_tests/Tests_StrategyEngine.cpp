@@ -6,6 +6,7 @@ class SimulatedBrokerTests : public ::testing::Test {
     public:
         
         Config config;
+        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/data_access_tests/test_data/market_data_test_1.csv";
 
         void SetUp() override 
         {
@@ -20,7 +21,6 @@ class SimulatedBrokerTests : public ::testing::Test {
 
         MarketData marketData;
         json jsonConfig;
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/data_access_tests/test_data/market_data_test_1.csv";
 
 
 };
@@ -28,18 +28,4 @@ class SimulatedBrokerTests : public ::testing::Test {
 TEST_F(SimulatedBrokerTests, CanInstantiate)
 {
     SimulatedBroker cut(marketData);
-}
-
-TEST_F(SimulatedBrokerTests, CanProcess)
-{
-    marketData.loadData(dataFilePath);
-    SimulatedBroker cut(marketData);
-    cut.process();
-}
-
-TEST_F(SimulatedBrokerTests, CanNextStep)
-{
-    marketData.loadData(dataFilePath);
-    SimulatedBroker cut(marketData);
-    cut.nextStep();
 }

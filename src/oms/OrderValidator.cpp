@@ -34,8 +34,14 @@ bool OrderValidator::validateOrder(const Order& order, MarketData& marketData)
 bool
 OrderValidator::isValidOrderType(const Order& order)
 {
-    return (order.getType() == "BUY" ||
-            order.getType() == "SELL");
+    // Check if the order type is recognized
+    OrderType type = order.getType();
+    return (type == OrderType::BUY || 
+            type == OrderType::SELL ||
+            type == OrderType::LIMIT_BUY || 
+            type == OrderType::LIMIT_SELL || 
+            type == OrderType::STOP_BUY || 
+            type == OrderType::STOP_SELL);
 }
 
 bool OrderValidator::isValidPrice(const Order& order, MarketData& marketData)
@@ -46,10 +52,10 @@ bool OrderValidator::isValidPrice(const Order& order, MarketData& marketData)
     // Calculate allowed price range based on slippage tolerance
     double allowedSlippage = (slippageTolerance / 100.0) * lastClose;
     
-    if (order.getType() == "BUY") {
+    if (order.isBuy()) {
         return orderPrice <= lastClose + allowedSlippage;
     } 
-    else if (order.getType() == "SELL") {
+    else if (order.isSell()) {
         return orderPrice >= lastClose - allowedSlippage;
     }
 

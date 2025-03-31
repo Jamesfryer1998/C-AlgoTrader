@@ -81,13 +81,18 @@ SimulatedBroker::getLatestPrice(std::string ticker)
     return currentCondition.Close;
 }
 
-void 
+int 
 SimulatedBroker::placeOrder(Order order)
 {
     // Add order to pending orders queue
     pendingOrders.push_back(order);
-    std::cout << "Order placed for " << order.getQuantity() << " shares of " 
-              << order.getTicker() << " at " << simulationTime << std::endl;
+    std::cout << "Order placed for order " 
+              << order.getId() << " for " 
+              << order.getTypeAsString() << " with " 
+              << order.getQuantity() << " shares of " 
+              << order.getTicker() << " at " 
+              << simulationTime << std::endl;
+    return 1;
 }
 
 void
@@ -140,10 +145,10 @@ SimulatedBroker::executeOrder(Order& order)
     double executionPrice = basePrice * slippageMultiplier;
     
     // For limit orders, check price constraints
-    if (order.getType() == "limit_buy" && executionPrice > order.getPrice()) {
+    if (order.getType() == OrderType::LIMIT_BUY && executionPrice > order.getPrice()) {
         // Cannot execute buy limit order above limit price
         return;
-    } else if (order.getType() == "limit_sell" && executionPrice < order.getPrice()) {
+    } else if (order.getType() == OrderType::LIMIT_SELL && executionPrice < order.getPrice()) {
         // Cannot execute sell limit order below limit price
         return;
     }
@@ -159,7 +164,7 @@ SimulatedBroker::executeOrder(Order& order)
     filledOrders.push_back(order);
     totalTrades++;
     
-    std::cout << "Order executed: " << (order.getType() == "buy" || order.getType() == "limit_buy" ? "BUY" : "SELL")
+    std::cout << "Order executed: " << (order.isBuy() ? "BUY" : "SELL")
               << " " << order.getQuantity() << " shares of " << order.getTicker()
               << " at $" << executionPrice << std::endl;
 }
@@ -171,8 +176,8 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
     double quantity = order.getQuantity();
     double orderTotal = quantity * executionPrice;
     
-    // Handle buys and sells differently
-    bool isBuy = (order.getType() == "buy" || order.getType() == "limit_buy");
+    // Handle buys and sells differently using the helper method
+    bool isBuy = order.isBuy();
     
     if (isBuy) {
         // Subtract cost from cash

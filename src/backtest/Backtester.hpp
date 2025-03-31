@@ -46,6 +46,10 @@ public:
     void setDateRange(const std::string& startDate, const std::string& endDate);
     void setNumThreads(int threads);
     
+    // Testing support
+    void setMarketData(std::vector<MarketCondition>& mockData);
+    void useDirectMarketData(bool useDirect);
+    
     // Result access methods
     const PerformanceMetrics& getPerformanceMetrics() const;
     
@@ -63,6 +67,7 @@ private:
     std::string startDate;
     std::string endDate;
     int numThreads;
+    bool useDirectData;
     
     // Performance tracking
     PerformanceMetrics metrics;

@@ -4,16 +4,18 @@
 #include "StrategyBase.hpp"
 
 
-#define JSON_STRATEGY_CONFIG "/src/config/strategies.json"
+// Using consolidated config file now
 
 class StrategyFactory
 {
     public: 
         StrategyFactory();
         StrategyFactory(string filePath);
+        StrategyFactory(const json& configData);
         ~StrategyFactory(){};
 
         void loadJson(string filePath);
+        void loadJsonData(const json& configData);
         void loadStrategies();
         std::vector<std::unique_ptr<StrategyBase>> generateStrategies();
         json getJson(){ return strategyData;};

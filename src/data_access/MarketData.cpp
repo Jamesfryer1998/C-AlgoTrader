@@ -238,11 +238,5 @@ MarketData::next()
     if (hasNext()) {
         currentData = data[currentIndex];
         currentIndex++;
-        
-        // Only output every 100th message to avoid console spam
-        if (currentIndex % 100 == 0 || currentIndex == 1) {
-            std::cout << "Processing data point " << currentIndex << "/" << data.size() 
-                      << " - " << currentData.DateTime << std::endl;
-        }
     }
 }
