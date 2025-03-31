@@ -71,20 +71,26 @@ MarketData::getLastClosePrice()
 void 
 MarketData::rewind() 
 {
+    std::cout << "Rewinding to the beginning of the data" << std::endl;
     currentIndex = 0;
 }
 
 bool 
 MarketData::hasNext() 
 {
-    return static_cast<size_t>(currentIndex) < backtestData.size();
+    std::cout << "Checking if we have more data..." << std::endl;
+    std::cout << "we have " << data.size()  << std::endl;
+    return static_cast<size_t>(currentIndex) < data.size();
 }
 
 void 
 MarketData::next() 
 {
+    std::cout << "Processing next data..." << std::endl;
+
     if (hasNext()) {
         currentData = backtestData[currentIndex];
         currentIndex++;
+        std::cout << "On timestamp: " << currentData.DateTime <<  std::endl;
     }
 }

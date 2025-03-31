@@ -3,10 +3,12 @@
 #include "../src/backtest/Backtester.hpp"
 
 
-int backtest() {
+int main() {
     Config config;
     json algoConfig = config.loadConfig();
     Backtester backtester(algoConfig);
     backtester.run();
     return 0;
 }
+
+// How to run this?

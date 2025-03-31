@@ -14,7 +14,7 @@ int main()
     Config config;
     json algoConfig = config.loadConfig();
     MarketData marketData;
-    marketData.process(algoConfig);
+    // marketData.process(algoConfig);
     StrategyFactory stratFactory;
     StrategyEngine stratEngine;
     SimulatedBroker broker(marketData);
