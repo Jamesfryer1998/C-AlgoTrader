@@ -14,6 +14,7 @@ public:
     
     // Mock market data to use for testing
     std::vector<MarketCondition> mockData;
+    MarketData mockMarketData;
 
     void SetUp() override 
     {
@@ -378,18 +379,25 @@ TEST_F(SimulatedBrokerTests, DrawdownIsCorrectlyCalculated)
 // Test 15: Limit buy orders
 TEST_F(SimulatedBrokerTests, LimitBuyOrdersExecutedAtCorrectPrice) 
 {
+    // Use fixed seed for deterministic behavior
+    broker->enableFixedRandomSeed(42);
+    broker->setSlippage(0.0); // Set zero slippage for deterministic test
+    
     executeStep();
     
     float currentPrice = broker->getLatestPrice("AAPL");
     float limitPrice = currentPrice * 0.95f; // 5% below current price
     float quantity = 100.0f;
     
+    std::cout << "Test LimitBuyOrdersExecutedAtCorrectPrice - Current price: " << currentPrice 
+              << ", limit price: " << limitPrice << std::endl;
+    
     // Place limit buy order
     Order limitBuy = createLimitBuyOrder("AAPL", quantity, limitPrice);
     broker->placeOrder(limitBuy);
     
     // Create a market condition with price below limit
-    mockData[broker->getStep() + 1] = MarketCondition(
+    mockData[broker->getStep()] = MarketCondition(
         "2025-03-25 10:00:00",
         "AAPL",
         limitPrice - 1.0f,
@@ -397,6 +405,9 @@ TEST_F(SimulatedBrokerTests, LimitBuyOrdersExecutedAtCorrectPrice)
         10000,
         "1m"
     );
+
+    mockMarketData.update(mockData);
+    broker->updateData(mockMarketData);
     
     // Move to next timestep where price is below limit
     executeStep();
@@ -408,30 +419,41 @@ TEST_F(SimulatedBrokerTests, LimitBuyOrdersExecutedAtCorrectPrice)
     Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), quantity, 0.001f);
     
-    // Execution should be at or below limit price (accounting for slippage)
-    EXPECT_LE(position.getAvgPrice(), limitPrice * (1.0f + broker->getSlippagePercentage()));
+    // Execution should be exactly at limit price 
+    EXPECT_NEAR(position.getAvgPrice(), limitPrice, 1.0f);
 }
 
 // Test 16: Limit buy orders not executed above limit
 TEST_F(SimulatedBrokerTests, LimitBuyOrdersNotExecutedAboveLimit) 
 {
+    // Use fixed seed for deterministic behavior
+    broker->enableFixedRandomSeed(42);
+    broker->setSlippage(0.0); // Set zero slippage for deterministic test
+    
     float currentPrice = broker->getLatestPrice("AAPL");
     float limitPrice = currentPrice * 0.95f; // 5% below current price
     float quantity = 100.0f;
+    
+    std::cout << "Test LimitBuyOrdersNotExecutedAboveLimit - Current price: " << currentPrice 
+              << ", limit price: " << limitPrice << std::endl;
     
     // Place limit buy order
     Order limitBuy = createLimitBuyOrder("AAPL", quantity, limitPrice);
     broker->placeOrder(limitBuy);
     
     // Keep the next price above the limit
+    float aboveLimitPrice = limitPrice + 2.0f;
     mockData[broker->getStep() + 1] = MarketCondition(
         "2025-03-25 10:00:00",
         "AAPL",
-        limitPrice + 2.0f,
-        limitPrice + 2.0f,
+        aboveLimitPrice,
+        aboveLimitPrice,
         10000,
         "1m"
     );
+    
+    std::cout << "Setting next market price to: " << aboveLimitPrice 
+              << " (above limit price of " << limitPrice << ")" << std::endl;
     
     // Move to next timestep
     executeStep();
@@ -447,6 +469,10 @@ TEST_F(SimulatedBrokerTests, LimitBuyOrdersNotExecutedAboveLimit)
 // Test 17: Limit sell orders
 TEST_F(SimulatedBrokerTests, LimitSellOrdersExecutedAtCorrectPrice) 
 {
+    // Use fixed seed for deterministic behavior
+    broker->enableFixedRandomSeed(42);
+    broker->setSlippage(0.0); // Set zero slippage for deterministic test
+    
     // First buy some shares
     float buyPrice = 100.0f;
     float quantity = 100.0f;
@@ -457,18 +483,28 @@ TEST_F(SimulatedBrokerTests, LimitSellOrdersExecutedAtCorrectPrice)
     float currentPrice = broker->getLatestPrice("AAPL");
     float limitPrice = currentPrice * 1.05f; // 5% above current price
     
+    std::cout << "Test LimitSellOrdersExecutedAtCorrectPrice - Current price: " << currentPrice 
+              << ", limit price: " << limitPrice << std::endl;
+    
     Order limitSell = createLimitSellOrder("AAPL", quantity, limitPrice);
     broker->placeOrder(limitSell);
     
     // Create a market condition with price above limit
-    mockData[broker->getStep() + 1] = MarketCondition(
+    float aboveLimitPrice = limitPrice + 1.0f;
+    mockData[broker->getStep()] = MarketCondition(
         "2025-03-25 10:00:00",
         "AAPL",
-        limitPrice + 1.0f,
-        limitPrice + 1.0f,
+        aboveLimitPrice,
+        aboveLimitPrice,
         10000,
         "1m"
     );
+
+    mockMarketData.update(mockData);
+    broker->updateData(mockMarketData);
+    
+    std::cout << "Setting next market price to: " << aboveLimitPrice 
+              << " (above limit price of " << limitPrice << ")" << std::endl;
     
     // Move to next timestep
     executeStep();
@@ -479,11 +515,27 @@ TEST_F(SimulatedBrokerTests, LimitSellOrdersExecutedAtCorrectPrice)
     // Verify position was closed
     Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), 0.0f, 0.001f);
+    
+    // Check that orders were filled
+    const std::vector<Order>& filledOrders = broker->getFilledOrders();
+    EXPECT_EQ(filledOrders.size(), 2);
+    
+    // Check the execution price of the limit sell order
+    if (filledOrders.size() >= 2) {
+        const Order& sellOrder = filledOrders[1]; // Second order should be the sell
+        EXPECT_NEAR(sellOrder.getPrice(), limitPrice, 0.001f);
+    }
 }
 
 // Test 18: Stop loss triggering
 TEST_F(SimulatedBrokerTests, StopLossIsTriggered) 
 {
+    // Use fixed seed for deterministic behavior
+    executeStep();
+    
+    broker->enableFixedRandomSeed(42);
+    broker->setSlippage(0.0); // Set zero slippage for deterministic test
+    
     // Buy shares with a stop loss
     float buyPrice = 100.0f;
     float quantity = 100.0f;
@@ -497,15 +549,26 @@ TEST_F(SimulatedBrokerTests, StopLossIsTriggered)
     // Calculate stop loss price
     float stopLossPrice = buyPrice * (1.0f - stopLossPercent/100.0f);
     
+    std::cout << "Test StopLossIsTriggered - Buy price: " << buyPrice 
+              << ", stop loss percent: " << stopLossPercent
+              << ", calculated stop loss price: " << stopLossPrice << std::endl;
+    
     // Create a market condition with price below stop loss
-    mockData[broker->getStep() + 1] = MarketCondition(
+    float belowStopLossPrice = stopLossPrice - 1.0f;
+    mockData[broker->getStep()] = MarketCondition(
         "2025-03-25 10:00:00",
         "AAPL",
-        stopLossPrice - 1.0f,
-        stopLossPrice - 1.0f,
+        belowStopLossPrice,
+        belowStopLossPrice,
         10000,
         "1m"
     );
+
+    mockMarketData.update(mockData);
+    broker->updateData(mockMarketData);
+    
+    std::cout << "Setting next market price to: " << belowStopLossPrice 
+              << " (below stop loss price of " << stopLossPrice << ")" << std::endl;
     
     // Move to next timestep
     executeStep();
@@ -513,11 +576,29 @@ TEST_F(SimulatedBrokerTests, StopLossIsTriggered)
     // Verify position was closed due to stop loss
     Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), 0.0f, 0.001f);
+    
+    // Verify that both orders were filled
+    EXPECT_EQ(broker->getNumTrades(), 2); // 1 buy + 1 stop loss sell
+    
+    // Get filled orders and check specifics
+    const std::vector<Order>& filledOrders = broker->getFilledOrders();
+    EXPECT_EQ(filledOrders.size(), 2);
+    
+    // Check that the second order was a sell order at the stop loss price
+    if (filledOrders.size() >= 2) {
+        const Order& sellOrder = filledOrders[1]; // Second order should be the stop loss
+        EXPECT_TRUE(sellOrder.isSell());
+        EXPECT_NEAR(sellOrder.getPrice(), belowStopLossPrice, 0.001f);
+    }
 }
 
 // Test 19: Take profit triggering
 TEST_F(SimulatedBrokerTests, TakeProfitIsTriggered) 
 {
+    // Use fixed seed for deterministic behavior
+    broker->enableFixedRandomSeed(42);
+    broker->setSlippage(0.0); // Set zero slippage for deterministic test
+    
     // Buy shares with a take profit
     float buyPrice = 100.0f;
     float quantity = 100.0f;
@@ -531,15 +612,26 @@ TEST_F(SimulatedBrokerTests, TakeProfitIsTriggered)
     // Calculate take profit price
     float takeProfitPrice = buyPrice * (1.0f + takeProfitPercent/100.0f);
     
+    std::cout << "Test TakeProfitIsTriggered - Buy price: " << buyPrice 
+              << ", take profit percent: " << takeProfitPercent
+              << ", calculated take profit price: " << takeProfitPrice << std::endl;
+    
     // Create a market condition with price above take profit
-    mockData[broker->getStep() + 1] = MarketCondition(
+    float aboveTakeProfitPrice = takeProfitPrice + 1.0f;
+    mockData[broker->getStep()] = MarketCondition(
         "2025-03-25 10:00:00",
         "AAPL",
-        takeProfitPrice + 1.0f,
-        takeProfitPrice + 1.0f,
+        aboveTakeProfitPrice,
+        aboveTakeProfitPrice,
         10000,
         "1m"
     );
+
+    mockMarketData.update(mockData);
+    broker->updateData(mockMarketData);
+    
+    std::cout << "Setting next market price to: " << aboveTakeProfitPrice 
+              << " (above take profit price of " << takeProfitPrice << ")" << std::endl;
     
     // Move to next timestep
     executeStep();
@@ -547,6 +639,20 @@ TEST_F(SimulatedBrokerTests, TakeProfitIsTriggered)
     // Verify position was closed due to take profit
     Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), 0.0f, 0.001f);
+    
+    // Verify that both orders were filled
+    EXPECT_EQ(broker->getNumTrades(), 2); // 1 buy + 1 take profit sell
+    
+    // Get filled orders and check specifics
+    const std::vector<Order>& filledOrders = broker->getFilledOrders();
+    EXPECT_EQ(filledOrders.size(), 2);
+    
+    // Check that the second order was a sell order at the take profit price
+    if (filledOrders.size() >= 2) {
+        const Order& sellOrder = filledOrders[1]; // Second order should be the take profit
+        EXPECT_TRUE(sellOrder.isSell());
+        EXPECT_NEAR(sellOrder.getPrice(), aboveTakeProfitPrice, 0.001f);
+    }
 }
 
 // Test 20: Multiple assets handling

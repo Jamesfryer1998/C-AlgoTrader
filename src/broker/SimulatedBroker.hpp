@@ -26,6 +26,7 @@ class SimulatedBroker : public BrokerBase {
         std::string getBrokerName() { return brokerName; };
         void process();
         int getStep() { return step; };
+        void updateData(MarketData MarketData) { marketData = MarketData; };
         
         // Performance metrics
         double getPnL() const;

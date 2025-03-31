@@ -147,7 +147,6 @@ SimulatedBroker::executeOrder(Order& order)
     // Get current price for the ticker
     float basePrice = getLatestPrice(order.getTicker());
     
-    // Apply random slippage based on configuration
     double slippageMultiplier = 1.0;
     
     if (slippagePercentage > 0.0) {
@@ -286,26 +285,35 @@ SimulatedBroker::getLatestPosition(std::string ticker)
 void 
 SimulatedBroker::checkStopLosses()
 {
+    // Create a copy of positionsByTicker to iterate, as we might modify during iteration
+    std::map<std::string, Position> positionsCopy = positionsByTicker;
+    
     // Iterate through positions and check if current price hits stop loss
-    for (const auto& pair : positionsByTicker) {
+    for (const auto& pair : positionsCopy) {
         const Position& position = pair.second;
         std::string ticker = position.getTicker();
+        
+        // Skip positions with zero quantity
+        if (position.getQuantity() <= 0) {
+            continue;
+        }
         
         // Find associated order with stop loss
         for (const auto& order : filledOrders) {
             if (order.getTicker() == ticker && order.getStopLossPrice() > 0) {
                 double currentPrice = getLatestPrice(ticker);
                 
-                // If price drops below stop loss, create sell order
+                // If price drops below stop loss, create and execute sell order immediately
                 if (currentPrice <= order.getStopLossPrice()) {
                     std::cout << "Stop loss triggered for " << ticker 
-                              << " at $" << currentPrice << std::endl;
+                              << " at $" << currentPrice 
+                              << ", stop price: " << order.getStopLossPrice() << std::endl;
                     
-                    // Create stop loss order
+                    // Create and execute stop loss order directly
                     Order stopOrder(OrderType::SELL, ticker, position.getQuantity(), currentPrice);
-                    placeOrder(stopOrder);
+                    executeOrder(stopOrder);
                     
-                    // Break after creating the first stop loss order for this position
+                    // Break after executing the first stop loss order for this position
                     break;
                 }
             }
@@ -316,26 +324,35 @@ SimulatedBroker::checkStopLosses()
 void 
 SimulatedBroker::checkTakeProfits()
 {
+    // Create a copy of positionsByTicker to iterate, as we might modify during iteration
+    std::map<std::string, Position> positionsCopy = positionsByTicker;
+    
     // Iterate through positions and check if current price hits take profit
-    for (const auto& pair : positionsByTicker) {
+    for (const auto& pair : positionsCopy) {
         const Position& position = pair.second;
         std::string ticker = position.getTicker();
+        
+        // Skip positions with zero quantity
+        if (position.getQuantity() <= 0) {
+            continue;
+        }
         
         // Find associated order with take profit
         for (const auto& order : filledOrders) {
             if (order.getTicker() == ticker && order.getTakeProfitPrice() > 0) {
                 double currentPrice = getLatestPrice(ticker);
                 
-                // If price rises above take profit, create sell order
+                // If price rises above take profit, create and execute sell order immediately
                 if (currentPrice >= order.getTakeProfitPrice()) {
                     std::cout << "Take profit triggered for " << ticker 
-                              << " at $" << currentPrice << std::endl;
+                              << " at $" << currentPrice 
+                              << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
                     
-                    // Create take profit order
+                    // Create and execute take profit order directly
                     Order tpOrder(OrderType::SELL, ticker, position.getQuantity(), currentPrice);
-                    placeOrder(tpOrder);
+                    executeOrder(tpOrder);
                     
-                    // Break after creating the first take profit order for this position
+                    // Break after executing the first take profit order for this position
                     break;
                 }
             }
