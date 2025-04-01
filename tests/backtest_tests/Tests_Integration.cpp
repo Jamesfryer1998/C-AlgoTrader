@@ -127,18 +127,13 @@ public:
     std::unique_ptr<SimulatedBroker> broker;
     std::unique_ptr<Backtester> backtester;
     json testConfig;
+    Config config;
     
-    void SetUp() override {
-        // Create basic test config
-        testConfig = {
-            {"ticker", "AAPL"},
-            {"marketDataBasePath", "data/"},
-            {"baseDataFileName", "marketData"},
-            {"strategies", {
-                {{"name", "RSI"}, {"parameters", {{"period", 14}, {"overbought", 70}, {"oversold", 30}}}}
-            }}
-        };
-        
+    void SetUp() override 
+    {
+        config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
+        testConfig = config.loadConfig();
+
         // Initialize market data
         marketData = std::make_unique<MarketData>();
     }
@@ -176,18 +171,13 @@ public:
         // Use the market data we've set up directly
         std::vector<MarketCondition> mockData = marketData->getData();
         backtester->setMarketData(mockData);
+        backtester->useDirectMarketData(true);
     }
 };
 
-// Test 1: Integration of Backtester with SimulatedBroker with trending market
 TEST_F(BacktestIntegrationTests, BacktesterWithSimulatedBrokerTrendingMarket) {
-    // Setup trending market data
     setupTrendingMarket();
-    
-    // Create SimulatedBroker with market data
     createBroker();
-    
-    // Create Backtester
     createBacktester();
     
     // Run backtest
@@ -205,15 +195,9 @@ TEST_F(BacktestIntegrationTests, BacktesterWithSimulatedBrokerTrendingMarket) {
     EXPECT_GT(metrics.sharpeRatio, 0.0);
 }
 
-// Test 2: Integration with volatile market conditions
 TEST_F(BacktestIntegrationTests, BacktesterWithSimulatedBrokerVolatileMarket) {
-    // Setup volatile market data
     setupVolatileMarket();
-    
-    // Create SimulatedBroker with market data
     createBroker();
-    
-    // Create Backtester
     createBacktester();
     
     // Run backtest
@@ -231,30 +215,20 @@ TEST_F(BacktestIntegrationTests, BacktesterWithSimulatedBrokerVolatileMarket) {
     EXPECT_GT(metrics.maxDrawdownPercent, 0.0);
 }
 
-// Test 3: Impact of different commission levels on backtest results
 TEST_F(BacktestIntegrationTests, CommissionImpactOnBacktestResults) {
-    // Setup trending market data
     setupTrendingMarket();
     
-    // Create SimulatedBroker with low commission
     createBroker();
-    broker->setCommission(0.5); // $0.50 per trade
-    
-    // Create Backtester
+    broker->setCommission(0.5);
     createBacktester();
     
-    // Run backtest with low commission
     backtester->run();
     const PerformanceMetrics& lowCommMetrics = backtester->getPerformanceMetrics();
     
-    // Now setup with high commission
     createBroker();
-    broker->setCommission(20.0); // $20 per trade
-    
-    // Create new Backtester
+    broker->setCommission(20.0);
     createBacktester();
     
-    // Run backtest with high commission
     backtester->run();
     const PerformanceMetrics& highCommMetrics = backtester->getPerformanceMetrics();
     
@@ -262,30 +236,20 @@ TEST_F(BacktestIntegrationTests, CommissionImpactOnBacktestResults) {
     EXPECT_GT(lowCommMetrics.totalPnL, highCommMetrics.totalPnL);
 }
 
-// Test 4: Impact of different slippage levels on backtest results
 TEST_F(BacktestIntegrationTests, SlippageImpactOnBacktestResults) {
-    // Setup trending market data
     setupTrendingMarket();
-    
-    // Create SimulatedBroker with low slippage
     createBroker();
-    broker->setSlippage(0.0001); // 0.01% slippage
-    
-    // Create Backtester
+
+    broker->setSlippage(0.0001);
     createBacktester();
     
-    // Run backtest with low slippage
     backtester->run();
     const PerformanceMetrics& lowSlippageMetrics = backtester->getPerformanceMetrics();
     
-    // Now setup with high slippage
     createBroker();
-    broker->setSlippage(0.01); // 1% slippage
-    
-    // Create new Backtester
+    broker->setSlippage(0.01);
     createBacktester();
     
-    // Run backtest with high slippage
     backtester->run();
     const PerformanceMetrics& highSlippageMetrics = backtester->getPerformanceMetrics();
     
@@ -295,30 +259,20 @@ TEST_F(BacktestIntegrationTests, SlippageImpactOnBacktestResults) {
     EXPECT_GE(highSlippageMetrics.startingCapital, 0.0);
 }
 
-// Test 5: Impact of different starting capital on backtest results
 TEST_F(BacktestIntegrationTests, StartingCapitalImpactOnBacktestResults) {
-    // Setup trending market data
     setupTrendingMarket();
-    
-    // Create SimulatedBroker with low capital
     createBroker();
-    broker->setStartingCapital(10000.0); // $10,000
-    
-    // Create Backtester
+
+    broker->setStartingCapital(10000.0);
     createBacktester();
     
-    // Run backtest with low capital
     backtester->run();
     const PerformanceMetrics& lowCapitalMetrics = backtester->getPerformanceMetrics();
     
-    // Now setup with high capital
     createBroker();
     broker->setStartingCapital(1000000.0); // $1,000,000
-    
-    // Create new Backtester
     createBacktester();
     
-    // Run backtest with high capital
     backtester->run();
     const PerformanceMetrics& highCapitalMetrics = backtester->getPerformanceMetrics();
     
@@ -326,24 +280,16 @@ TEST_F(BacktestIntegrationTests, StartingCapitalImpactOnBacktestResults) {
     EXPECT_NE(lowCapitalMetrics.totalPnL, highCapitalMetrics.totalPnL);
 }
 
-// Test 6: Multi-asset backtesting
 TEST_F(BacktestIntegrationTests, MultiAssetBacktesting) {
-    // Setup multi-asset market data
     setupMultiAssetMarket();
     
-    // Update config for multi-asset testing
     testConfig["ticker"] = "AAPL,MSFT,GOOG";
     
-    // Create broker
     createBroker();
-    
-    // Create backtester
     createBacktester();
     
-    // Run backtest
     EXPECT_NO_THROW(backtester->run());
     
-    // Check the results
     const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
     
     // We should have results with non-zero metrics
@@ -351,35 +297,25 @@ TEST_F(BacktestIntegrationTests, MultiAssetBacktesting) {
     EXPECT_NE(metrics.totalPnL, 0.0);
 }
 
-// Test 7: Long-term vs short-term backtesting comparison
 TEST_F(BacktestIntegrationTests, LongTermVsShortTermBacktesting) {
-    // Create short-term market data (10 days)
     auto shortTermData = TestMarketDataProvider::createTrendingMarketData(10);
     marketData->update(shortTermData);
     
-    // Create SimulatedBroker
     createBroker();
-    
-    // Create Backtester
     createBacktester();
     
-    // Run short-term backtest
     backtester->run();
     const PerformanceMetrics& shortTermMetrics = backtester->getPerformanceMetrics();
     
-    // Now create long-term market data (60 days)
     auto longTermData = TestMarketDataProvider::createTrendingMarketData(60);
     marketData->update(longTermData);
     
-    // Create new broker and backtester for long-term test
     createBroker();
     createBacktester();
     
-    // Run long-term backtest
     backtester->run();
     const PerformanceMetrics& longTermMetrics = backtester->getPerformanceMetrics();
     
-    // Long-term backtest should have more trades
     EXPECT_GT(longTermMetrics.numTrades, shortTermMetrics.numTrades);
     
     // Annualized returns might be similar if the trend is consistent
@@ -390,7 +326,6 @@ TEST_F(BacktestIntegrationTests, LongTermVsShortTermBacktesting) {
     EXPECT_LE(longTermMetrics.annualizedReturn, 1000.0);
 }
 
-// Test 8: System resilience to extreme market conditions
 TEST_F(BacktestIntegrationTests, ResilienceToExtremeMarketConditions) {
     // Create extreme market conditions - sharp crash followed by recovery
     std::vector<MarketCondition> extremeData;
@@ -426,26 +361,19 @@ TEST_F(BacktestIntegrationTests, ResilienceToExtremeMarketConditions) {
     
     marketData->update(extremeData);
     
-    // Create broker and backtester
     createBroker();
     createBacktester();
     
-    // Run backtest - should not crash
     EXPECT_NO_THROW(backtester->run());
     
-    // Check the results
     const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
     
     // Max drawdown should be significant due to the crash
     EXPECT_GT(metrics.maxDrawdownPercent, 20.0);
 }
 
-// Test 9: Backtesting with stop losses and take profits
 TEST_F(BacktestIntegrationTests, StopLossAndTakeProfitBacktesting) {
-    // Create volatile market data
     setupVolatileMarket();
-    
-    // Create broker
     createBroker();
     
     // We'll manually place orders with stop losses and take profits
@@ -491,34 +419,32 @@ TEST_F(BacktestIntegrationTests, StopLossAndTakeProfitBacktesting) {
     }
 }
 
-// Test 10: Backtesting with different order types
 TEST_F(BacktestIntegrationTests, DifferentOrderTypesBacktesting) {
-    // Create trending market data
     setupTrendingMarket();
-    
-    // Create broker
     createBroker();
     
     // Place different types of orders
     float currentPrice = broker->getLatestPrice("AAPL");
     
     // Market order - should execute immediately
-    Order marketOrder("buy", "AAPL", 100.0f, currentPrice);
+    Order marketOrder(OrderType::BUY, "AAPL", 100.0f, currentPrice);
     broker->placeOrder(marketOrder);
     
     // Limit buy below market - should not execute until price drops
-    Order limitBuyOrder("limit_buy", "AAPL", 50.0f, currentPrice * 0.95f);
+    Order limitBuyOrder(OrderType::LIMIT_BUY, "AAPL", 50.0f, currentPrice * 0.95f);
     broker->placeOrder(limitBuyOrder);
     
     // Limit sell above market - should execute when price rises
-    Order limitSellOrder("limit_sell", "AAPL", 100.0f, currentPrice * 1.05f);
+    Order limitSellOrder(OrderType::LIMIT_SELL, "AAPL", 100.0f, currentPrice * 1.05f);
     broker->placeOrder(limitSellOrder);
     
     // Run some market steps
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 30; i++) {
         broker->nextStep();
     }
+
+    currentPrice = broker->getLatestPrice("AAPL");
     
     // Check results - market order should have executed
-    EXPECT_GT(broker->getNumTrades(), 0);
+    EXPECT_EQ(broker->getNumTrades(), 2);
 }
