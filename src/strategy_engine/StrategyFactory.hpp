@@ -16,7 +16,6 @@ class StrategyFactory
 
         void loadJson(string filePath);
         void loadJsonData(const json& configData);
-        void loadStrategies();
         std::vector<std::unique_ptr<StrategyBase>> generateStrategies();
         json getJson(){ return strategyData;};
 

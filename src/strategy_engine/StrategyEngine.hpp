@@ -22,7 +22,6 @@ class StrategyEngine
 
     private:
 
-        void generateAndLoadStrategies(string filePath);
         void executeStrategies();
         void printStategies();
 

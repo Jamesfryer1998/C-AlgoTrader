@@ -43,6 +43,8 @@ StrategyEngine::run()
     
     setMarketData(marketData);
     oms->setMarketData(marketData);
+
+    std::cout << "Executing strategies..." << std::endl;
     executeStrategies();
 }
 
@@ -55,8 +57,7 @@ StrategyEngine::setMarketData(MarketData& inputData)
 void
 StrategyEngine::executeStrategies()
 {
-    // Maybe thread this
-    // std::cout << "Executing strategies..." << std::endl;
+    // Maybe thread this, thread for each strategy
 
     for (auto& strat : strategyList) 
     {

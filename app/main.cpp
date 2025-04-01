@@ -15,9 +15,9 @@ int main()
     json algoConfig = config.loadConfig();
     MarketData marketData;
     // marketData.process(algoConfig);
-    StrategyFactory stratFactory;
+    StrategyFactory stratFactory(algoConfig);
     StrategyEngine stratEngine;
-    SimulatedBroker broker(marketData);
+    SimulatedBroker broker(marketData); // Change this to IBKR
 
     stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
     while (true)

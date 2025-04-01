@@ -13,21 +13,9 @@
 // Default constructor - uses the Config class to load the consolidated config
 StrategyFactory::StrategyFactory()
 {
-    // Use the default Config loading mechanism to get the consolidated config
     Config configLoader;
     json fullConfig = configLoader.loadConfig();
-    
-    // Extract just the strategies section
-    if (fullConfig.contains("strategies")) {
-        json strategiesSection;
-        strategiesSection["strategies"] = fullConfig["strategies"];
-        strategyData = strategiesSection;
-    } else {
-        // Log warning if no strategies section found
-        std::cerr << "Warning: No 'strategies' section found in config file!" << std::endl;
-        // Create empty strategies array to prevent issues
-        strategyData["strategies"] = json::array();
-    }
+    loadJsonData(fullConfig);
 }
 
 // Constructor for testing - accepts a custom file path
@@ -53,8 +41,6 @@ StrategyFactory::loadJson(string filePath)
 string
 StrategyFactory::formatStrategyPath()
 {
-    // This is no longer used in the default constructor
-    // but kept for backwards compatibility
     string projectRoot = config.getProjectRoot();
     string configPath = projectRoot + JSON_CONFIG_NAME;
     return configPath;
@@ -63,24 +49,14 @@ StrategyFactory::formatStrategyPath()
 void
 StrategyFactory::loadJsonData(const json& configData)
 {
-    // Extract strategies section from the provided config
     if (configData.contains("strategies")) {
         json strategiesSection;
         strategiesSection["strategies"] = configData["strategies"];
         strategyData = strategiesSection;
     } else {
-        // Log warning if no strategies section found
         std::cerr << "Warning: No 'strategies' section found in provided config!" << std::endl;
-        // Create empty strategies array to prevent issues
         strategyData["strategies"] = json::array();
     }
-}
-
-void
-StrategyFactory::loadStrategies()
-{
-    // Recreate the StrategyFactory to reload from default config
-    *this = StrategyFactory();
 }
 
 // Strat factory
