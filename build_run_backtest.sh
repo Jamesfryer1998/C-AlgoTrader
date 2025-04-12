@@ -28,9 +28,8 @@ fi
 
 # Step 3: Run tests only if the build succeeded
 echo -e "${BLUE}Running tests...${NC}"
-    ctest --test-dir build --output-on-failure
+ctest --test-dir build --output-on-failure
     TEST_RESULT=$?
-fi
 
 if [ $TEST_RESULT -ne 0 ]; then
     echo -e "${RED}⚠️ Some tests failed, but continuing with execution${NC}"

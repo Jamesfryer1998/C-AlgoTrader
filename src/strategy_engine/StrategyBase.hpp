@@ -3,6 +3,8 @@
 #include <iostream>
 #include "../oms/Order.hpp"
 #include "StrategyAttribute.hpp"
+#include "../data_access/MarketData.hpp"
+#include "../data_access/MarketCondition.hpp"
 
 
 // class StrategyBase {
@@ -40,11 +42,17 @@ class StrategyBase
             return order; 
         };
 
+        virtual void supplyData(MarketData marketdata)
+        {
+            marketData = marketdata;
+        }
+
         // Base strats take in entire list of strat params
         // Specific strats pick and choose from this list
         StrategyAttribute _strategyAttribute;
         bool NewOrder = false;
         Order order;
+        MarketData marketData;
 
     private:
 

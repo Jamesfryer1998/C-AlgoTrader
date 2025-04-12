@@ -314,6 +314,8 @@ TEST_F(BacktesterTests, WinRateCalculation) {
     EXPECT_LE(metrics.winRate, 100.0);
 }
 
+//TODO:
+// Add fixed seed into this test class, see simulated broker tests
 TEST_F(BacktesterTests, CommissionAffectsTradingPerformance) {
     // Run with low commission
     createBacktesterWithSettings(100000.0, 1.0);

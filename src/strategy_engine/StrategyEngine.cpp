@@ -44,7 +44,7 @@ StrategyEngine::run()
     setMarketData(marketData);
     oms->setMarketData(marketData);
 
-    std::cout << "Executing strategies..." << std::endl;
+    // std::cout << "Executing strategies..." << std::endl;
     executeStrategies();
 }
 
@@ -61,6 +61,7 @@ StrategyEngine::executeStrategies()
 
     for (auto& strat : strategyList) 
     {
+        strat->supplyData(marketData);
         strat->execute();
         if(strat->onNewOrder())
         {

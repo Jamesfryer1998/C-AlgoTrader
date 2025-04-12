@@ -18,11 +18,11 @@ if [ $? -ne 0 ]; then
 fi
 
 # Step 3: Run tests only if the build succeeded
-# ctest --test-dir build --output-on-failure
-# if [ $? -ne 0 ]; then
-#     echo "❌ Tests failed!"
-#     exit 1
-# fi
+ctest --test-dir build --output-on-failure
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed!"
+    exit 1
+fi
 
 echo "✅ All builds and tests successful!"
 
