@@ -36,6 +36,11 @@ class StrategyBase
             return (NewOrder == true);
         };
 
+        virtual void reset()
+        {
+            NewOrder = false;
+        }
+
         virtual Order getOrder()
         {
             NewOrder = false;

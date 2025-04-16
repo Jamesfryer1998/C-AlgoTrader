@@ -13,6 +13,7 @@ enum class OrderType {
     LIMIT_SELL,
     STOP_BUY,
     STOP_SELL,
+    HOLD,
     UNKNOWN
 };
 

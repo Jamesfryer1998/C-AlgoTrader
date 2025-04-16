@@ -9,6 +9,7 @@ string orderTypeToString(OrderType type) {
         case OrderType::LIMIT_SELL: return "LIMIT_SELL";
         case OrderType::STOP_BUY: return "STOP_BUY";
         case OrderType::STOP_SELL: return "STOP_SELL";
+        case OrderType::HOLD: return "HOLD";
         default: return "UNKNOWN";
     }
 }
