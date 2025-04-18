@@ -11,7 +11,7 @@
         {
             "name": "RSI",
             "active": 1,
-            "period": 14,
+            "period": 15,
             "overbought_threshold": 70.0,
             "oversold_threshold": 30.0,
             "stop_loss": 5,

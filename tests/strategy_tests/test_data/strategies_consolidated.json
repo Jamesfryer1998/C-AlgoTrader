@@ -21,7 +21,7 @@
         },
         {
             "name": "MEANREV",
-            "active": 1,
+            "active": 0,
             "lookback_period": 20,
             "entry_threshold": 2.0,
             "exit_threshold": 0.5,

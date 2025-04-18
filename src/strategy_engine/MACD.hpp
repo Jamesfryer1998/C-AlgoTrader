@@ -20,7 +20,7 @@ class MACD : public StrategyBase {
                 throw std::runtime_error("MACD long_period not set");
             if(!_strategyAttribute.signal_period)
                 throw std::runtime_error("MACD signal_period not set");
-        }  
+        } 
 
         StrategyAttribute getAttributes(){ return _strategyAttribute; }    
 };

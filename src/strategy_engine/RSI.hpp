@@ -11,9 +11,55 @@ class RSI : public StrategyBase {
         {
             validate();
             run();
-            // std::cout << "  -> RSI" << std::endl;
-            // createOrder(order);
         }
+
+        void supplyData(MarketData marketdata) override
+        {
+            marketData = marketdata;
+        }
+
+        MarketData getData()
+        {
+            return marketData;
+        }
+
+        float calculateRSI(const std::vector<float>& closes)
+        {
+            float gainSum = 0.0f;
+            float lossSum = 0.0f;
+            int period = _strategyAttribute.period;   
+
+            
+            // Calculate gains and losses for the specified period
+            for (size_t i = closes.size() - period; i < closes.size()-1; i++) {
+                float current = closes[i];
+                float next = closes[i+1];
+                float change = next-current;
+                if (change > 0) {
+                    gainSum += change;
+                } else {
+                    lossSum -= change;
+                }
+            }
+            
+            // Calculate average gain and loss
+            float avgGain = gainSum / period;
+            float avgLoss = lossSum / period;
+            
+            // Handle division by zero
+            if (avgLoss == 0.0f && avgGain == 0.0f) {
+                return 50.0f; // No movement, neutral RSI
+            } else if (avgLoss == 0.0f) {
+                return 100.0f; // No losses means RSI = 100
+            }
+            
+            float rs = avgGain / avgLoss;
+            float rsi = 100.0f - (100.0f / (1.0f + rs));
+            
+            return std::round(rsi * 100) / 100;
+        }
+
+    private:
 
         void validate() override
         {
@@ -47,9 +93,9 @@ class RSI : public StrategyBase {
                 holdOrder();
             }
 
-            logDecision(currentCondition.Ticker, currentCondition.Close);
+            if (decision != orderTypeToString(OrderType::HOLD))
+                logDecision(currentCondition, rsi);
         }
-
 
         std::vector<float> getRecentCloses(int period)
         {
@@ -73,13 +119,13 @@ class RSI : public StrategyBase {
             for (int i = start; i < dataSize; ++i) {
                 closes.push_back(data[i].Close);
             }
+
+            // for (int i = dataSize-1; i > dataSize-period; i--){
+            //     closes.push_back(data[i].Close);
+            // }
             return closes;
         }
 
-        float calculateRSI(const std::vector<float>& closes)
-        {
-            return 0.0;
-        }
 
         bool isOverbought()
         {
@@ -134,12 +180,17 @@ class RSI : public StrategyBase {
         MarketCondition getCurrentMarketCondition()
         {
             return marketData.getCurrentData();
-            // Retrieves the latest data point (probably from inside StrategyBase).
         }
 
-        void logDecision(string ticker, float price)
+        void logDecision(MarketCondition currentCondition, float rsi)
         {
-            std::cout << "We have a " << decision << " for ticker: " << ticker << " at price: " << price << endl;
+            std::cout << "\n==== RSI SIGNAL ====" << std::endl;
+            std::cout << "Date: " << currentCondition.DateTime << std::endl;
+            std::cout << "Ticker: " << currentCondition.Ticker << std::endl;
+            std::cout << "Price:  $" << std::fixed << std::setprecision(2) << currentCondition.Close << std::endl;
+            std::cout << "RSI:    " << std::fixed << std::setprecision(1) << rsi << std::endl;
+            std::cout << "Action: " << decision << std::endl;
+            std::cout << "===================\n" << std::endl;
         }
 
         StrategyAttribute getAttributes() { return _strategyAttribute; }

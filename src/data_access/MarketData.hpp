@@ -36,7 +36,7 @@ class MarketData
         void next();
         
         // Current data access
-        MarketCondition getCurrentData() const { return currentData; }
+        MarketCondition getCurrentData();
         int getCurrentIndex() const { return currentIndex; }
 
     private:

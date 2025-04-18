@@ -240,3 +240,21 @@ MarketData::next()
         currentIndex++;
     }
 }
+
+MarketCondition
+MarketData::getCurrentData()
+{
+    // Check if we have set current data
+    // else get from top of vector
+    if(currentData.Close == 0 ||
+       currentData.Open == 0 ||
+       currentData.DateTime == "" ||
+       currentData.Ticker == "")
+
+    {
+        return data.back();
+    }
+    // else return (
+    
+    return currentData;
+}
