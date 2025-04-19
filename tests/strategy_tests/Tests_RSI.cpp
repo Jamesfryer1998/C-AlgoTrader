@@ -17,11 +17,29 @@ public:
 
     void GenerateMarketData()
     {
+        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_test.csv";
+        marketData.loadData(dataFilePath);
+    }
+
+    void GenerateMarketDataForSell()
+    {
+        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_for_sell.csv";
+        marketData.loadData(dataFilePath);
+    }
+
+    void GenerateMarketDataForBuy()
+    {
+        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_for_buy.csv";
+        marketData.loadData(dataFilePath);
+    }
+
+    void GenerateMarketDataForHold()
+    {
+        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_for_hold.csv";
         marketData.loadData(dataFilePath);
     }
 
     string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json";
-    string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_test_1.csv";
     MarketData marketData;
     StrategyFactory strategyFactory{stratFilePath};
 
@@ -41,7 +59,7 @@ TEST_F(RSITests, CanSupplyWithData)
 
     rsi.supplyData(marketData);
 
-    EXPECT_EQ(rsi.getData().getData().size(), 10);
+    EXPECT_EQ(rsi.getData().getData().size(), 20);
 }
 
 TEST_F(RSITests, ExecuteWorksCorreclty)
@@ -55,6 +73,48 @@ TEST_F(RSITests, ExecuteWorksCorreclty)
     EXPECT_NO_THROW(rsi.execute());
 }
 
+TEST_F(RSITests, ExecuteGenerateABuyOrder)
+{
+    auto strats = strategyFactory.generateStrategies();
+    RSI rsi{strats[0].get()->_strategyAttribute};
+    GenerateMarketDataForBuy();
+
+    rsi.supplyData(marketData);
+    rsi.execute();
+    
+    EXPECT_TRUE(rsi.NewOrder);
+    EXPECT_EQ("BUY", rsi.order.getTypeAsString());
+}
+
+TEST_F(RSITests, ExecuteGenerateASellOrder)
+{
+    auto strats = strategyFactory.generateStrategies();
+    RSI rsi{strats[0].get()->_strategyAttribute};
+    GenerateMarketDataForSell();
+
+    rsi.supplyData(marketData);
+    rsi.execute();
+    
+    EXPECT_TRUE(rsi.NewOrder);
+    EXPECT_EQ("SELL", rsi.order.getTypeAsString());
+}
+
+TEST_F(RSITests, ExecuteGenerateAHold)
+{
+    auto strats = strategyFactory.generateStrategies();
+    RSI rsi{strats[0].get()->_strategyAttribute};
+    GenerateMarketDataForHold();
+
+    rsi.supplyData(marketData);
+    rsi.execute();
+    
+    // We do not generate a order for a HOLD
+    EXPECT_FALSE(rsi.NewOrder);
+}
+
+
+// Calculate RSI
+// Following calculations have been tested in Excel and talib RSI formula to check against
 TEST_F(RSITests, CalculateCorrectRSIForConstantIncreaseOverPeriod)
 {
     auto strats = strategyFactory.generateStrategies();
@@ -95,15 +155,23 @@ TEST_F(RSITests, CalculateCorrectRSIForEqualRiseAndFallOverPeriod)
     EXPECT_EQ(50, rsi.calculateRSI(closes));
 }
 
+TEST_F(RSITests, TooFewPointsReturnsNeutural)
+{
+    auto strats = strategyFactory.generateStrategies();
+    RSI rsi{strats[0].get()->_strategyAttribute};
 
-// Following caluclations have been tested in Excel RSI formula to check againts
+    std::vector<float> closes = {1};
+
+    EXPECT_EQ(50, rsi.calculateRSI(closes));
+}
+
 TEST_F(RSITests, Calculation_1)
 {
     auto strats = strategyFactory.generateStrategies();
     strats[0].get()->_strategyAttribute.period = 14;
     RSI rsi{strats[0].get()->_strategyAttribute};
 
-    std::vector<float> closes = {109,187,167,178,167,176,148,154,134,176,123,145,165,122};
+    std::vector<float> closes = {109,187,167,178,167,176,148,154,134,176,123,145,165,122,122};
 
     EXPECT_EQ(51.79f, rsi.calculateRSI(closes));
 }
@@ -114,7 +182,98 @@ TEST_F(RSITests, Calculation_2)
     strats[0].get()->_strategyAttribute.period = 7;
     RSI rsi{strats[0].get()->_strategyAttribute};
 
-    std::vector<float> closes = {25.5, 26.0, 26.5, 27.1, 27.8, 27.9, 28.2, 27.3};
+    std::vector<float> closes = {25.5f, 26.0f, 26.5f, 27.1f, 27.8f, 27.9f, 28.2f, 27.3f};
 
-    EXPECT_EQ(63.79f, rsi.calculateRSI(closes));
+    EXPECT_EQ(75.0f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_3)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 14;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {45.0, 45.25, 45.10, 45.64, 46.25, 46.50, 46.75, 47.21, 47.42, 47.35, 47.15, 46.95, 47.65, 48.12, 48.55};
+
+    EXPECT_EQ(87.06f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_4)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 5;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {105.6, 104.7, 103.8, 102.9, 101.5, 100.2};
+
+    EXPECT_EQ(0.00f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_5)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 10;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {67.2, 67.2, 67.2, 67.2, 67.2, 67.2, 67.2, 67.2, 67.2, 67.2, 67.2};
+
+    EXPECT_EQ(50.00f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_6)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 9;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {34.5, 35.2, 36.1, 35.8, 35.9, 36.7, 37.2, 38.1, 39.2, 40.1};
+
+    EXPECT_EQ(95.16f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_7)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 21;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {128.6, 129.2, 130.5, 131.4, 132.8, 133.7, 132.5, 131.8, 132.4, 
+                                133.5, 134.6, 135.7, 136.9, 137.5, 136.8, 137.1, 138.6, 139.2, 
+                                138.5, 137.9, 138.4, 139.2};
+
+    EXPECT_EQ(78.80f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_8)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 3;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {243.8, 242.5, 241.3, 240.1};
+
+    EXPECT_EQ(0.00f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_9)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 6;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {55.72, 55.63, 55.95, 56.42, 56.89, 57.11, 57.63};
+
+    EXPECT_EQ(95.69f, rsi.calculateRSI(closes));
+}
+
+TEST_F(RSITests, Calculation_10)
+{
+    auto strats = strategyFactory.generateStrategies();
+    strats[0].get()->_strategyAttribute.period = 14;
+    RSI rsi{strats[0].get()->_strategyAttribute};
+
+    std::vector<float> closes = {425.5, 424.8, 425.3, 426.7, 428.1, 429.5, 428.7, 429.2, 430.6, 
+                                431.2, 432.5, 433.1, 432.4, 431.5, 432.7};
+
+    EXPECT_EQ(76.87f, rsi.calculateRSI(closes));
 }

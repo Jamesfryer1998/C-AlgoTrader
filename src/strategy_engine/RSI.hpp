@@ -25,16 +25,20 @@ class RSI : public StrategyBase {
 
         float calculateRSI(const std::vector<float>& closes)
         {
+            if (closes.size() <= 1) {
+                return 50.0f;
+            }
+
             float gainSum = 0.0f;
             float lossSum = 0.0f;
-            int period = _strategyAttribute.period;   
-
+            int period = _strategyAttribute.period;
+            
+            // Make sure we don't go out of bounds
+            period = std::min(period, static_cast<int>(closes.size() - 1));
             
             // Calculate gains and losses for the specified period
-            for (size_t i = closes.size() - period; i < closes.size()-1; i++) {
-                float current = closes[i];
-                float next = closes[i+1];
-                float change = next-current;
+            for (size_t i = 1; i < closes.size(); i++) {
+                float change = closes[i] - closes[i-1];
                 if (change > 0) {
                     gainSum += change;
                 } else {
@@ -42,11 +46,10 @@ class RSI : public StrategyBase {
                 }
             }
             
-            // Calculate average gain and loss
             float avgGain = gainSum / period;
             float avgLoss = lossSum / period;
             
-            // Handle division by zero
+            // Handle edge cases
             if (avgLoss == 0.0f && avgGain == 0.0f) {
                 return 50.0f; // No movement, neutral RSI
             } else if (avgLoss == 0.0f) {
@@ -119,10 +122,6 @@ class RSI : public StrategyBase {
             for (int i = start; i < dataSize; ++i) {
                 closes.push_back(data[i].Close);
             }
-
-            // for (int i = dataSize-1; i > dataSize-period; i--){
-            //     closes.push_back(data[i].Close);
-            // }
             return closes;
         }
 
