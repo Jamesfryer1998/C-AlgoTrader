@@ -34,7 +34,7 @@ class MarketData
         void rewind();
         bool hasNext();
         void next();
-        void setIndexedData();
+        std::vector<MarketCondition> getDataUpToCurrentIndex() const;
         
         // Current data access
         MarketCondition getCurrentData();

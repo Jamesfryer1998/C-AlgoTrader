@@ -27,7 +27,7 @@ class StrategyEngine
 
         bool backtest;
         json configData;
-        MarketData marketData;
+        MarketData* marketData; // Use a pointer to the MarketData object
         static OrderManagement* oms;
         std::vector<MarketCondition> marketConditions;
         std::vector<std::unique_ptr<StrategyBase>> strategyList;

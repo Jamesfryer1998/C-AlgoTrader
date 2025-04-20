@@ -185,6 +185,28 @@ MarketData::getData() const
     return data;
 }
 
+vector<MarketCondition>
+MarketData::getDataUpToCurrentIndex() const
+{
+    if (data.empty()) {
+        return std::vector<MarketCondition>();
+    }
+        
+    // For index 0, we need to ensure we return at least the first element
+    if (currentIndex == 0) {
+        if (!data.empty()) {
+            return std::vector<MarketCondition>{data[0]};
+        }
+        return std::vector<MarketCondition>();
+    }
+    
+    // For all other indices, return data from start up to and including current index
+    // After next() is called, currentIndex is the index of the next data point, not the current one
+    // So we need to use currentIndex, which is the position after the one we just processed
+    size_t endIdx = std::min(static_cast<size_t>(currentIndex), data.size());
+    return std::vector<MarketCondition>(data.begin(), data.begin() + endIdx);
+}
+
 string
 MarketData::generateFilePath(json configData)
 {
@@ -257,23 +279,4 @@ MarketData::getCurrentData()
     // else return (
     
     return currentData;
-}
-
-void 
-MarketData::setIndexedData()
-{
-    // Make a backup of the full data
-
-    if (data.empty() || currentIndex <= 0) {
-        std::cerr << "Warning: Cannot set indexed data - data is empty or index is invalid" << currentIndex << std::endl;
-        return;
-    }
- 
-    // Create a new vector with data up to current index
-    std::vector<MarketCondition> limitedData(data.begin(), data.begin() + currentIndex);
-
-    // Replace data with the limited version
-    data = limitedData;
-
-    std::cout << "MarketData limited to " << currentIndex << " data points for backtesting" << std::endl;
 }

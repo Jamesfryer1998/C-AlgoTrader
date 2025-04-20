@@ -47,7 +47,7 @@ class StrategyBase
             return order; 
         };
 
-        virtual void supplyData(MarketData marketdata)
+        virtual void supplyData(MarketData& marketdata)
         {
             marketData = marketdata;
         }

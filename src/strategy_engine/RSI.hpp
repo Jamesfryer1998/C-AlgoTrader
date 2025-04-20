@@ -1,4 +1,6 @@
 #include "StrategyBase.hpp"
+#include <cassert>
+#include <iomanip> // For std::setprecision
 
 class RSI : public StrategyBase {
     public:
@@ -13,7 +15,7 @@ class RSI : public StrategyBase {
             run();
         }
 
-        void supplyData(MarketData marketdata) override
+        void supplyData(MarketData& marketdata) override
         {
             marketData = marketdata;
         }
@@ -25,39 +27,49 @@ class RSI : public StrategyBase {
 
         float calculateRSI(const std::vector<float>& closes)
         {
+            // Verify we have enough data to calculate RSI properly
             if (closes.size() <= 1) {
-                return 50.0f;
+                // Since getRecentCloses() now strictly enforces the period requirement,
+                // we should never get here unless there's an error
+                std::cout << "ERROR - calculateRSI: Called with insufficient data (" 
+                          << closes.size() << " points)" << std::endl;
+                return 50.0f; // Return neutral value as a fallback
             }
 
             float gainSum = 0.0f;
             float lossSum = 0.0f;
             int period = _strategyAttribute.period;
             
-            // Make sure we don't go out of bounds
-            period = std::min(period, static_cast<int>(closes.size() - 1));
+            assert(static_cast<int>(closes.size()) >= period);
             
-            // Calculate gains and losses for the specified period
+            // Calculate gains and losses for all available price changes
             for (size_t i = 1; i < closes.size(); i++) {
                 float change = closes[i] - closes[i-1];
                 if (change > 0) {
                     gainSum += change;
-                } else {
+                } else if (change < 0) {
                     lossSum -= change;
                 }
             }
             
-            float avgGain = gainSum / period;
-            float avgLoss = lossSum / period;
+            // Use the configured period for the average
+            float avgGain = gainSum / (closes.size() - 1);
+            float avgLoss = lossSum / (closes.size() - 1);
             
             // Handle edge cases
             if (avgLoss == 0.0f && avgGain == 0.0f) {
-                return 50.0f; // No movement, neutral RSI
+                std::cout << "INFO - calculateRSI: No price movement, returning neutral RSI 50" << std::endl;
+                return 50.0f;
             } else if (avgLoss == 0.0f) {
-                return 100.0f; // No losses means RSI = 100
+                std::cout << "INFO - calculateRSI: No losses, returning maximum RSI 100" << std::endl;
+                return 100.0f;
             }
             
             float rs = avgGain / avgLoss;
             float rsi = 100.0f - (100.0f / (1.0f + rs));
+            
+            std::cout << "INFO - calculateRSI: Calculated RSI(" << period << "): " << std::fixed 
+                      << std::setprecision(2) << rsi << " using " << closes.size() << " data points" << std::endl;
             
             return std::round(rsi * 100) / 100;
         }
@@ -77,7 +89,12 @@ class RSI : public StrategyBase {
         void run()
         {
             std::vector<float> recentCloses = getRecentCloses(_strategyAttribute.period);
-            if(recentCloses.size() == 0) return;
+            if(recentCloses.size() == 0) {
+                std::cout << "DEBUG - RSI::run - No recent closes, skipping RSI calculation" << std::endl;
+                return;
+            }
+            
+            std::cout << "DEBUG - RSI::run - Got " << recentCloses.size() << " recent closes" << std::endl;
             MarketCondition currentCondition = getCurrentMarketCondition();
             float quantity = 0.0;
 
@@ -103,22 +120,23 @@ class RSI : public StrategyBase {
         std::vector<float> getRecentCloses(int period)
         {
             std::vector<float> closes;
-            const auto& data = marketData.getData();
+            const auto& data = marketData.getDataUpToCurrentIndex();
             int dataSize = static_cast<int>(data.size());
-
+            
             if (data.empty() || period <= 0) 
             {
                 std::cout << "Data is empty, or invalid period set, period:" << period << std::endl;
                 return closes;
             }
+            
             if (dataSize < period)
             {
-                std::cout << "Not enought data for period: " << period << std::endl;
-                return closes;
+                std::cout << "Skipping RSI calculation: Insufficient data (" << dataSize 
+                          << " points available, " << period << " required)" << std::endl;
+                return closes; // Return empty vector
             }
 
             int start = std::max(0, dataSize - period);
-
             for (int i = start; i < dataSize; ++i) {
                 closes.push_back(data[i].Close);
             }
@@ -129,13 +147,11 @@ class RSI : public StrategyBase {
         bool isOverbought()
         {
             return (rsi > _strategyAttribute.overbought_threshold);
-            // Returns true if RSI > overbought_threshold.
         }
 
         bool isOversold()
         {
             return (rsi < _strategyAttribute.oversold_threshold);
-            // Returns true if RSI < oversold_threshold.
         }
 
         bool isNeutral()

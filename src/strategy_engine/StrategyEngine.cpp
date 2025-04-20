@@ -4,11 +4,13 @@
 OrderManagement* StrategyEngine::oms = new OrderManagement();
 
 StrategyEngine::StrategyEngine()
+: marketData(nullptr)
 {
 }
 
 StrategyEngine::~StrategyEngine()
 {
+    // We don't own the marketData pointer, so don't delete it
 }
 
 
@@ -19,7 +21,7 @@ StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData
     configData = configdata;
     oms->setUp(configData, broker);
     strategyList = stratFactory.generateStrategies();
-    marketData = marketdata;
+    marketData = &marketdata; // Store a pointer to the MarketData object
     backtest = Backtest;
 
     std::cout << "  --> Config Data set" << std::endl;
@@ -35,16 +37,23 @@ StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData
 void
 StrategyEngine::run()
 {
+    // Check if marketData pointer is valid
+    if (marketData == nullptr) {
+        std::cerr << "ERROR: marketData pointer is null in StrategyEngine::run()" << std::endl;
+        return;
+    }
+    
     // We don't need to reload the data every time
     // The MarketData object already has the data loaded
     // and is advanced by next() in backtesting mode
     if(!backtest)
-        marketData.process(configData);
-    else
-        marketData.setIndexedData();
+        marketData->process(configData);
     
-    setMarketData(marketData);
-    oms->setMarketData(marketData);
+    // No need to call setIndexedData() which replaces the entire dataset
+    // Instead, we'll use the getDataUpToCurrentIndex() method when needed
+    
+    setMarketData(*marketData);
+    oms->setMarketData(*marketData);
 
     // std::cout << "Executing strategies..." << std::endl;
     executeStrategies();
@@ -59,11 +68,16 @@ StrategyEngine::setMarketData(MarketData& inputData)
 void
 StrategyEngine::executeStrategies()
 {
-    // Maybe thread this, thread for each strategy
+    // Check if marketData pointer is valid
+    if (marketData == nullptr) {
+        std::cerr << "ERROR: marketData pointer is null in StrategyEngine::executeStrategies()" << std::endl;
+        return;
+    }
 
+    // Maybe thread this, thread for each strategy
     for (auto& strat : strategyList) 
     {
-        strat->supplyData(marketData);
+        strat->supplyData(*marketData); // Pass by reference
         strat->execute();
         if(strat->onNewOrder())
         {
