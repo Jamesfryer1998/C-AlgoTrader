@@ -10,9 +10,8 @@
 #include "../util/DateTimeConversion.hpp"
 
 MarketData::MarketData() 
-: currentIndex(0)
+: currentIndex(0), backtest(false)
 {
-    backtest = false;
 }
 
 MarketData::~MarketData() 
@@ -185,31 +184,33 @@ MarketData::update(std::vector<MarketCondition>& marketData)
 vector<MarketCondition>
 MarketData::getData() const
 {
-    return data;
+    if (backtest) {
+        return getDataUpToCurrentIndex();
+    } else {
+        return data;
+    }
 }
 
 vector<MarketCondition>
 MarketData::getDataUpToCurrentIndex() const
 {
-    if(backtest){
-        // For index 0, we need to ensure we return at least the first element
-        if (currentIndex == 0) {
-            if (!data.empty()) {
-                return std::vector<MarketCondition>{data[0]};
-            }
-            return std::vector<MarketCondition>();
-        }
-        
-        // For all other indices, return data from start up to and including current index
-        // After next() is called, currentIndex is the index of the next data point, not the current one
-        // So we need to use currentIndex, which is the position after the one we just processed
-        size_t endIdx = std::min(static_cast<size_t>(currentIndex), data.size());
-        return std::vector<MarketCondition>(data.begin(), data.begin() + endIdx);
-    }
-    else
-    {
+    if (!backtest) {
         return data;
     }
+    
+    // For index 0, we need to ensure we return at least the first element
+    if (currentIndex == 0) {
+        if (!data.empty()) {
+            return std::vector<MarketCondition>{data[0]};
+        }
+        return std::vector<MarketCondition>();
+    }
+    
+    // For all other indices, return data from start up to and including current index
+    // After next() is called, currentIndex is the index of the next data point, not the current one
+    // So we need to use currentIndex, which is the position after the one we just processed
+    size_t endIdx = std::min(static_cast<size_t>(currentIndex), data.size());
+    return std::vector<MarketCondition>(data.begin(), data.begin() + endIdx);
 }
 
 string
@@ -243,6 +244,20 @@ MarketData::getLastClosePrice()
     if (data.empty()) {
         throw std::runtime_error("No market data available");
     }
+    
+    if (backtest) {
+        // In backtest mode, return the close of the current data point
+        // If current index is 0, we need to ensure we have at least one data point
+        if (currentIndex == 0 && !data.empty()) {
+            return data[0].Close;
+        } else if (currentIndex > 0) {
+            // Return the last processed data point (currentIndex-1)
+            int idx = std::min(currentIndex - 1, static_cast<int>(data.size() - 1));
+            return data[idx].Close;
+        }
+    }
+    
+    // In normal mode, return the last data point's close
     return data.back().Close;
 }
 
@@ -273,16 +288,19 @@ MarketCondition
 MarketData::getCurrentData()
 {
     // Check if we have set current data
-    // else get from top of vector
+    // else get from the appropriate place
     if(currentData.Close == 0 ||
        currentData.Open == 0 ||
        currentData.DateTime == "" ||
        currentData.Ticker == "")
-
     {
-        return data.back();
+        if (backtest && currentIndex > 0) {
+            int idx = std::min(currentIndex - 1, static_cast<int>(data.size() - 1));
+            return data[idx];
+        } else {
+            return data.back();
+        }
     }
-    // else return (
     
     return currentData;
 }

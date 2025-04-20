@@ -83,8 +83,9 @@ void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
     
     // Verify the data was set and reset the current index to the beginning
     marketData.rewind();
-    std::cout << "Verified market data size: " << marketData.getData().size() << " data points" << std::endl;
-    std::cout << "First data point: " << (marketData.getData().empty() ? "N/A" : marketData.getData()[0].DateTime) << std::endl;
+    const auto& fullData = marketData.getFullData();
+    std::cout << "Verified market data size: " << fullData.size() << " data points" << std::endl;
+    std::cout << "First data point: " << (fullData.empty() ? "N/A" : fullData[0].DateTime) << std::endl;
     std::cout << "Current index after rewind: " << marketData.getCurrentIndex() << std::endl;
 }
 
@@ -112,12 +113,12 @@ Backtester::run()
             marketData.processForBacktest(algoConfig, startDate, endDate);
         }
     } else {
-        std::cout << "Using directly provided market data (" << marketData.getData().size() << " data points)" << std::endl;
+        std::cout << "Using directly provided market data (" << marketData.getFullData().size() << " data points)" << std::endl;
     }
     
     
     // Verify we have data before proceeding
-    if (marketData.getData().empty()) {
+    if (marketData.getFullData().empty()) {
         std::cerr << "ERROR: No market data available for backtesting. Exiting run()." << std::endl;
         return;
     }
@@ -132,16 +133,19 @@ Backtester::run()
     // Initialize backtest
     initializeBacktest();
     
+    // Use getFullData() to get complete data regardless of backtest mode
+    const auto& fullData = marketData.getFullData();
+    
     // Log initial state - ensure we have data before trying to access it
-    if (!marketData.getData().empty()) {
-        equityCurve.push_back({marketData.getData()[0].DateTime, broker.getCurrentEquity()});
+    if (!fullData.empty()) {
+        equityCurve.push_back({fullData[0].DateTime, broker.getCurrentEquity()});
     } else {
         std::cerr << "ERROR: Market data is empty after initialization. Exiting run()." << std::endl;
         return;
     }
     
-    // Count how many data points we'll process
-    size_t totalDataPoints = marketData.getData().size();
+    // Count how many data points we'll process using the full dataset
+    size_t totalDataPoints = fullData.size();
     std::cout << "Processing " << totalDataPoints << " market data points" << std::endl;
     
     // Progress tracking

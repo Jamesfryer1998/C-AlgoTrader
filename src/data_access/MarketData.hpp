@@ -37,6 +37,9 @@ class MarketData
         void setBacktest();
         std::vector<MarketCondition> getDataUpToCurrentIndex() const;
         
+        // Get the full data regardless of backtest mode (for initialization only)
+        std::vector<MarketCondition> getFullData() const { return data; }
+        
         // Current data access
         MarketCondition getCurrentData();
         int getCurrentIndex() const { return currentIndex; }

@@ -74,10 +74,6 @@ bool
 OrderValidator::checkMaxPositionSize(const Order& order)
 {
     return (order.getQuantity() <= maxPositionSize);
-
-    // TODO: Decide
-    // Might need OMS here, pull back positions for TICKER
-    // Check againts maxPositionSize
 }
 
 bool

@@ -96,7 +96,7 @@ class RSI : public StrategyBase {
             
             std::cout << "DEBUG - RSI::run - Got " << recentCloses.size() << " recent closes" << std::endl;
             MarketCondition currentCondition = getCurrentMarketCondition();
-            float quantity = 0.0;
+            float quantity = 1;
 
             rsi = calculateRSI(recentCloses);
 
@@ -114,7 +114,7 @@ class RSI : public StrategyBase {
             }
 
             if (decision != orderTypeToString(OrderType::HOLD))
-                logDecision(currentCondition, rsi);
+                logDecision(currentCondition, rsi, quantity);
         }
 
         std::vector<float> getRecentCloses(int period)
@@ -171,6 +171,9 @@ class RSI : public StrategyBase {
                 price
             };
 
+            order.setStopLoss(_strategyAttribute.stop_loss);
+            order.setTakeProfit(_strategyAttribute.take_profit);
+
             decision = orderTypeToString(OrderType::BUY);
             NewOrder = true;
             return order;
@@ -184,6 +187,9 @@ class RSI : public StrategyBase {
                 quantity,
                 price
             };
+
+            order.setStopLoss(_strategyAttribute.stop_loss);
+            order.setTakeProfit(_strategyAttribute.take_profit);
 
             decision = orderTypeToString(OrderType::SELL);
             NewOrder = true;
@@ -200,13 +206,14 @@ class RSI : public StrategyBase {
             return marketData.getCurrentData();
         }
 
-        void logDecision(MarketCondition currentCondition, float rsi)
+        void logDecision(MarketCondition currentCondition, float rsi, float quantity)
         {
             std::cout << "\n==== RSI SIGNAL ====" << std::endl;
             std::cout << "Date: " << currentCondition.DateTime << std::endl;
             std::cout << "Ticker: " << currentCondition.Ticker << std::endl;
             std::cout << "Price:  $" << std::fixed << std::setprecision(2) << currentCondition.Close << std::endl;
-            std::cout << "RSI:    " << std::fixed << std::setprecision(1) << rsi << std::endl;
+            std::cout << "Quantity:  " << std::fixed << std::setprecision(2) << quantity << std::endl;
+            std::cout << "RSI:    " << std::fixed << std::setprecision(2) << rsi << std::endl;
             std::cout << "Action: " << decision << std::endl;
             std::cout << "===================\n" << std::endl;
         }
