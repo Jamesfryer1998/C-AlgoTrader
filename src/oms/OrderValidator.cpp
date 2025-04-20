@@ -90,7 +90,15 @@ OrderValidator::checkStopLoss(const Order& order, MarketData& marketData)
     // This also forces us to use stoploss and take profit values which is probs a good thing
     if(order.getStopLossPrice() == 0) return false;
     if(order.getStopLossPrice() == marketData.getLastClosePrice()) return false;
-    if(order.getStopLossPrice() > marketData.getLastClosePrice()) return false;
+
+    if(order.getType() == OrderType::BUY)
+    {
+        if(order.getStopLossPrice() > marketData.getLastClosePrice()) return false;
+    }
+    else if(order.getType() == OrderType::SELL)
+    {
+        if(order.getStopLossPrice() < marketData.getLastClosePrice()) return false;
+    }
 
     return true;
 }
@@ -103,7 +111,15 @@ OrderValidator::checkTakeProfit(const Order& order, MarketData& marketData)
     // If price has rises too far maybe we dont want to do the trade?
     if(order.getTakeProfitPrice() == 0) return false;
     if(order.getTakeProfitPrice() == marketData.getLastClosePrice()) return false;
-    if(order.getTakeProfitPrice() < marketData.getLastClosePrice()) return false;
+
+    if(order.getType() == OrderType::BUY)
+    {
+        if(order.getTakeProfitPrice() < marketData.getLastClosePrice()) return false;
+    }
+    else if(order.getType() == OrderType::SELL)
+    {
+        if(order.getTakeProfitPrice() > marketData.getLastClosePrice()) return false;
+    }
 
     return true;
 }

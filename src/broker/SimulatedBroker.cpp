@@ -365,10 +365,16 @@ SimulatedBroker::nextStep()
 {
     process();
     
-    if (static_cast<size_t>(step+1) >= marketData.getData().size()) {
+    if(marketData.reachedEnd())
+    {
         std::cout << "Simulation finished." << std::endl;
         return;
     }
+
+    // if (static_cast<size_t>(step+1) >= marketData.getData().size()) {
+    //     std::cout << "Simulation finished." << std::endl;
+    //     return;
+    // }
 
     // Move to the next market condition
     step++;

@@ -310,3 +310,12 @@ MarketData::setBacktest()
 {
     backtest = true;
 }
+
+bool
+MarketData::reachedEnd()
+{
+    if(static_cast<size_t>(1+currentIndex) == data.size())
+       return true;
+    
+    return false;
+}

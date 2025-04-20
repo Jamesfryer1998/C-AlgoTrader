@@ -175,7 +175,7 @@ public:
     }
 };
 
-TEST_F(BacktestIntegrationTests, DISABLED_BacktesterWithSimulatedBrokerTrendingMarket) {
+TEST_F(BacktestIntegrationTests, BacktesterWithSimulatedBrokerTrendingMarket) {
     setupTrendingMarket();
     createBroker();
     createBacktester();
