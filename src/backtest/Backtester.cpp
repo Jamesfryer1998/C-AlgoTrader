@@ -21,7 +21,7 @@ Backtester::Backtester(const json& algoConfig)
     broker.setStartingCapital(100000.0);
     broker.setCommission(1.0);
     broker.setSlippage(0.0005);
-    
+
     // Default date range (last 7 days)
     auto now = std::chrono::system_clock::now();
     auto endTimeT = std::chrono::system_clock::to_time_t(now);
@@ -99,6 +99,7 @@ Backtester::run()
     
     // Record start time
     auto startTime = std::chrono::high_resolution_clock::now();
+    marketData.setBacktest();
     
     // Only process market data if not using direct data mode
     if (!useDirectData) {

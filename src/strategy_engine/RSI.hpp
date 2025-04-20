@@ -137,8 +137,11 @@ class RSI : public StrategyBase {
             }
 
             int start = std::max(0, dataSize - period);
+            // std::cout << "DEBUG: Recent closes for RSI calculation:" << std::endl;
             for (int i = start; i < dataSize; ++i) {
                 closes.push_back(data[i].Close);
+                // std::cout << "  [" << i - start << "] " << data[i].DateTime << ": $" 
+                //           << std::fixed << std::setprecision(2) << data[i].Close << std::endl;
             }
             return closes;
         }

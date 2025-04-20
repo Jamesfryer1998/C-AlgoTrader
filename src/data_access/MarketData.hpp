@@ -34,6 +34,7 @@ class MarketData
         void rewind();
         bool hasNext();
         void next();
+        void setBacktest();
         std::vector<MarketCondition> getDataUpToCurrentIndex() const;
         
         // Current data access
@@ -45,6 +46,7 @@ class MarketData
         MarketCondition currentData;
         int currentIndex;
         static std::string const FILE_PATH;
+        bool backtest;
         
         // Helper methods
         std::string getDataDirectory();

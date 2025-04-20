@@ -12,6 +12,7 @@
 MarketData::MarketData() 
 : currentIndex(0)
 {
+    backtest = false;
 }
 
 MarketData::~MarketData() 
@@ -45,6 +46,8 @@ MarketData::processForBacktest(json configData, const std::string& startDate, co
     
     // Update our data with the stitched data
     update(stitchedData);
+
+    backtest = true;
     
     // If no data was found, try loading a single file as fallback
     if (data.empty()) {
@@ -188,23 +191,25 @@ MarketData::getData() const
 vector<MarketCondition>
 MarketData::getDataUpToCurrentIndex() const
 {
-    if (data.empty()) {
-        return std::vector<MarketCondition>();
-    }
-        
-    // For index 0, we need to ensure we return at least the first element
-    if (currentIndex == 0) {
-        if (!data.empty()) {
-            return std::vector<MarketCondition>{data[0]};
+    if(backtest){
+        // For index 0, we need to ensure we return at least the first element
+        if (currentIndex == 0) {
+            if (!data.empty()) {
+                return std::vector<MarketCondition>{data[0]};
+            }
+            return std::vector<MarketCondition>();
         }
-        return std::vector<MarketCondition>();
+        
+        // For all other indices, return data from start up to and including current index
+        // After next() is called, currentIndex is the index of the next data point, not the current one
+        // So we need to use currentIndex, which is the position after the one we just processed
+        size_t endIdx = std::min(static_cast<size_t>(currentIndex), data.size());
+        return std::vector<MarketCondition>(data.begin(), data.begin() + endIdx);
     }
-    
-    // For all other indices, return data from start up to and including current index
-    // After next() is called, currentIndex is the index of the next data point, not the current one
-    // So we need to use currentIndex, which is the position after the one we just processed
-    size_t endIdx = std::min(static_cast<size_t>(currentIndex), data.size());
-    return std::vector<MarketCondition>(data.begin(), data.begin() + endIdx);
+    else
+    {
+        return data;
+    }
 }
 
 string
@@ -259,6 +264,7 @@ MarketData::next()
 {
     if (hasNext()) {
         currentData = data[currentIndex];
+        std::cout << "DEBUG: Processing timepoint [" << currentData.DateTime << "] at index " << currentIndex << std::endl;
         currentIndex++;
     }
 }
@@ -279,4 +285,10 @@ MarketData::getCurrentData()
     // else return (
     
     return currentData;
+}
+
+void
+MarketData::setBacktest()
+{
+    backtest = true;
 }

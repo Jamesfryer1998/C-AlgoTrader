@@ -84,7 +84,8 @@
         "random": "cpp",
         "regex": "cpp",
         "future": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "cassert": "cpp"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }

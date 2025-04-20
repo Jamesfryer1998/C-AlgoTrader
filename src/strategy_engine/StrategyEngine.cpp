@@ -49,9 +49,6 @@ StrategyEngine::run()
     if(!backtest)
         marketData->process(configData);
     
-    // No need to call setIndexedData() which replaces the entire dataset
-    // Instead, we'll use the getDataUpToCurrentIndex() method when needed
-    
     setMarketData(*marketData);
     oms->setMarketData(*marketData);
 
