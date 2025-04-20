@@ -34,6 +34,7 @@ class MarketData
         void rewind();
         bool hasNext();
         void next();
+        void setIndexedData();
         
         // Current data access
         MarketCondition getCurrentData();

@@ -258,3 +258,22 @@ MarketData::getCurrentData()
     
     return currentData;
 }
+
+void 
+MarketData::setIndexedData()
+{
+    // Make a backup of the full data
+
+    if (data.empty() || currentIndex <= 0) {
+        std::cerr << "Warning: Cannot set indexed data - data is empty or index is invalid" << currentIndex << std::endl;
+        return;
+    }
+ 
+    // Create a new vector with data up to current index
+    std::vector<MarketCondition> limitedData(data.begin(), data.begin() + currentIndex);
+
+    // Replace data with the limited version
+    data = limitedData;
+
+    std::cout << "MarketData limited to " << currentIndex << " data points for backtesting" << std::endl;
+}

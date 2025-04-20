@@ -40,6 +40,8 @@ StrategyEngine::run()
     // and is advanced by next() in backtesting mode
     if(!backtest)
         marketData.process(configData);
+    else
+        marketData.setIndexedData();
     
     setMarketData(marketData);
     oms->setMarketData(marketData);
