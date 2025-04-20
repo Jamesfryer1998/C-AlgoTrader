@@ -7,6 +7,7 @@
 #include "../../src/strategy_engine/StrategyFactory.hpp"
 #include "../../src/oms/Order.hpp"
 #include "../../src/oms/Position.hpp"
+#include "MockMarketDataAdapter.hpp"
 
 // Class for creating mock data
 class TestMarketDataProvider {
@@ -123,7 +124,7 @@ public:
 // Integration test fixture
 class BacktestIntegrationTests : public ::testing::Test {
 public:
-    std::unique_ptr<MarketData> marketData;
+    std::unique_ptr<MockMarketDataAdapter> mockAdapter;
     std::unique_ptr<SimulatedBroker> broker;
     std::unique_ptr<Backtester> backtester;
     json testConfig;
@@ -134,33 +135,33 @@ public:
         config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
         testConfig = config.loadConfig();
 
-        // Initialize market data
-        marketData = std::make_unique<MarketData>();
+        // Initialize market data adapter
+        mockAdapter = std::make_unique<MockMarketDataAdapter>();
     }
     
     void TearDown() override {
         backtester.reset();
         broker.reset();
-        marketData.reset();
+        mockAdapter.reset();
     }
     
     void setupTrendingMarket() {
         auto mockData = TestMarketDataProvider::createTrendingMarketData();
-        marketData->update(mockData);
+        mockAdapter->setMockData(mockData);
     }
     
     void setupVolatileMarket() {
         auto mockData = TestMarketDataProvider::createVolatileMarketData();
-        marketData->update(mockData);
+        mockAdapter->setMockData(mockData);
     }
     
     void setupMultiAssetMarket() {
         auto mockData = TestMarketDataProvider::createMultiAssetMarketData();
-        marketData->update(mockData);
+        mockAdapter->setMockData(mockData);
     }
     
     void createBroker() {
-        broker = std::make_unique<SimulatedBroker>(*marketData);
+        broker = std::make_unique<SimulatedBroker>(mockAdapter->getMarketData());
         broker->setStartingCapital(100000.0);
         broker->setCommission(1.0);
         broker->setSlippage(0.001);
@@ -168,8 +169,8 @@ public:
     
     void createBacktester() {
         backtester = std::make_unique<Backtester>(testConfig);
-        // Use the market data we've set up directly
-        std::vector<MarketCondition> mockData = marketData->getData();
+        // Get the complete dataset from the adapter
+        std::vector<MarketCondition> mockData = mockAdapter->getFullDataset();
         backtester->setMarketData(mockData);
         backtester->useDirectMarketData(true);
     }
@@ -299,7 +300,7 @@ TEST_F(BacktestIntegrationTests, DISABLED_MultiAssetBacktesting) {
 
 TEST_F(BacktestIntegrationTests, DISABLED_LongTermVsShortTermBacktesting) {
     auto shortTermData = TestMarketDataProvider::createTrendingMarketData(10);
-    marketData->update(shortTermData);
+    mockAdapter->setMockData(shortTermData);
     
     createBroker();
     createBacktester();
@@ -308,7 +309,7 @@ TEST_F(BacktestIntegrationTests, DISABLED_LongTermVsShortTermBacktesting) {
     const PerformanceMetrics& shortTermMetrics = backtester->getPerformanceMetrics();
     
     auto longTermData = TestMarketDataProvider::createTrendingMarketData(60);
-    marketData->update(longTermData);
+    mockAdapter->setMockData(longTermData);
     
     createBroker();
     createBacktester();
@@ -359,7 +360,7 @@ TEST_F(BacktestIntegrationTests, DISABLED_ResilienceToExtremeMarketConditions) {
         extremeData.push_back(condition);
     }
     
-    marketData->update(extremeData);
+    mockAdapter->setMockData(extremeData);
     
     createBroker();
     createBacktester();

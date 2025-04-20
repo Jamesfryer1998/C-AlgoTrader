@@ -22,6 +22,13 @@ SimulatedBroker::SimulatedBroker(MarketData& marketdata)
     useFixedSeed = false;
     randomSeed = 42; // Default seed
     
+    // Log the default settings
+    std::cout << "SimulatedBroker initialized with:"
+              << "\n  - Starting capital: $" << startingCapital
+              << "\n  - Commission: $" << commissionPerTrade << " per trade"
+              << "\n  - Slippage: ±" << (slippagePercentage * 100.0) << "% (random variation)"
+              << std::endl;
+    
     connect();
 }
 
@@ -40,15 +47,20 @@ SimulatedBroker::~SimulatedBroker()
 void
 SimulatedBroker::process()
 {
+    // Check for valid market data
     auto data = marketData.getData();
     if(data.size() == 0)
     {
         throw std::runtime_error("No market data found");
     }
 
-    // Use the current MarketData index instead of our own step counter
-    currentCondition = data[step];
+    // Always refresh the current condition to ensure we're using the latest data
+    // This is critical for timestamp consistency between strategy signals and order execution
+    currentCondition = marketData.getCurrentData();
     simulationTime = currentCondition.DateTime;
+    
+    // Log the current time step being processed
+    std::cout << "SimulatedBroker processing time step: " << simulationTime << std::endl;
     
     // Process pending orders with latest market data
     processOrders();
@@ -97,6 +109,12 @@ SimulatedBroker::placeOrder(Order order)
 {
     // Add order to pending orders queue
     pendingOrders.push_back(order);
+    
+    // Update to ensure we're using the most current timestamp from MarketData
+    // Get fresh current data from MarketData to ensure timestamp consistency
+    currentCondition = marketData.getCurrentData();
+    simulationTime = currentCondition.DateTime;
+    
     std::cout << "Order placed for order " 
               << order.getId() << " for " 
               << order.getTypeAsString() << " with " 
@@ -146,8 +164,10 @@ SimulatedBroker::executeOrder(Order& order)
 {
     // Get current price for the ticker
     float basePrice = getLatestPrice(order.getTicker());
+    float originalOrderPrice = order.getPrice();
     
     double slippageMultiplier = 1.0;
+    double actualSlippagePercent = 0.0;
     
     if (slippagePercentage > 0.0) {
         std::mt19937 gen;
@@ -162,7 +182,8 @@ SimulatedBroker::executeOrder(Order& order)
         }
         
         std::uniform_real_distribution<> slippageDist(-slippagePercentage, slippagePercentage);
-        slippageMultiplier = 1.0 + slippageDist(gen);
+        actualSlippagePercent = slippageDist(gen);
+        slippageMultiplier = 1.0 + actualSlippagePercent;
     }
     
     double executionPrice = basePrice * slippageMultiplier;
@@ -170,9 +191,13 @@ SimulatedBroker::executeOrder(Order& order)
     // For limit orders, check price constraints
     if (order.getType() == OrderType::LIMIT_BUY && executionPrice > order.getPrice()) {
         // Cannot execute buy limit order above limit price
+        std::cout << "Limit Buy order not executed: Market price $" << executionPrice 
+                  << " above limit price $" << order.getPrice() << std::endl;
         return;
     } else if (order.getType() == OrderType::LIMIT_SELL && executionPrice < order.getPrice()) {
         // Cannot execute sell limit order below limit price
+        std::cout << "Limit Sell order not executed: Market price $" << executionPrice 
+                  << " below limit price $" << order.getPrice() << std::endl;
         return;
     }
     
@@ -187,9 +212,22 @@ SimulatedBroker::executeOrder(Order& order)
     filledOrders.push_back(order);
     totalTrades++;
     
+    // Calculate the price difference due to slippage
+    // double priceDifference = executionPrice - originalOrderPrice;
+    // double slippageImpact = (priceDifference / originalOrderPrice) * 100.0;
+    
     std::cout << "Order executed: " << (order.isBuy() ? "BUY" : "SELL")
               << " " << order.getQuantity() << " shares of " << order.getTicker()
-              << " at $" << executionPrice << std::endl;
+              << " at $" << std::fixed << std::setprecision(2) << executionPrice;
+    
+    // Display slippage information
+    if (slippagePercentage > 0.0) {
+        std::cout << " (Order price: $" << std::fixed << std::setprecision(2) << originalOrderPrice
+                  << ", Slippage: " << (actualSlippagePercent >= 0 ? "+" : "")
+                  << std::fixed << std::setprecision(3) << (actualSlippagePercent * 100.0) << "%)";
+    }
+    
+    std::cout << std::endl;
 }
 
 void
@@ -365,17 +403,9 @@ SimulatedBroker::nextStep()
 {
     process();
     
-    if(marketData.reachedEnd())
-    {
-        std::cout << "Simulation finished." << std::endl;
-        return;
-    }
-
-    // if (static_cast<size_t>(step+1) >= marketData.getData().size()) {
-    //     std::cout << "Simulation finished." << std::endl;
-    //     return;
-    // }
-
+    // Note: The Backtester now controls the time stepping and data handling,
+    // so this method just runs the current step's processing
+    
     // Move to the next market condition
     step++;
 }
@@ -422,7 +452,12 @@ SimulatedBroker::getFilledOrders() const
 void 
 SimulatedBroker::setSlippage(double slippagePerc) 
 {
+    double oldSlippage = slippagePercentage;
     slippagePercentage = slippagePerc;
+    
+    std::cout << "SimulatedBroker: Slippage changed from ±" 
+              << std::fixed << std::setprecision(3) << (oldSlippage * 100.0) 
+              << "% to ±" << (slippagePercentage * 100.0) << "%" << std::endl;
 }
 
 void 

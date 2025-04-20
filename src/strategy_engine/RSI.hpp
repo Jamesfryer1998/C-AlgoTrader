@@ -120,7 +120,7 @@ class RSI : public StrategyBase {
         std::vector<float> getRecentCloses(int period)
         {
             std::vector<float> closes;
-            const auto& data = marketData.getDataUpToCurrentIndex();
+            const auto& data = marketData.getData();
             int dataSize = static_cast<int>(data.size());
             
             if (data.empty() || period <= 0) 

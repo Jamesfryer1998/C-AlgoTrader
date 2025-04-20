@@ -15,14 +15,13 @@ StrategyEngine::~StrategyEngine()
 
 
 void 
-StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData &marketdata, BrokerBase* broker, bool Backtest)
+StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData &marketdata, BrokerBase* broker)
 {    
     std::cout << "Setting up Strategy Engine..." << std::endl;
     configData = configdata;
     oms->setUp(configData, broker);
     strategyList = stratFactory.generateStrategies();
     marketData = &marketdata; // Store a pointer to the MarketData object
-    backtest = Backtest;
 
     std::cout << "  --> Config Data set" << std::endl;
     std::cout << "  --> OMS set" << std::endl;
@@ -33,7 +32,6 @@ StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData
     printStategies();
 }
 
-// This will run in a continuious loop somewhere, every min maybe?
 void
 StrategyEngine::run()
 {
@@ -43,16 +41,13 @@ StrategyEngine::run()
         return;
     }
     
-    // We don't need to reload the data every time
-    // The MarketData object already has the data loaded
-    // and is advanced by next() in backtesting mode
-    if(!backtest)
-        marketData->process(configData);
-    
+    // Update the market data with the latest data
+    // In live mode, this will fetch new data
+    // In backtest mode, the data is updated by the adapter
     setMarketData(*marketData);
     oms->setMarketData(*marketData);
-
-    // std::cout << "Executing strategies..." << std::endl;
+    
+    // Execute all active strategies
     executeStrategies();
 }
 

@@ -14,18 +14,25 @@ class StrategyEngine
         StrategyEngine();
         ~StrategyEngine();
 
+        // Run the strategy engine for one iteration
         void run();
-        void setUp(json configData, StrategyFactory &stratFilePath, MarketData &marketdata, BrokerBase* broker, bool backtest=false);
+        
+        // Set up the strategy engine
+        void setUp(json configData, StrategyFactory &stratFactory, MarketData &marketdata, BrokerBase* broker);
 
+        // Update market data
         void setMarketData(MarketData& inputData);
+        
+        // Get the order management system
         OrderManagement* getOms() { return oms;};
 
     private:
-
+        // Execute strategies on current market data
         void executeStrategies();
+        
+        // Print loaded strategies for debugging
         void printStategies();
 
-        bool backtest;
         json configData;
         MarketData* marketData; // Use a pointer to the MarketData object
         static OrderManagement* oms;

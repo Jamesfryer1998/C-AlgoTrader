@@ -9,82 +9,12 @@
 #include "../../src/strategy_engine/StrategyFactory.hpp"
 #include "../../src/oms/Order.hpp"
 #include "../../src/oms/Position.hpp"
-
-// Mock class for testing
-class MockMarketData : public MarketData {
-public:
-    MockMarketData() : MarketData() {
-        // Initialize currentIndex to 0
-        rewind();
-    }
-    
-    void setMockData(std::vector<MarketCondition>& mockData) {
-        // Verify data is not empty
-        if (mockData.empty()) {
-            std::cerr << "ERROR: Attempted to set empty mock data in MockMarketData::setMockData!" << std::endl;
-            return;
-        }
-        
-        std::cout << "MockMarketData: Setting " << mockData.size() << " data points" << std::endl;
-        update(mockData);
-        
-        // Always rewind after setting data
-        rewind();
-        std::cout << "MockMarketData: After update, data size=" << getData().size() 
-                  << ", currentIndex=" << getCurrentIndex() << std::endl;
-    }
-    
-    std::vector<MarketCondition> createMockData(int numDays = 10, float startPrice = 100.0f) {
-        std::vector<MarketCondition> mockData;
-        
-        // Ensure we're creating at least one data point
-        numDays = std::max(1, numDays);
-        
-        for (int i = 0; i < numDays; i++) {
-            std::string dateTime = "2025-03-" + std::to_string(20 + i) + " 10:00:00";
-            float price = startPrice + (i * 2.0f); // Price increases by $2 each day
-            
-            MarketCondition condition(
-                dateTime,          // DateTime
-                "AAPL",           // Ticker
-                price,            // Open
-                price,            // Close
-                1000 * (i + 1),   // Volume
-                "1m"              // TimeInterval
-            );
-            
-            mockData.push_back(condition);
-        }
-        
-        std::cout << "MockMarketData: Created " << mockData.size() << " data points" << std::endl;
-        return mockData;
-    }
-    
-    void setupMockDataForTesting(int numDays = 10) {
-        auto mockData = createMockData(numDays);
-        
-        // Ensure we have created data
-        if (mockData.empty()) {
-            std::cerr << "ERROR: Failed to create mock data in setupMockDataForTesting!" << std::endl;
-            // Create backup data
-            mockData.push_back(MarketCondition(
-                "2025-03-20 10:00:00",  // DateTime
-                "AAPL",                 // Ticker
-                100.0f,                 // Open
-                100.0f,                 // Close
-                1000,                   // Volume
-                "1m"                    // TimeInterval
-            ));
-        }
-        
-        setMockData(mockData);
-    }
-};
+#include "MockMarketDataAdapter.hpp"
 
 // Test fixture for Backtester tests
 class BacktesterTests : public ::testing::Test {
 public:
-    std::unique_ptr<MockMarketData> marketData;
+    std::unique_ptr<MockMarketDataAdapter> mockAdapter;
     std::unique_ptr<Backtester> backtester;
     json testConfig;
     Config config;
@@ -94,23 +24,26 @@ public:
         config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
         testConfig = config.loadConfig();
         
-        // Set up mock market data
-        marketData = std::make_unique<MockMarketData>();
-        marketData->setupMockDataForTesting();
+        // Set up mock market data adapter
+        mockAdapter = std::make_unique<MockMarketDataAdapter>();
+        mockAdapter->setupMockDataForTesting();
     }
     
     void TearDown() override {
         backtester.reset();
-        marketData.reset();
+        mockAdapter.reset();
     }
     
     void createBacktester(std::vector<MarketCondition> mockData={}) {
         // Reset market data first to ensure we have fresh data for each test
-        marketData->setupMockDataForTesting(20); // Use 20 days for more robust testing
+        mockAdapter->setupMockDataForTesting(20); // Use 20 days for more robust testing
         
         // Get a copy of the market data for use in backtester
-        if(mockData.size() == 0)
-            mockData = marketData->getData();
+        if(mockData.size() == 0) {
+            mockData = mockAdapter->getAdapter().getDataSize() > 0 ? 
+                mockAdapter->createMockData(20) : 
+                std::vector<MarketCondition>();
+        }
         
         // Verify the mock data is not empty
         if (mockData.empty()) {
@@ -129,7 +62,7 @@ public:
             }
             
             // Update the market data object
-            marketData->setMockData(mockData);
+            mockAdapter->setMockData(mockData);
         }
         
         // Create and configure the backtester
@@ -394,7 +327,8 @@ TEST_F(BacktesterTests, DISABLED_MultipleRunsProduceConsistentResults) {
 }
 
 TEST_F(BacktesterTests, DISABLED_CompleteBacktestProcess) {
-    auto marketData = std::make_unique<MockMarketData>();
+    // auto marketData = std::make_unique<MockMarketData>();
+    auto mockAdapter = std::make_unique<MockMarketDataAdapter>();
     std::vector<MarketCondition> complexData;
     
     // Create a 30-day price series with ups and downs
@@ -421,7 +355,7 @@ TEST_F(BacktesterTests, DISABLED_CompleteBacktestProcess) {
         complexData.push_back(condition);
     }
     
-    marketData->setMockData(complexData);
+    mockAdapter->setMockData(complexData);
     createBacktesterWithSettings(100000.0, 1.0, 0.001, false, complexData);
 
     backtester->run();

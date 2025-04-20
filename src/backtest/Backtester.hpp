@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <vector>
 #include <unistd.h>
@@ -11,7 +13,11 @@
 #include "../strategy_engine/StrategyEngine.hpp"
 #include "../strategy_engine/StrategyFactory.hpp"
 #include "../broker/SimulatedBroker.hpp"
+#include "BacktestMarketDataAdapter.hpp"
 
+/**
+ * Performance metrics for backtesting results
+ */
 struct PerformanceMetrics {
     double startingCapital;
     double finalEquity;
@@ -30,10 +36,24 @@ struct PerformanceMetrics {
     std::chrono::duration<double> executionTime;
 };
 
+/**
+ * Backtester class
+ * 
+ * Manages the backtesting of trading strategies with historical market data.
+ * Uses adapter patterns to coordinate interactions between core components without
+ * modifying their implementation.
+ */
 class Backtester {
 public:
+    /**
+     * Constructor
+     * @param algoConfig JSON configuration for the backtester
+     */
     Backtester(const json& algoConfig);
 
+    /**
+     * Run the backtest simulation
+     */
     void run();
     
     // Configuration methods
@@ -55,10 +75,11 @@ public:
     
 private:
     // Core components
-    MarketData marketData;
-    SimulatedBroker broker;
-    StrategyFactory stratFactory;
-    StrategyEngine stratEngine;
+    MarketData marketData;                    // Raw market data instance
+    BacktestMarketDataAdapter marketDataAdapter;  // Adapter for backtest control
+    SimulatedBroker broker;                   // Simulated broker for order execution
+    StrategyFactory stratFactory;             // Factory for creating strategies
+    StrategyEngine stratEngine;               // Engine for running strategies
     
     // Configuration
     json algoConfig;

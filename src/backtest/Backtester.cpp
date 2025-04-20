@@ -12,10 +12,13 @@ Backtester::Backtester(const json& algoConfig)
           detailedLogging(false),
           resultsFilename(""),
           numThreads(0), // 0 means use all available cores
-          useDirectData(false) // Default to file-based data
+          useDirectData(false)
 {
     // Initialize the performance metrics
     metrics = PerformanceMetrics();
+    
+    // Initialize the market data adapter
+    marketDataAdapter.initialize(marketData);
     
     // Configure the broker with default settings
     broker.setStartingCapital(100000.0);
@@ -47,6 +50,8 @@ void Backtester::setCommissionPerTrade(double commission) {
 
 void Backtester::setSlippagePercentage(double slippage) {
     broker.setSlippage(slippage);
+    std::cout << "Backtester: Setting slippage to " << std::fixed << std::setprecision(3) 
+              << (slippage * 100.0) << "% (random variation within +/- this range)" << std::endl;
 }
 
 void Backtester::enableDetailedLogging(bool enable) {
@@ -76,17 +81,18 @@ void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
         return;
     }
     
-    marketData.update(mockData);
+    // Load the mock data into the adapter
+    marketDataAdapter.loadMockData(mockData);
     
     // Auto-enable direct data mode when mock data is provided
     useDirectData = true;
     
-    // Verify the data was set and reset the current index to the beginning
-    marketData.rewind();
-    const auto& fullData = marketData.getFullData();
-    std::cout << "Verified market data size: " << fullData.size() << " data points" << std::endl;
-    std::cout << "First data point: " << (fullData.empty() ? "N/A" : fullData[0].DateTime) << std::endl;
-    std::cout << "Current index after rewind: " << marketData.getCurrentIndex() << std::endl;
+    std::cout << "Verified market data size: " << marketDataAdapter.getDataSize() << " data points" << std::endl;
+    if (marketDataAdapter.getDataSize() > 0) {
+        MarketCondition firstPoint = marketDataAdapter.getCurrentData();
+        std::cout << "First data point: " << firstPoint.DateTime << std::endl;
+    }
+    std::cout << "Current index: " << marketDataAdapter.getCurrentIndex() << std::endl;
 }
 
 void Backtester::useDirectMarketData(bool useDirect) {
@@ -100,52 +106,47 @@ Backtester::run()
     
     // Record start time
     auto startTime = std::chrono::high_resolution_clock::now();
-    marketData.setBacktest();
     
     // Only process market data if not using direct data mode
     if (!useDirectData) {
         // Process market data with date range and parallel processing
         if (numThreads > 0) {
             std::cout << "Using " << numThreads << " threads for processing" << std::endl;
-            marketData.processParallel(algoConfig, numThreads);
+            marketDataAdapter.loadHistoricalDataParallel(algoConfig, numThreads);
         } else {
             std::cout << "Using all available cores for processing" << std::endl;
-            marketData.processForBacktest(algoConfig, startDate, endDate);
+            marketDataAdapter.loadHistoricalData(algoConfig, startDate, endDate);
         }
     } else {
-        std::cout << "Using directly provided market data (" << marketData.getFullData().size() << " data points)" << std::endl;
+        std::cout << "Using directly provided market data (" << marketDataAdapter.getDataSize() << " data points)" << std::endl;
     }
     
-    
     // Verify we have data before proceeding
-    if (marketData.getFullData().empty()) {
+    if (marketDataAdapter.getDataSize() == 0) {
         std::cerr << "ERROR: No market data available for backtesting. Exiting run()." << std::endl;
         return;
     }
     
     // Ensure we're at the beginning of the data
-    marketData.rewind();
+    marketDataAdapter.rewind();
     
     // Set up strategy engine
-    bool backtest = true;
-    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker, backtest);
+    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
     
     // Initialize backtest
     initializeBacktest();
     
-    // Use getFullData() to get complete data regardless of backtest mode
-    const auto& fullData = marketData.getFullData();
-    
     // Log initial state - ensure we have data before trying to access it
-    if (!fullData.empty()) {
-        equityCurve.push_back({fullData[0].DateTime, broker.getCurrentEquity()});
+    if (marketDataAdapter.getDataSize() > 0) {
+        MarketCondition firstPoint = marketDataAdapter.getCurrentData();
+        equityCurve.push_back({firstPoint.DateTime, broker.getCurrentEquity()});
     } else {
         std::cerr << "ERROR: Market data is empty after initialization. Exiting run()." << std::endl;
         return;
     }
     
-    // Count how many data points we'll process using the full dataset
-    size_t totalDataPoints = fullData.size();
+    // Count how many data points we'll process
+    size_t totalDataPoints = marketDataAdapter.getDataSize();
     std::cout << "Processing " << totalDataPoints << " market data points" << std::endl;
     
     // Progress tracking
@@ -157,12 +158,12 @@ Backtester::run()
     int loopCount = 0;
     const int MAX_LOOPS = totalDataPoints * 2; // Safety limit
         
-    while (marketData.hasNext() && loopCount < MAX_LOOPS) {         
+    while (marketDataAdapter.hasNext() && loopCount < MAX_LOOPS) {         
         executeTimeStep();
         loopCount++;
         
         // Show progress
-        size_t currentIndex = marketData.getCurrentIndex();
+        size_t currentIndex = marketDataAdapter.getCurrentIndex();
         if (currentIndex - lastProgress >= progressStep) {
             int progressPercent = static_cast<int>((static_cast<double>(currentIndex) / totalDataPoints) * 100);
             std::cout << "Progress: " << progressPercent << "% ("
@@ -211,20 +212,29 @@ Backtester::initializeBacktest()
 void
 Backtester::executeTimeStep() 
 {
-    // Process next data point
-    marketData.next();
+    // 1. Process next data point using the adapter
+    // This updates the underlying MarketData with the next time point
+    marketDataAdapter.next();
     
-    // Execute strategy
+    // Get the current data point for logging and synchronization
+    MarketCondition currentData = marketDataAdapter.getCurrentData();
+    std::string timestamp = currentData.DateTime;
+    
+    // Log the timestamp we're about to process
+    std::cout << "Backtester time step: " << timestamp << std::endl;
+    
+    // 2. Execute strategy - this will use the updated marketData
+    // The strategy will generate signals based on this data point
     stratEngine.run();
     
-    // Simulate trade execution
+    // 3. Simulate broker operations - this includes processing orders from strategies
+    // The broker will use the same current data point for execution
     broker.nextStep();
     
-    // Log performance
+    // 4. Log performance and update metrics
     logPerformance();
     
     // Add to equity curve using current timestamp
-    std::string timestamp = marketData.getCurrentData().DateTime;
     equityCurve.push_back({timestamp, broker.getCurrentEquity()});
     
     // Calculate daily return and add to returns vector (if equity has changed)
