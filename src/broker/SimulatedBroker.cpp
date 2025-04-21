@@ -17,6 +17,7 @@ SimulatedBroker::SimulatedBroker(MarketData& marketdata)
     commissionPerTrade = 1.0;    // $1 per trade default commission
     totalTrades = 0;
     step = 0;
+    detailedLogging = false; // Detailed logging disabled by default
     
     // Random seed initialization
     useFixedSeed = false;
@@ -39,6 +40,12 @@ void SimulatedBroker::enableFixedRandomSeed(unsigned int seed)
     std::cout << "Using fixed random seed: " << seed << " for deterministic testing" << std::endl;
 }
 
+void SimulatedBroker::enableDetailedLogging(bool enable)
+{
+    detailedLogging = enable;
+    std::cout << "SimulatedBroker: Detailed logging " << (enable ? "enabled" : "disabled") << std::endl;
+}
+
 SimulatedBroker::~SimulatedBroker()
 {
     disconnect();
@@ -56,7 +63,7 @@ SimulatedBroker::process()
 
     // Always refresh the current condition to ensure we're using the latest data
     // This is critical for timestamp consistency between strategy signals and order execution
-    currentCondition = marketData.getCurrentData();
+    currentCondition = marketData.getData()[step];
     simulationTime = currentCondition.DateTime;
     
     // Log the current time step being processed
@@ -212,10 +219,6 @@ SimulatedBroker::executeOrder(Order& order)
     filledOrders.push_back(order);
     totalTrades++;
     
-    // Calculate the price difference due to slippage
-    // double priceDifference = executionPrice - originalOrderPrice;
-    // double slippageImpact = (priceDifference / originalOrderPrice) * 100.0;
-    
     std::cout << "Order executed: " << (order.isBuy() ? "BUY" : "SELL")
               << " " << order.getQuantity() << " shares of " << order.getTicker()
               << " at $" << std::fixed << std::setprecision(2) << executionPrice;
@@ -248,40 +251,107 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
         if (positionsByTicker.find(ticker) != positionsByTicker.end()) {
             // Existing position - update it
             Position& existingPos = positionsByTicker[ticker];
-            double newTotalShares = existingPos.getQuantity() + quantity;
-            double newAvgPrice = ((existingPos.getQuantity() * existingPos.getAvgPrice()) + 
-                                 (quantity * executionPrice)) / newTotalShares;
+            double existingQuantity = existingPos.getQuantity();
             
-            // Update position
-            existingPos.setQuantity(newTotalShares);
-            existingPos.setAvgPrice(newAvgPrice);
+            // If there's a short position (negative quantity), handle buying to cover
+            if (existingQuantity < 0) {
+                // Buying to cover a short position
+                double newTotalShares = existingQuantity + quantity;
+                
+                if (newTotalShares >= 0) {
+                    // We're covering the entire short position and potentially going long
+                    if (newTotalShares > 0) {
+                        // Long position after covering short
+                        existingPos.setQuantity(newTotalShares);
+                        existingPos.setAvgPrice(executionPrice); // Reset average price as we're now long
+                        std::cout << "Covered short position for " << ticker << " and established long position of " 
+                                  << newTotalShares << " shares" << std::endl;
+                    } else {
+                        // Exactly covered the short position, close position
+                        positionHistory.push_back(existingPos);
+                        positionsByTicker.erase(ticker);
+                        std::cout << "Completely covered short position for " << ticker << std::endl;
+                    }
+                } else {
+                    // Partially covering short position
+                    existingPos.setQuantity(newTotalShares);
+                    // We don't update avg price for partial short covers
+                    std::cout << "Partially covered short position for " << ticker 
+                              << ", remaining short: " << -newTotalShares << " shares" << std::endl;
+                }
+            } else {
+                // Normal buying to increase long position
+                double newTotalShares = existingQuantity + quantity;
+                double newAvgPrice = ((existingQuantity * existingPos.getAvgPrice()) + 
+                                     (quantity * executionPrice)) / newTotalShares;
+                
+                // Update position
+                existingPos.setQuantity(newTotalShares);
+                existingPos.setAvgPrice(newAvgPrice);
+                std::cout << "Increased long position for " << ticker << " to " 
+                          << newTotalShares << " shares at avg price $" 
+                          << std::fixed << std::setprecision(2) << newAvgPrice << std::endl;
+            }
         } else {
             // New position
             Position newPosition(ticker, quantity, executionPrice);
             positionsByTicker[ticker] = newPosition;
+            std::cout << "Established new long position for " << ticker << " with " 
+                      << quantity << " shares at $" << executionPrice << std::endl;
         }
     } else {
         // Selling
         currentCash += orderTotal;
         
         if (positionsByTicker.find(ticker) != positionsByTicker.end()) {
+            // We have an existing position for this ticker
             Position& existingPos = positionsByTicker[ticker];
-            double newTotalShares = existingPos.getQuantity() - quantity;
+            double existingQuantity = existingPos.getQuantity();
             
-            // If position would be zero or negative, close it
-            if (newTotalShares <= 0) {
-                // Save to history before deleting
-                positionHistory.push_back(existingPos);
+            if (existingQuantity > 0) {
+                // Currently long, selling to reduce or close position
+                double newTotalShares = existingQuantity - quantity;
                 
-                // Remove position
-                positionsByTicker.erase(ticker);
+                if (newTotalShares <= 0) {
+                    // Closing long position and potentially going short
+                    if (newTotalShares < 0) {
+                        // Going short after closing long
+                        existingPos.setQuantity(newTotalShares);
+                        existingPos.setAvgPrice(executionPrice); // Reset average price as we're now short
+                        std::cout << "Closed long position for " << ticker 
+                                  << " and established short position of " 
+                                  << -newTotalShares << " shares" << std::endl;
+                    } else {
+                        // Exactly closed the long position
+                        positionHistory.push_back(existingPos);
+                        positionsByTicker.erase(ticker);
+                        std::cout << "Completely closed long position for " << ticker << std::endl;
+                    }
+                } else {
+                    // Partially reducing long position
+                    existingPos.setQuantity(newTotalShares);
+                    // Average price remains unchanged when reducing a long position
+                    std::cout << "Partially closed long position for " << ticker 
+                              << ", remaining: " << newTotalShares << " shares" << std::endl;
+                }
             } else {
-                // Update position
+                // Currently short, selling to increase short position
+                double newTotalShares = existingQuantity - quantity;
+                // The average price is weighted for short positions too
+                double newAvgPrice = (existingPos.getAvgPrice() + executionPrice) / 2;
+                
                 existingPos.setQuantity(newTotalShares);
-                // Note: We don't update avg price when selling
+                existingPos.setAvgPrice(newAvgPrice);
+                std::cout << "Increased short position for " << ticker << " to " 
+                          << -newTotalShares << " shares at avg price $" 
+                          << std::fixed << std::setprecision(2) << newAvgPrice << std::endl;
             }
         } else {
-            std::cerr << "Warning: Attempting to sell position not in portfolio: " << ticker << std::endl;
+            // No existing position, establishing a new short position
+            Position newPosition(ticker, -quantity, executionPrice);
+            positionsByTicker[ticker] = newPosition;
+            std::cout << "Established new short position for " << ticker << " with " 
+                      << quantity << " shares at $" << executionPrice << std::endl;
         }
     }
     
@@ -295,14 +365,63 @@ SimulatedBroker::updatePortfolioValue()
     // Calculate portfolio value: cash + value of all positions
     double portfolioValue = currentCash;
     
+    if (detailedLogging) {
+        std::cout << "\n--- Portfolio Value Calculation ---" << std::endl;
+        std::cout << "Cash: $" << std::fixed << std::setprecision(2) << currentCash << std::endl;
+    }
+    
+    // Track total long and short values separately for reporting
+    double totalLongValue = 0.0;
+    double totalShortValue = 0.0;
+    
     for (const auto& pair : positionsByTicker) {
         const Position& position = pair.second;
-        double currentPrice = getLatestPrice(position.getTicker());
-        portfolioValue += position.getQuantity() * currentPrice;
+        std::string ticker = position.getTicker();
+        double quantity = position.getQuantity();
+        double avgPrice = position.getAvgPrice();
+        double currentPrice = getLatestPrice(ticker);
+        double positionValue = quantity * currentPrice;
+        
+        // Add to portfolio value (works for both long and short since quantity will be negative for shorts)
+        portfolioValue += positionValue;
+        
+        // Track long and short values separately
+        if (quantity > 0) {
+            totalLongValue += positionValue;
+        } else {
+            totalShortValue += positionValue; // This will be negative for shorts
+        }
+        
+        if (detailedLogging) {
+            // Calculate unrealized P&L
+            double unrealizedPnL = quantity * (currentPrice - avgPrice);
+            double unrealizedPnLPercent = ((currentPrice / avgPrice) - 1.0) * 100.0;
+            if (quantity < 0) {
+                // For shorts, profit/loss is reversed
+                unrealizedPnL = -unrealizedPnL;
+                unrealizedPnLPercent = -unrealizedPnLPercent;
+            }
+            
+            std::cout << ticker << ": " 
+                      << (quantity > 0 ? "LONG " : "SHORT ")
+                      << std::abs(quantity) << " shares @ $" << avgPrice
+                      << ", current price: $" << currentPrice
+                      << ", value: $" << positionValue
+                      << ", unrealized P&L: $" << unrealizedPnL
+                      << " (" << (unrealizedPnLPercent >= 0 ? "+" : "") 
+                      << unrealizedPnLPercent << "%)" << std::endl;
+        }
     }
     
     // Update current equity
     currentEquity = portfolioValue;
+    
+    if (detailedLogging) {
+        std::cout << "Total Long Value: $" << std::fixed << std::setprecision(2) << totalLongValue << std::endl;
+        std::cout << "Total Short Value: $" << std::fixed << std::setprecision(2) << totalShortValue << std::endl;
+        std::cout << "Total Portfolio Value: $" << std::fixed << std::setprecision(2) << portfolioValue << std::endl;
+        std::cout << "--------------------------------\n" << std::endl;
+    }
     
     // Update highest equity for drawdown calculation
     highestEquity = std::max(highestEquity, currentEquity);
@@ -332,7 +451,7 @@ SimulatedBroker::checkStopLosses()
         std::string ticker = position.getTicker();
         
         // Skip positions with zero quantity
-        if (position.getQuantity() <= 0) {
+        if (position.getQuantity() == 0) {
             continue;
         }
         
@@ -473,4 +592,10 @@ SimulatedBroker::setStartingCapital(double capital)
     currentCash = capital;
     currentEquity = capital;
     highestEquity = capital;
+}
+
+void
+SimulatedBroker::setMarketData(MarketData& MarketData) 
+{
+    marketData = MarketData;
 }

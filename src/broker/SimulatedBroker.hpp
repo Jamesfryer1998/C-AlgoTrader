@@ -13,6 +13,9 @@ class SimulatedBroker : public BrokerBase {
         
         // For testing - allows setting a fixed random seed for deterministic tests
         void enableFixedRandomSeed(unsigned int seed);
+        
+        // Enable detailed logging for debugging
+        void enableDetailedLogging(bool enable);
 
         // BrokerBase interface implementation
         int connect() override;
@@ -44,6 +47,8 @@ class SimulatedBroker : public BrokerBase {
         void setSlippage(double slippagePerc);
         void setCommission(double commissionPerTrade);
         void setStartingCapital(double capital);
+        void setMarketData(MarketData& marketData);
+
         
     private:
         // Order processing
@@ -85,4 +90,5 @@ class SimulatedBroker : public BrokerBase {
         // Simulation state
         int step;
         std::string simulationTime;
+        bool detailedLogging;
 };
