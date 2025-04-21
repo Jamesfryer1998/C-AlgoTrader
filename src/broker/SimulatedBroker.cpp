@@ -449,9 +449,10 @@ SimulatedBroker::checkStopLosses()
     for (const auto& pair : positionsCopy) {
         const Position& position = pair.second;
         std::string ticker = position.getTicker();
+        double quantity = position.getQuantity();
         
         // Skip positions with zero quantity
-        if (position.getQuantity() == 0) {
+        if (quantity == 0) {
             continue;
         }
         
@@ -460,18 +461,31 @@ SimulatedBroker::checkStopLosses()
             if (order.getTicker() == ticker && order.getStopLossPrice() > 0) {
                 double currentPrice = getLatestPrice(ticker);
                 
-                // If price drops below stop loss, create and execute sell order immediately
-                if (currentPrice <= order.getStopLossPrice()) {
-                    std::cout << "Stop loss triggered for " << ticker 
-                              << " at $" << currentPrice 
-                              << ", stop price: " << order.getStopLossPrice() << std::endl;
-                    
-                    // Create and execute stop loss order directly
-                    Order stopOrder(OrderType::SELL, ticker, position.getQuantity(), currentPrice);
-                    executeOrder(stopOrder);
-                    
-                    // Break after executing the first stop loss order for this position
-                    break;
+                // Handle stop loss differently for long and short positions
+                if (quantity > 0) {
+                    // For LONG positions: Stop loss triggers when price falls below stop level
+                    if (currentPrice <= order.getStopLossPrice()) {
+                        std::cout << "LONG position stop loss triggered for " << ticker 
+                                  << " at $" << currentPrice 
+                                  << ", stop price: " << order.getStopLossPrice() << std::endl;
+                        
+                        // For long positions, we SELL to exit
+                        Order stopOrder(OrderType::SELL, ticker, std::abs(order.getQuantity()), currentPrice);
+                        executeOrder(stopOrder);
+                        break;
+                    }
+                } else {
+                    // For SHORT positions: Stop loss triggers when price rises above stop level
+                    if (currentPrice >= order.getStopLossPrice()) {
+                        std::cout << "SHORT position stop loss triggered for " << ticker 
+                                  << " at $" << currentPrice 
+                                  << ", stop price: " << order.getStopLossPrice() << std::endl;
+                        
+                        // For short positions, we BUY to cover and exit
+                        Order stopOrder(OrderType::BUY, ticker, std::abs(order.getQuantity()), currentPrice);
+                        executeOrder(stopOrder);
+                        break;
+                    }
                 }
             }
         }
@@ -488,9 +502,10 @@ SimulatedBroker::checkTakeProfits()
     for (const auto& pair : positionsCopy) {
         const Position& position = pair.second;
         std::string ticker = position.getTicker();
+        double quantity = position.getQuantity();
         
         // Skip positions with zero quantity
-        if (position.getQuantity() <= 0) {
+        if (quantity == 0) {
             continue;
         }
         
@@ -499,18 +514,31 @@ SimulatedBroker::checkTakeProfits()
             if (order.getTicker() == ticker && order.getTakeProfitPrice() > 0) {
                 double currentPrice = getLatestPrice(ticker);
                 
-                // If price rises above take profit, create and execute sell order immediately
-                if (currentPrice >= order.getTakeProfitPrice()) {
-                    std::cout << "Take profit triggered for " << ticker 
-                              << " at $" << currentPrice 
-                              << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
-                    
-                    // Create and execute take profit order directly
-                    Order tpOrder(OrderType::SELL, ticker, position.getQuantity(), currentPrice);
-                    executeOrder(tpOrder);
-                    
-                    // Break after executing the first take profit order for this position
-                    break;
+                // Handle take profit differently for long and short positions
+                if (quantity > 0) {
+                    // For LONG positions: Take profit triggers when price rises above target level
+                    if (currentPrice >= order.getTakeProfitPrice()) {
+                        std::cout << "LONG position take profit triggered for " << ticker 
+                                  << " at $" << currentPrice 
+                                  << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
+                        
+                        // For long positions, we SELL to exit with profit
+                        Order tpOrder(OrderType::SELL, ticker, std::abs(quantity), currentPrice);
+                        executeOrder(tpOrder);
+                        break;
+                    }
+                } else {
+                    // For SHORT positions: Take profit triggers when price falls below target level
+                    if (currentPrice <= order.getTakeProfitPrice()) {
+                        std::cout << "SHORT position take profit triggered for " << ticker 
+                                  << " at $" << currentPrice 
+                                  << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
+                        
+                        // For short positions, we BUY to cover and exit with profit
+                        Order tpOrder(OrderType::BUY, ticker, std::abs(quantity), currentPrice);
+                        executeOrder(tpOrder);
+                        break;
+                    }
                 }
             }
         }
