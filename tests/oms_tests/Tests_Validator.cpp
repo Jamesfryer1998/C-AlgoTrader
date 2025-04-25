@@ -28,6 +28,8 @@ public:
                 "AAPL",
                 10,
                 109.0};
+
+        positions.push_back(Position{"AAPL", 10, 109.0});
     }
 
     void GivenWeHaveASellOrder()
@@ -37,6 +39,8 @@ public:
                 "AAPL",
                 10,
                 109.0};
+
+        positions.push_back(Position{"AAPL", 10, 109.0});
     }
 
     void GivenWeHaveAnInvalidOrder()
@@ -46,6 +50,8 @@ public:
                 "AAPL",
                 20,
                 120.00};
+
+        positions.push_back(Position{"AAPL", 20, 120.0});
     }
 
     void GivenWeHaveMarketData()
@@ -55,8 +61,10 @@ public:
     }
 
     Order order;
+    Position position;
     json algoTestConfig;
     MarketData marketData;
+    std::vector<Position> positions;
 
 };
 
@@ -157,7 +165,7 @@ TEST_F(OrderValidatorTests, GivenWeHaveValidPositionSize_WeValidateCorrectly)
     GivenWeHaveMarketData();
     GivenWeHaveABuyOrder();
     
-    EXPECT_EQ(cut.checkMaxPositionSize(order), true);
+    EXPECT_EQ(cut.checkMaxPositionSize(order, 10), true);
 }
 
 TEST_F(OrderValidatorTests, GivenWeHaveInvalidPositionSize_WeValidateCorrectly)
@@ -165,7 +173,7 @@ TEST_F(OrderValidatorTests, GivenWeHaveInvalidPositionSize_WeValidateCorrectly)
     GivenWeHaveMarketData();
     GivenWeHaveAnInvalidOrder();
     
-    EXPECT_EQ(cut.checkMaxPositionSize(order), false);
+    EXPECT_EQ(cut.checkMaxPositionSize(order, 10), false);
 }
 
 TEST_F(OrderValidatorTests, GivenWeHaveAValidOrder_WeValidateCorrectly)
@@ -175,7 +183,7 @@ TEST_F(OrderValidatorTests, GivenWeHaveAValidOrder_WeValidateCorrectly)
     order.setStopLoss(10);
     order.setTakeProfit(10);
     
-    EXPECT_EQ(cut.validateOrder(order, marketData), true);
+    EXPECT_EQ(cut.validateOrder(order, marketData, positions), true);
 }
 
 TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidOrder_WeValidateCorrectly)
@@ -183,5 +191,5 @@ TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidOrder_WeValidateCorrectly)
     GivenWeHaveMarketData();
     GivenWeHaveAnInvalidOrder();
     
-    EXPECT_EQ(cut.validateOrder(order, marketData), false);
+    EXPECT_EQ(cut.validateOrder(order, marketData, positions), false);
 }

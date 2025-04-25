@@ -69,7 +69,7 @@ StrategyEngine::executeStrategies()
     // Maybe thread this, thread for each strategy
     for (auto& strat : strategyList) 
     {
-        strat->supplyData(*marketData); // Pass by reference
+        strat->supplyData(*marketData);
         strat->execute();
         if(strat->onNewOrder())
         {

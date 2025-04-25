@@ -18,12 +18,14 @@ OrderValidator::setParams(json configData)
                 << "slippageTolerance=" << slippageTolerance << std::endl;
 }
 
-bool OrderValidator::validateOrder(const Order& order, MarketData& marketData)
+bool OrderValidator::validateOrder(const Order& order, MarketData& marketData, std::vector<Position>& positions)
 {
+    float totalHeldPositions = getTotalHeldQuantity(order, positions);
+    
     if(!isValidOrderType(order)) return false;
     if(!isValidPrice(order, marketData)) return false;
     if(!isValidQuantity(order)) return false;
-    if(!checkMaxPositionSize(order)) return false;
+    if(!checkMaxPositionSize(order, totalHeldPositions)) return false;
     if(!checkStopLoss(order, marketData)) return false;
     if(!checkTakeProfit(order, marketData)) return false;
     // if(!checkTickSize(order, marketData))) return false;
@@ -71,8 +73,11 @@ OrderValidator::isValidQuantity(const Order& order)
 }
 
 bool
-OrderValidator::checkMaxPositionSize(const Order& order)
+OrderValidator::checkMaxPositionSize(const Order& order, float totalHeldQuantity)
 {
+    float newTotal = totalHeldQuantity + (order.isBuy() ? order.getQuantity() : 0.0f);
+
+    return (newTotal <= maxPositionSize);
     return (order.getQuantity() <= maxPositionSize);
 }
 
@@ -141,4 +146,16 @@ bool OrderValidator::checkSlippage(const Order& order, MarketData& marketData)
     std::cerr<<slippage<<std::endl;
 
     return slippage <= slippageTolerance;
+}
+float OrderValidator::getTotalHeldQuantity(const Order& order, std::vector<Position>& positions)
+{
+    float totalHeldQuantity = 0.0f;
+
+    for (const auto& pos : positions) {
+        if (pos.getTicker() == order.getTicker()) {
+            totalHeldQuantity += pos.getQuantity();
+        }
+    }
+
+    return totalHeldQuantity;
 }
