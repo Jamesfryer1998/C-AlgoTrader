@@ -1,21 +1,64 @@
-Here’s your **updated README** with additional descriptions for each section and collapsible image sections:  
+# C++ Algorithmic Trading System
 
----
+A modern C++ framework for algorithmic trading, backtesting strategies, and live trading.
 
-## **To Run**  
+## **Building the Project**
+
+### Prerequisites
+- CMake 3.3 or higher
+- C++23 compatible compiler
+- nlohmann_json library (automatically fetched)
+- GoogleTest (automatically fetched)
+
+### To Build
 ```sh
+# Create a build directory
+mkdir -p build
+cd build
+
+# Configure the project
+cmake ..
+
+# Build
+make -j4
+```
+
+### To Run
+```sh
+# Run from the project root directory
 ./build_run.sh
-```  
-This script builds and runs the trading system. Ensure all dependencies are installed before execution.
+```
+This script builds and runs the trading system.
 
----
+### To Run Backtester
+```sh
+# Run from the project root directory
+./build_run_backtest.sh
+```
 
-## **To Debug Crash**  
+### Running Tests
+```sh
+# From the build directory
+ctest
+# or
+make test
+```
+Individual test executables are located in subdirectories:
+```
+./build/tests/data_access_tests/data_access_tests
+./build/tests/oms_tests/oms_tests
+./build/tests/strategy_tests/strategy_tests
+./build/tests/broker_tests/broker_tests
+./build/tests/backtest_tests/backtest_tests
+./build/tests/util_tests/util_tests
+```
+
+### To Debug Crash
 ```sh
 lldb ./build/app/algo_trader_app
 run
 bt
-```  
+```
 
 ## **Architecture**  
 

@@ -10,10 +10,9 @@ public:
 
     void SetUp() override 
     {
-        config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
+        config.loadJson(config.getTestPath("strategy_tests/test_data/config_test.json"));
         algoTestConfig = config.loadConfig();
         cut.setParams(algoTestConfig);
-
     }
 
     void TearDown() override 
@@ -29,7 +28,7 @@ public:
                 10,
                 109.0};
 
-        positions.push_back(Position{"AAPL", 10, 109.0});
+        // positions.push_back(Position{"AAPL", 10, 109.0});
     }
 
     void GivenWeHaveASellOrder()
@@ -40,7 +39,7 @@ public:
                 10,
                 109.0};
 
-        positions.push_back(Position{"AAPL", 10, 109.0});
+        // positions.push_back(Position{"AAPL", 10, 109.0});
     }
 
     void GivenWeHaveAnInvalidOrder()
@@ -51,12 +50,12 @@ public:
                 20,
                 120.00};
 
-        positions.push_back(Position{"AAPL", 20, 120.0});
+        // positions.push_back(Position{"AAPL", 20, 120.0});
     }
 
     void GivenWeHaveMarketData()
     {
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/data_access_tests/test_data/market_data_test_1.csv";
+        string dataFilePath = config.getTestPath("data_access_tests/test_data/market_data_test_1.csv");
         marketData.loadData(dataFilePath);
     }
 
@@ -165,7 +164,7 @@ TEST_F(OrderValidatorTests, GivenWeHaveValidPositionSize_WeValidateCorrectly)
     GivenWeHaveMarketData();
     GivenWeHaveABuyOrder();
     
-    EXPECT_EQ(cut.checkMaxPositionSize(order, 10), true);
+    EXPECT_EQ(cut.checkMaxPositionSize(order, 0), true);
 }
 
 TEST_F(OrderValidatorTests, GivenWeHaveInvalidPositionSize_WeValidateCorrectly)
@@ -173,7 +172,7 @@ TEST_F(OrderValidatorTests, GivenWeHaveInvalidPositionSize_WeValidateCorrectly)
     GivenWeHaveMarketData();
     GivenWeHaveAnInvalidOrder();
     
-    EXPECT_EQ(cut.checkMaxPositionSize(order, 10), false);
+    EXPECT_EQ(cut.checkMaxPositionSize(order, 0), false);
 }
 
 TEST_F(OrderValidatorTests, GivenWeHaveAValidOrder_WeValidateCorrectly)

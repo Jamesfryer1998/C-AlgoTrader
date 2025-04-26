@@ -23,6 +23,9 @@ target_include_directories(backtest_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/util
 )
 
+# Copy test data to build directory
+copy_test_data(backtest_tests "data" "data")
+
 # Enable verbose output for GoogleTest
 set(CMAKE_CTEST_ARGUMENTS "--verbose")
 

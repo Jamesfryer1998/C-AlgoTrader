@@ -11,7 +11,7 @@ public:
 
     void SetUp() override 
     {
-        config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
+        config.loadJson(config.getTestPath("strategy_tests/test_data/config_test.json"));
         jsonConfig = config.loadConfig();
     }
 
@@ -31,7 +31,7 @@ TEST_F(StrategyEngineTests, CanInstantiate)
 TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
 {
     // Use consolidated config file
-    string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies_consolidated.json";
+    string stratFilePath = config.getTestPath("strategy_tests/test_data/strategies_consolidated.json");
     MarketData marketData;
     StrategyFactory stratFactory(stratFilePath);
     SimulatedBroker broker(marketData);
@@ -43,7 +43,7 @@ TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
 
 // TEST_F(StrategyEngineTests, CanGetOmsFromStrategyEngine)
 // {
-//     string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies_consolidated.json";
+//     string stratFilePath = config.getTestPath("strategy_tests/test_data/strategies_consolidated.json");
 //     MarketData marketData;
 //     StrategyFactory stratFactory(stratFilePath);
 //     SimulatedBroker broker(marketData);

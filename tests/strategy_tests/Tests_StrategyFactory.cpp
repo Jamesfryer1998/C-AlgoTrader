@@ -3,8 +3,8 @@
 
 class StrategyFactoryTests : public ::testing::Test {
 public:
-
-    string filePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/strategies_consolidated.json";
+    Config config;
+    string filePath = config.getTestPath("strategy_tests/test_data/strategies_consolidated.json");
     StrategyFactory cut{filePath};
 
     void SetUp() override 

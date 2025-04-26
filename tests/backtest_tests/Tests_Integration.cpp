@@ -132,7 +132,8 @@ public:
     
     void SetUp() override 
     {
-        config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
+        // Use relative path from the tests directory instead of absolute path
+        config.loadJson(config.getTestPath("strategy_tests/test_data/config_test.json"));
         testConfig = config.loadConfig();
 
         // Initialize market data adapter

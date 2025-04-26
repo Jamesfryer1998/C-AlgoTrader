@@ -8,7 +8,7 @@ class MarketDataTests : public ::testing::Test
 
         MarketData cut;
         Config config;
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/data_access_tests/test_data/market_data_test_1.csv";
+        string dataFilePath = config.getTestPath("data_access_tests/test_data/market_data_test_1.csv");
 
         void SetUp() override 
         {
@@ -45,7 +45,7 @@ TEST_F(MarketDataTests, DataLoadedInCorrectOrder)
 
 TEST_F(MarketDataTests, CanUpdateMarketDataFromNewFileCorrectly)
 {
-    string dataFilePath2 = "/Users/james/Projects/C++AlgoTrader/tests/data_access_tests/test_data/market_data_test_2.csv";
+    string dataFilePath2 = config.getTestPath("data_access_tests/test_data/market_data_test_2.csv");
     cut.loadData(dataFilePath);
     cut.loadData(dataFilePath2);
     auto data = cut.getData();

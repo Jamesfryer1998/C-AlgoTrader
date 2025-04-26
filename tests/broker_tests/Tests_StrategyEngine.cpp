@@ -6,11 +6,11 @@ class SimulatedBrokerTests : public ::testing::Test {
     public:
         
         Config config;
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/data_access_tests/test_data/market_data_test_1.csv";
+        string dataFilePath = config.getTestPath("data_access_tests/test_data/market_data_test_1.csv");
 
         void SetUp() override 
         {
-            config.loadJson("/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json");
+            config.loadJson(config.getTestPath("strategy_tests/test_data/config_test.json"));
             jsonConfig = config.loadConfig();
         }
 

@@ -17,29 +17,34 @@ public:
 
     void GenerateMarketData()
     {
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_test.csv";
+        Config config;
+        string dataFilePath = config.getTestPath("strategy_tests/test_data/market_data_test.csv");
         marketData.loadData(dataFilePath);
     }
 
     void GenerateMarketDataForSell()
     {
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_for_sell.csv";
+        Config config;
+        string dataFilePath = config.getTestPath("strategy_tests/test_data/market_data_for_sell.csv");
         marketData.loadData(dataFilePath);
     }
 
     void GenerateMarketDataForBuy()
     {
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_for_buy.csv";
+        Config config;
+        string dataFilePath = config.getTestPath("strategy_tests/test_data/market_data_for_buy.csv");
         marketData.loadData(dataFilePath);
     }
 
     void GenerateMarketDataForHold()
     {
-        string dataFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/market_data_for_hold.csv";
+        Config config;
+        string dataFilePath = config.getTestPath("strategy_tests/test_data/market_data_for_hold.csv");
         marketData.loadData(dataFilePath);
     }
 
-    string stratFilePath = "/Users/james/Projects/C++AlgoTrader/tests/strategy_tests/test_data/config_test.json";
+    Config config;
+    string stratFilePath = config.getTestPath("strategy_tests/test_data/config_test.json");
     MarketData marketData;
     StrategyFactory strategyFactory{stratFilePath};
 
