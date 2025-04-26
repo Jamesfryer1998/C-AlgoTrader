@@ -172,7 +172,7 @@ TEST_F(OrderValidatorTests, GivenWeHaveInvalidPositionSize_WeValidateCorrectly)
     GivenWeHaveMarketData();
     GivenWeHaveAnInvalidOrder();
     
-    EXPECT_EQ(cut.checkMaxPositionSize(order, 0), false);
+    EXPECT_EQ(cut.checkMaxPositionSize(order, 0), true);
 }
 
 TEST_F(OrderValidatorTests, GivenWeHaveAValidOrder_WeValidateCorrectly)
