@@ -35,8 +35,8 @@ class StrategyAttribute
 
         // RSI
         int period;
-        double overbought_threshold;
         double oversold_threshold;
+        double overbought_threshold;
 
         // MACD
         int short_period;
@@ -45,8 +45,8 @@ class StrategyAttribute
 
         // MEANREV
         int lookback_period;
-        double entry_threshold;
         double exit_threshold;
+        double entry_threshold;
         int moving_average_period;
 
         // Common

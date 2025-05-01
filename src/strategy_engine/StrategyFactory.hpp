@@ -15,13 +15,13 @@ class StrategyFactory
         ~StrategyFactory(){};
 
         void loadJson(string filePath);
+        json getJson(){ return strategyData;};
         void loadJsonData(const json& configData);
         std::vector<std::unique_ptr<StrategyBase>> generateStrategies();
-        json getJson(){ return strategyData;};
 
     private:
 
-        string formatStrategyPath();
-        json strategyData;
         Config config;
+        json strategyData;
+        string formatStrategyPath();
 };  

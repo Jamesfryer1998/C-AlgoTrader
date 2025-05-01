@@ -17,27 +17,27 @@ class OrderManagement
     public:
         OrderManagement();
         ~OrderManagement();
-        void addOrder(Order &order);
-        void addPosition(Position &position);
-        vector<Order> getOrders(){ return orders; };
-        vector<Position> getPositions(){ return positions; };
         void removeOrder(int id);
+        void addOrder(Order &order);
         void removePosition(int id);
-        void reset() { orders.clear(); positions.clear(); };
         void onNewOrder(Order& order);
         void onOrderExecuted(Order& order);
-        void setUp(json configdata, BrokerBase* Broker) 
+        void addPosition(Position &position);
+        vector<Order> getOrders(){ return orders; };
+        void setUp(json configdata, BrokerBase* Broker);
+        void reset() { orders.clear(); positions.clear(); };
+        vector<Position> getPositions(){ return positions; };
         {
             validator.setParams(configdata);
             broker = Broker;
         };
         void setMarketData(MarketData marketdata) { marketData = marketdata;};
 
-        int latestOrderId = 1;
-        int latestPositionId = 1;
-        vector<Order> orders;
-        vector<Position> positions;
-        MarketData marketData;
-        OrderValidator validator;
         BrokerBase* broker;
+        vector<Order> orders;
+        int latestOrderId = 1;
+        MarketData marketData;
+        int latestPositionId = 1;
+        OrderValidator validator;
+        vector<Position> positions;
 };

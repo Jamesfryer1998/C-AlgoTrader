@@ -54,10 +54,10 @@ class StrategyBase
 
         // Base strats take in entire list of strat params
         // Specific strats pick and choose from this list
-        StrategyAttribute _strategyAttribute;
-        bool NewOrder = false;
         Order order;
         MarketData marketData;
+        bool NewOrder = false;
+        StrategyAttribute _strategyAttribute;
 
     private:
 

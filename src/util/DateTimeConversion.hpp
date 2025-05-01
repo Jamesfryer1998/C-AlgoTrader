@@ -9,11 +9,11 @@ public:
     DateTimeConversion();
     ~DateTimeConversion();
 
-    tm* getLocalTimeNow();
     tm* getTime();
-    void setTime(std::time_t epochTime);
-    std::string timeNowToString();
+    tm* getLocalTimeNow();
     std::string timeNowToDate();
+    std::string timeNowToString();
+    void setTime(std::time_t epochTime);
 
 private:
     std::tm t{};

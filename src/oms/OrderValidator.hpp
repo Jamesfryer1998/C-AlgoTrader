@@ -17,18 +17,18 @@ class OrderValidator
         float getTotalHeldQuantity(const Order& order, std::vector<Position>& positions);
 
         // Validation methods
+        bool isValidQuantity(const Order& order);
         bool isValidOrderType(const Order& order);
         bool isValidPrice(const Order& order, MarketData& marketData);
-        bool isValidQuantity(const Order& order);
-        bool checkMaxPositionSize(const Order& order, float totalHeldQuantity);
         bool checkStopLoss(const Order& order, MarketData& marketData);
-        bool checkTakeProfit(const Order& order, MarketData& marketData);
         bool checkTickSize(const Order& order, MarketData& marketData);
         bool checkSlippage(const Order& order, MarketData& marketData);
+        bool checkTakeProfit(const Order& order, MarketData& marketData);
+        bool checkMaxPositionSize(const Order& order, float totalHeldQuantity);
 
     private:
         // Risk constraints
-        double maxPositionSize;
         double maxExposure;
+        double maxPositionSize;
         double slippageTolerance;
 };

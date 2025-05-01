@@ -10,9 +10,9 @@ class CSVParser
         CSVParser();
         ~CSVParser();
         void Read(const std::string& filename);
+        std::vector<MarketCondition>& GetData(){ return data; };
         MarketCondition ParseToMarketCondition(std::string line);
         std::vector<std::string> tokenise(std::string csvLine, char separator);
-        std::vector<MarketCondition>& GetData(){ return data; };
 
     private:
        std::vector<MarketCondition> data;

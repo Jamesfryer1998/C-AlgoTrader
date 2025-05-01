@@ -32,8 +32,8 @@ private:
     std::string tickerSymbol;
     
     // Helper functions
+    std::string extractDateFromFilename(const std::string& filename);
     std::vector<MarketCondition> readCSVFile(const std::string& filePath);
     std::vector<MarketCondition> mergeDataSeries(const std::vector<std::vector<MarketCondition>>& allData);
     bool isDateInRange(const std::string& dateToCheck, const std::string& startDate, const std::string& endDate);
-    std::string extractDateFromFilename(const std::string& filename);
 };
