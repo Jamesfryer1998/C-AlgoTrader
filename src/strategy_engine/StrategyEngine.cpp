@@ -78,12 +78,13 @@ StrategyEngine::executeStrategies()
         if(strat->onNewOrder())
         {
             Order order = strat->getOrder();
-            proposedOrders.push_back(order);
+            // proposedOrders.push_back(order);
+            oms->onNewOrder(order);
         }
     }
 
-    if(DecideToMakeTrade(proposedOrders))
-        oms->onNewOrder(order);
+    // if(DecideToMakeTrade(proposedOrders))
+    //     oms->onNewOrder(order);
 
 }
 

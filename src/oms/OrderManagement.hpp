@@ -24,9 +24,9 @@ class OrderManagement
         void onOrderExecuted(Order& order);
         void addPosition(Position &position);
         vector<Order> getOrders(){ return orders; };
-        void setUp(json configdata, BrokerBase* Broker);
         void reset() { orders.clear(); positions.clear(); };
         vector<Position> getPositions(){ return positions; };
+        void setUp(json configdata, BrokerBase* Broker)
         {
             validator.setParams(configdata);
             broker = Broker;

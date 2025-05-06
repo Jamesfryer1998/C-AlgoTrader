@@ -23,10 +23,10 @@ class MarketCondition
 
     public:
         // Add members here
-        float Open;
-        int Volume;
-        float Close;
-        std::string Ticker;
         std::string DateTime;
+        std::string Ticker;
+        float Open;
+        float Close;
+        int Volume;
         std::string TimeInterval;
 };
