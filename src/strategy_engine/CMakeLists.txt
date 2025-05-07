@@ -3,5 +3,6 @@ file(GLOB SOURCES *.cpp)
 # Create a library for shared functionality
 add_library(strategy_lib ${SOURCES})
 
-target_link_libraries(strategy_lib nlohmann_json)
-target_link_libraries(strategy_lib oms_lib)
+target_link_libraries(strategy_lib 
+    nlohmann_json
+    oms_lib)
