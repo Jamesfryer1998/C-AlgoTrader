@@ -4,14 +4,14 @@
 TEST(OrderTests, CanBeInstantiated)
 {
     // Test with enum
-    Order cut1{
+    oms::Order cut1{
             OrderType::BUY,
             "AAPL",
             100.0,
             120.0};
             
     // Test with string for backwards compatibility
-    Order cut2{
+    oms::Order cut2{
             "Filled",
             "AAPL",
             100.0,
@@ -39,7 +39,7 @@ TEST(OrderTests, OrderTypeConversion)
 
 TEST(OrderTests, CanSetAndGetValues)
 {
-    Order cut{
+    oms::Order cut{
             OrderType::BUY,
             "AAPL",
             100.0,
@@ -66,10 +66,10 @@ TEST(OrderTests, CanSetAndGetValues)
 
 TEST(OrderTests, HelperMethods)
 {
-    Order buyOrder(OrderType::BUY, "AAPL", 100, 100);
-    Order sellOrder(OrderType::SELL, "AAPL", 100, 100);
-    Order limitBuyOrder(OrderType::LIMIT_BUY, "AAPL", 100, 100);
-    Order limitSellOrder(OrderType::LIMIT_SELL, "AAPL", 100, 100);
+    oms::Order buyOrder(OrderType::BUY, "AAPL", 100, 100);
+    oms::Order sellOrder(OrderType::SELL, "AAPL", 100, 100);
+    oms::Order limitBuyOrder(OrderType::LIMIT_BUY, "AAPL", 100, 100);
+    oms::Order limitSellOrder(OrderType::LIMIT_SELL, "AAPL", 100, 100);
     
     // Test isBuy() and isSell()
     EXPECT_TRUE(buyOrder.isBuy());
@@ -100,7 +100,7 @@ TEST(OrderTests, HelperMethods)
 
 TEST(OrderTests, StopLossPriceForLongIsCorrectlyCalculated)
 {
-    Order cut{
+    oms::Order cut{
             OrderType::BUY,
             "AAPL",
             100.0,
@@ -134,7 +134,7 @@ TEST(OrderTests, StopLossPriceForLongIsCorrectlyCalculated)
 
 TEST(OrderTests, StopLossPriceForShortIsCorrectlyCalculated)
 {
-    Order cut{
+    oms::Order cut{
             OrderType::SELL,
             "AAPL",
             100.0,
@@ -168,7 +168,7 @@ TEST(OrderTests, StopLossPriceForShortIsCorrectlyCalculated)
 
 TEST(OrderTests, TakeProfitPriceForLongIsCorrectlyCalculated)
 {
-    Order cut{
+    oms::Order cut{
             OrderType::BUY,
             "AAPL",
             100.0,
@@ -202,7 +202,7 @@ TEST(OrderTests, TakeProfitPriceForLongIsCorrectlyCalculated)
 
 TEST(OrderTests, TakeProfitPriceForShortIsCorrectlyCalculated)
 {
-    Order cut{
+    oms::Order cut{
             OrderType::SELL,
             "AAPL",
             100.0,

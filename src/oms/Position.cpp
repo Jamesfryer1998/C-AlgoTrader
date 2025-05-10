@@ -1,7 +1,7 @@
 #include "Position.hpp"
         
 
-Position::Position(
+oms::Position::Position(
     string _ticker,
     float _quantity,
     float _avgPrice)
@@ -12,6 +12,6 @@ Position::Position(
 {
 }
 
-Position::~Position()
+oms::Position::~Position()
 {
 }

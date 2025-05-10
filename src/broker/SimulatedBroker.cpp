@@ -112,7 +112,7 @@ SimulatedBroker::getLatestPrice(std::string ticker)
 }
 
 int 
-SimulatedBroker::placeOrder(Order order)
+SimulatedBroker::placeOrder(oms::Order order)
 {
     // Add order to pending orders queue
     pendingOrders.push_back(order);
@@ -122,7 +122,7 @@ SimulatedBroker::placeOrder(Order order)
     currentCondition = marketData.getCurrentData();
     simulationTime = currentCondition.DateTime;
     
-    std::cout << "Order placed for order " 
+    std::cout << "oms::Order placed for order " 
               << order.getId() << " for " 
               << order.getTypeAsString() << " with " 
               << order.getQuantity() << " shares of " 
@@ -139,7 +139,7 @@ SimulatedBroker::processOrders()
     }
     
     // Process all pending orders with current market data
-    std::vector<Order> remainingOrders;
+    std::vector<oms::Order> remainingOrders;
     
     for (auto& order : pendingOrders) {
         if (checkOrderValidity(order)) {
@@ -155,7 +155,7 @@ SimulatedBroker::processOrders()
 }
 
 bool
-SimulatedBroker::checkOrderValidity(const Order& order) const
+SimulatedBroker::checkOrderValidity(const oms::Order& order) const
 {
     // For a real system, we'd perform more validation:
     // - Check if we have enough cash for buy orders
@@ -167,7 +167,7 @@ SimulatedBroker::checkOrderValidity(const Order& order) const
 }
 
 void
-SimulatedBroker::executeOrder(Order& order)
+SimulatedBroker::executeOrder(oms::Order& order)
 {
     // Get current price for the ticker
     float basePrice = getLatestPrice(order.getTicker());
@@ -219,13 +219,13 @@ SimulatedBroker::executeOrder(Order& order)
     filledOrders.push_back(order);
     totalTrades++;
     
-    std::cout << "Order executed: " << (order.isBuy() ? "BUY" : "SELL")
+    std::cout << "oms::Order executed: " << (order.isBuy() ? "BUY" : "SELL")
               << " " << order.getQuantity() << " shares of " << order.getTicker()
               << " at $" << std::fixed << std::setprecision(2) << executionPrice;
     
     // Display slippage information
     if (slippagePercentage > 0.0) {
-        std::cout << " (Order price: $" << std::fixed << std::setprecision(2) << originalOrderPrice
+        std::cout << " (oms::Order price: $" << std::fixed << std::setprecision(2) << originalOrderPrice
                   << ", Slippage: " << (actualSlippagePercent >= 0 ? "+" : "")
                   << std::fixed << std::setprecision(3) << (actualSlippagePercent * 100.0) << "%)";
     }
@@ -234,7 +234,7 @@ SimulatedBroker::executeOrder(Order& order)
 }
 
 void
-SimulatedBroker::updatePositions(const Order& order, double executionPrice)
+SimulatedBroker::updatePositions(const oms::Order& order, double executionPrice)
 {
     std::string ticker = order.getTicker();
     double quantity = order.getQuantity();
@@ -250,7 +250,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
         // Add to position or create new position
         if (positionsByTicker.find(ticker) != positionsByTicker.end()) {
             // Existing position - update it
-            Position& existingPos = positionsByTicker[ticker];
+            oms::Position& existingPos = positionsByTicker[ticker];
             double existingQuantity = existingPos.getQuantity();
             
             // If there's a short position (negative quantity), handle buying to cover
@@ -294,7 +294,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
             }
         } else {
             // New position
-            Position newPosition(ticker, quantity, executionPrice);
+            oms::Position newPosition(ticker, quantity, executionPrice);
             positionsByTicker[ticker] = newPosition;
             std::cout << "Established new long position for " << ticker << " with " 
                       << quantity << " shares at $" << executionPrice << std::endl;
@@ -305,7 +305,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
         
         if (positionsByTicker.find(ticker) != positionsByTicker.end()) {
             // We have an existing position for this ticker
-            Position& existingPos = positionsByTicker[ticker];
+            oms::Position& existingPos = positionsByTicker[ticker];
             double existingQuantity = existingPos.getQuantity();
             
             if (existingQuantity > 0) {
@@ -348,7 +348,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
             }
         } else {
             // No existing position, establishing a new short position
-            Position newPosition(ticker, -quantity, executionPrice);
+            oms::Position newPosition(ticker, -quantity, executionPrice);
             positionsByTicker[ticker] = newPosition;
             std::cout << "Established new short position for " << ticker << " with " 
                       << quantity << " shares at $" << executionPrice << std::endl;
@@ -375,7 +375,7 @@ SimulatedBroker::updatePortfolioValue()
     double totalShortValue = 0.0;
     
     for (const auto& pair : positionsByTicker) {
-        const Position& position = pair.second;
+        const oms::Position& position = pair.second;
         std::string ticker = position.getTicker();
         double quantity = position.getQuantity();
         double avgPrice = position.getAvgPrice();
@@ -427,7 +427,7 @@ SimulatedBroker::updatePortfolioValue()
     highestEquity = std::max(highestEquity, currentEquity);
 }
 
-Position
+oms::Position
 SimulatedBroker::getLatestPosition(std::string ticker)
 {
     // Return existing position or empty position
@@ -435,7 +435,7 @@ SimulatedBroker::getLatestPosition(std::string ticker)
         return positionsByTicker[ticker];
     } else {
         // Return empty position
-        return Position(ticker, 0, 0);
+        return oms::Position(ticker, 0, 0);
     }
 }
 
@@ -443,11 +443,11 @@ void
 SimulatedBroker::checkStopLosses()
 {
     // Create a copy of positionsByTicker to iterate, as we might modify during iteration
-    std::map<std::string, Position> positionsCopy = positionsByTicker;
+    std::map<std::string, oms::Position> positionsCopy = positionsByTicker;
     
     // Iterate through positions and check if current price hits stop loss
     for (const auto& pair : positionsCopy) {
-        const Position& position = pair.second;
+        const oms::Position& position = pair.second;
         std::string ticker = position.getTicker();
         double quantity = position.getQuantity();
         
@@ -470,7 +470,7 @@ SimulatedBroker::checkStopLosses()
                                   << ", stop price: " << order.getStopLossPrice() << std::endl;
                         
                         // For long positions, we SELL to exit
-                        Order stopOrder(OrderType::SELL, ticker, std::abs(order.getQuantity()), currentPrice);
+                        oms::Order stopOrder(OrderType::SELL, ticker, std::abs(order.getQuantity()), currentPrice);
                         executeOrder(stopOrder);
                         break;
                     }
@@ -482,7 +482,7 @@ SimulatedBroker::checkStopLosses()
                                   << ", stop price: " << order.getStopLossPrice() << std::endl;
                         
                         // For short positions, we BUY to cover and exit
-                        Order stopOrder(OrderType::BUY, ticker, std::abs(order.getQuantity()), currentPrice);
+                        oms::Order stopOrder(OrderType::BUY, ticker, std::abs(order.getQuantity()), currentPrice);
                         executeOrder(stopOrder);
                         break;
                     }
@@ -496,11 +496,11 @@ void
 SimulatedBroker::checkTakeProfits()
 {
     // Create a copy of positionsByTicker to iterate, as we might modify during iteration
-    std::map<std::string, Position> positionsCopy = positionsByTicker;
+    std::map<std::string, oms::Position> positionsCopy = positionsByTicker;
     
     // Iterate through positions and check if current price hits take profit
     for (const auto& pair : positionsCopy) {
-        const Position& position = pair.second;
+        const oms::Position& position = pair.second;
         std::string ticker = position.getTicker();
         double quantity = position.getQuantity();
         
@@ -523,7 +523,7 @@ SimulatedBroker::checkTakeProfits()
                                   << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
                         
                         // For long positions, we SELL to exit with profit
-                        Order tpOrder(OrderType::SELL, ticker, std::abs(quantity), currentPrice);
+                        oms::Order tpOrder(OrderType::SELL, ticker, std::abs(quantity), currentPrice);
                         executeOrder(tpOrder);
                         break;
                     }
@@ -535,7 +535,7 @@ SimulatedBroker::checkTakeProfits()
                                   << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
                         
                         // For short positions, we BUY to cover and exit with profit
-                        Order tpOrder(OrderType::BUY, ticker, std::abs(quantity), currentPrice);
+                        oms::Order tpOrder(OrderType::BUY, ticker, std::abs(quantity), currentPrice);
                         executeOrder(tpOrder);
                         break;
                     }
@@ -589,7 +589,7 @@ SimulatedBroker::getNumTrades() const
     return totalTrades;
 }
 
-const std::vector<Order>& 
+const std::vector<oms::Order>& 
 SimulatedBroker::getFilledOrders() const 
 {
     return filledOrders;

@@ -18,7 +18,7 @@ OrderValidator::setParams(json configData)
                 << "slippageTolerance=" << slippageTolerance << std::endl;
 }
 
-bool OrderValidator::validateOrder(const Order& order, MarketData& marketData, std::vector<Position>& positions)
+bool OrderValidator::validateOrder(const oms::Order& order, MarketData& marketData, std::vector<oms::Position>& positions)
 {
     float totalHeldPositions = getTotalHeldQuantity(order, positions);
     
@@ -35,7 +35,7 @@ bool OrderValidator::validateOrder(const Order& order, MarketData& marketData, s
 }
 
 bool
-OrderValidator::isValidOrderType(const Order& order)
+OrderValidator::isValidOrderType(const oms::Order& order)
 {
     // Check if the order type is recognized
     OrderType type = order.getType();
@@ -47,7 +47,7 @@ OrderValidator::isValidOrderType(const Order& order)
             type == OrderType::STOP_SELL);
 }
 
-bool OrderValidator::isValidPrice(const Order& order, MarketData& marketData)
+bool OrderValidator::isValidPrice(const oms::Order& order, MarketData& marketData)
 {
     double orderPrice = order.getPrice();
     double lastClose = marketData.getLastClosePrice();
@@ -66,14 +66,14 @@ bool OrderValidator::isValidPrice(const Order& order, MarketData& marketData)
 }
 
 bool
-OrderValidator::isValidQuantity(const Order& order)
+OrderValidator::isValidQuantity(const oms::Order& order)
 {
         return (order.getQuantity() > 0 &&
                 order.getQuantity() <= maxPositionSize);
 }
 
 bool
-OrderValidator::checkMaxPositionSize(const Order& order, float totalHeldQuantity)
+OrderValidator::checkMaxPositionSize(const oms::Order& order, float totalHeldQuantity)
 {
     float newTotal = totalHeldQuantity + (order.isBuy() ? order.getQuantity() : 0.0f);
 
@@ -82,7 +82,7 @@ OrderValidator::checkMaxPositionSize(const Order& order, float totalHeldQuantity
 }
 
 bool
-OrderValidator::checkStopLoss(const Order& order, MarketData& marketData)
+OrderValidator::checkStopLoss(const oms::Order& order, MarketData& marketData)
 {
     // Add stop loss into strategy config
     // When creating a order from a strategy, set the stop loss, this will be a %
@@ -109,7 +109,7 @@ OrderValidator::checkStopLoss(const Order& order, MarketData& marketData)
 }
 
 bool
-OrderValidator::checkTakeProfit(const Order& order, MarketData& marketData)
+OrderValidator::checkTakeProfit(const oms::Order& order, MarketData& marketData)
 {
     // TODO: Decide
     // Maybe need to have some user input here
@@ -130,14 +130,14 @@ OrderValidator::checkTakeProfit(const Order& order, MarketData& marketData)
 }
 
 bool
-OrderValidator::checkTickSize(const Order& order, MarketData& marketData)
+OrderValidator::checkTickSize(const oms::Order& order, MarketData& marketData)
 {
     return true; // TODO: Implement
     // Will need to test with certain exchanges
     // Tick size will also change based on the commondity/security we trade
 }
 
-bool OrderValidator::checkSlippage(const Order& order, MarketData& marketData) 
+bool OrderValidator::checkSlippage(const oms::Order& order, MarketData& marketData) 
 {
     double orderPrice = order.getPrice();
     double lastClose = marketData.getLastClosePrice();
@@ -147,7 +147,7 @@ bool OrderValidator::checkSlippage(const Order& order, MarketData& marketData)
 
     return slippage <= slippageTolerance;
 }
-float OrderValidator::getTotalHeldQuantity(const Order& order, std::vector<Position>& positions)
+float OrderValidator::getTotalHeldQuantity(const oms::Order& order, std::vector<oms::Position>& positions)
 {
     float totalHeldQuantity = 0.0f;
 

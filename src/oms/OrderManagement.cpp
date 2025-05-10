@@ -18,7 +18,7 @@ OrderManagement::~OrderManagement()
 // }
 
 void
-OrderManagement::addOrder(Order &order)
+OrderManagement::addOrder(oms::Order &order)
 {
     order.setId(latestOrderId);
     orders.push_back(order);
@@ -26,7 +26,7 @@ OrderManagement::addOrder(Order &order)
 }
 
 void
-OrderManagement::addPosition(Position &position)
+OrderManagement::addPosition(oms::Position &position)
 {
     position.setId(latestPositionId);
     positions.push_back(position);
@@ -35,15 +35,15 @@ OrderManagement::addPosition(Position &position)
 
 void OrderManagement::removeOrder(int id)
 {
-    std::erase_if(orders, [id](Order& order) { return order.getId() == id; });
+    std::erase_if(orders, [id](oms::Order& order) { return order.getId() == id; });
 }
 
 void OrderManagement::removePosition(int id)
 {
-    std::erase_if(positions, [id](Position& position) { return position.getId() == id; });
+    std::erase_if(positions, [id](oms::Position& position) { return position.getId() == id; });
 }
 
-void OrderManagement::onNewOrder(Order& order)
+void OrderManagement::onNewOrder(oms::Order& order)
 {
     // Wait for new order to be added to orders from strat engine
     bool orderValid = validator.validateOrder(order, marketData, positions);
@@ -54,19 +54,19 @@ void OrderManagement::onNewOrder(Order& order)
         // connect with Broker API to place order here
         if (broker->placeOrder(order))
         {
-            Position newPosition = broker->getLatestPosition(order.getTicker());
+            oms::Position newPosition = broker->getLatestPosition(order.getTicker());
             addPosition(newPosition);
         }
     }
 }
 
         
-void OrderManagement::onOrderExecuted(Order& order)
+void OrderManagement::onOrderExecuted(oms::Order& order)
 {
-    // Order passes back from Broker API saying we have executed
+    // oms::Order passes back from Broker API saying we have executed
     // Create position from order and add to positions
     // Strats will then use positions to make decisions    
-    Position newPosition{
+    oms::Position newPosition{
         order.getTicker(),
         order.getQuantity(),
         order.getPrice() // Broker will change this to average price 

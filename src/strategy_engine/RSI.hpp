@@ -162,9 +162,9 @@ class RSI : public StrategyBase {
             return (rsi < _strategyAttribute.overbought_threshold && rsi > _strategyAttribute.oversold_threshold);
         }
 
-        Order createBuyOrder(string ticker, float price, float quantity)
+        oms::Order createBuyOrder(string ticker, float price, float quantity)
         {
-            Order order{
+            oms::Order order{
                 OrderType::BUY,
                 ticker,
                 quantity,
@@ -179,9 +179,9 @@ class RSI : public StrategyBase {
             return order;
         }
 
-        Order createSellOrder(string ticker, float price, float quantity)
+        oms::Order createSellOrder(string ticker, float price, float quantity)
         {
-            Order order{
+            oms::Order order{
                 OrderType::SELL,
                 ticker,
                 quantity,

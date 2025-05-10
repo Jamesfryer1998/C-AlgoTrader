@@ -20,9 +20,9 @@ class SimulatedBroker : public BrokerBase {
         // BrokerBase interface implementation
         int connect() override;
         int disconnect() override;
-        int placeOrder(Order order) override;
+        int placeOrder(oms::Order order) override;
         float getLatestPrice(std::string ticker) override;
-        Position getLatestPosition(std::string ticker) override;
+        oms::Position getLatestPosition(std::string ticker) override;
         
         // Simulation specific methods
         void process();
@@ -37,7 +37,7 @@ class SimulatedBroker : public BrokerBase {
         double getDrawdown() const;
         double getCurrentEquity() const;
         double getStartingCapital() const;
-        const std::vector<Order>& getFilledOrders() const;
+        const std::vector<oms::Order>& getFilledOrders() const;
         double getCurrentCash() const { return currentCash; }
         size_t getPendingOrdersCount() const { return pendingOrders.size(); }
         double getSlippagePercentage() const { return slippagePercentage; }
@@ -51,14 +51,14 @@ class SimulatedBroker : public BrokerBase {
 
         
     private:
-        // Order processing
+        // oms::Order processing
         void processOrders();
         void checkStopLosses();
         void checkTakeProfits();
         void updatePortfolioValue();
-        void executeOrder(Order& order);
-        bool checkOrderValidity(const Order& order) const;
-        void updatePositions(const Order& order, double executionPrice);
+        void executeOrder(oms::Order& order);
+        bool checkOrderValidity(const oms::Order& order) const;
+        void updatePositions(const oms::Order& order, double executionPrice);
         
         // For testing
         bool useFixedSeed;
@@ -70,13 +70,13 @@ class SimulatedBroker : public BrokerBase {
         MarketCondition currentCondition;
         
         // Orders tracking
-        std::vector<Order> filledOrders;
-        std::vector<Order> pendingOrders;
-        std::vector<Order> cancelledOrders;
+        std::vector<oms::Order> filledOrders;
+        std::vector<oms::Order> pendingOrders;
+        std::vector<oms::Order> cancelledOrders;
         
         // Positions and portfolio
-        std::vector<Position> positionHistory;
-        std::map<std::string, Position> positionsByTicker;
+        std::vector<oms::Position> positionHistory;
+        std::map<std::string, oms::Position> positionsByTicker;
         
         // Performance metrics
         int totalTrades;

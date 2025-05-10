@@ -33,7 +33,7 @@ class StrategyEngine
         // Print loaded strategies for debugging
         void printStategies();
 
-        bool DecideToMakeTrade(std::vector<Order> proposedOrders);
+        bool DecideToMakeTrade(std::vector<oms::Order> proposedOrders);
 
         json configData;
         MarketData* marketData; // Use a pointer to the MarketData object

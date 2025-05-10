@@ -22,35 +22,35 @@ public:
 
     void GivenWeHaveABuyOrder()
     {
-        order = Order{
+        order = oms::Order{
                 OrderType::BUY,
                 "AAPL",
                 10,
                 109.0};
 
-        // positions.push_back(Position{"AAPL", 10, 109.0});
+        // positions.push_back(oms::Position{"AAPL", 10, 109.0});
     }
 
     void GivenWeHaveASellOrder()
     {
-        order = Order{
+        order = oms::Order{
                 OrderType::SELL,
                 "AAPL",
                 10,
                 109.0};
 
-        // positions.push_back(Position{"AAPL", 10, 109.0});
+        // positions.push_back(oms::Position{"AAPL", 10, 109.0});
     }
 
     void GivenWeHaveAnInvalidOrder()
     {
-        order = Order{
+        order = oms::Order{
                 OrderType::UNKNOWN, 
                 "AAPL",
                 20,
                 120.00};
 
-        // positions.push_back(Position{"AAPL", 20, 120.0});
+        // positions.push_back(oms::Position{"AAPL", 20, 120.0});
     }
 
     void GivenWeHaveMarketData()
@@ -59,11 +59,11 @@ public:
         marketData.loadData(dataFilePath);
     }
 
-    Order order;
-    Position position;
+    oms::Order order;
+    oms::Position position;
     json algoTestConfig;
     MarketData marketData;
-    std::vector<Position> positions;
+    std::vector<oms::Position> positions;
 
 };
 

@@ -12,8 +12,8 @@ class IBKR : public BrokerBase
     int connect();
     int disconnect();
     float getLatestPrice(std::string ticker);
-    int placeOrder(Order order);
-    Position getLatestPosition(std::string ticker);
+    int placeOrder(oms::Order order);
+    oms::Position getLatestPosition(std::string ticker);
 
     EClientSocket *m_pClient;
 

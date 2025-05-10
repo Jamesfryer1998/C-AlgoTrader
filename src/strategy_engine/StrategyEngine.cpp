@@ -60,8 +60,8 @@ StrategyEngine::setMarketData(MarketData& inputData)
 void
 StrategyEngine::executeStrategies()
 {   
-    Order order;
-    std::vector<Order> proposedOrders;
+    oms::Order order;
+    std::vector<oms::Order> proposedOrders;
     
     // Check if marketData pointer is valid
     if (marketData == nullptr) {
@@ -77,7 +77,7 @@ StrategyEngine::executeStrategies()
 
         if(strat->onNewOrder())
         {
-            Order order = strat->getOrder();
+            oms::Order order = strat->getOrder();
             // proposedOrders.push_back(order);
             oms->onNewOrder(order);
         }
@@ -100,7 +100,7 @@ StrategyEngine::printStategies()
 }
 
 bool
-StrategyEngine::DecideToMakeTrade(std::vector<Order> proposedOrders)
+StrategyEngine::DecideToMakeTrade(std::vector<oms::Order> proposedOrders)
 {
     string orderType;
     for (auto& order : proposedOrders) 

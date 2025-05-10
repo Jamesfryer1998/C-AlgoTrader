@@ -19,7 +19,7 @@ class OrderManagementTests : public ::testing::Test
 
     void GenerateOrder()
     {
-        Order order{
+        oms::Order order{
                 "Filled",
                 "AAPL",
                 100.0,
@@ -30,7 +30,7 @@ class OrderManagementTests : public ::testing::Test
 
     void GeneratePosition()
     {
-        Position position{
+        oms::Position position{
                 "AAPL",
                 100.0,
                 120.0};
@@ -38,8 +38,8 @@ class OrderManagementTests : public ::testing::Test
         cut->addPosition(position);
     }
 
-    Order order;
-    Position position;
+    oms::Order order;
+    oms::Position position;
 };
 
 TEST_F(OrderManagementTests, CanBeInstantiated) 

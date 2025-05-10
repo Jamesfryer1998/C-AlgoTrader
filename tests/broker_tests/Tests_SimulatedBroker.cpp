@@ -66,36 +66,36 @@ public:
         }
     }
 
-    Order createBuyOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
+    oms::Order createBuyOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
     {
         if (price == 0.0f) {
             price = broker->getLatestPrice(ticker);
         }
-        return Order(OrderType::BUY, ticker, quantity, price);
+        return oms::Order(OrderType::BUY, ticker, quantity, price);
     }
 
-    Order createSellOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
+    oms::Order createSellOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
     {
         if (price == 0.0f) {
             price = broker->getLatestPrice(ticker);
         }
-        return Order(OrderType::SELL, ticker, quantity, price);
+        return oms::Order(OrderType::SELL, ticker, quantity, price);
     }
 
-    Order createLimitBuyOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
+    oms::Order createLimitBuyOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
     {
         if (price == 0.0f) {
             price = broker->getLatestPrice(ticker) * 0.95f; // 5% below current price
         }
-        return Order(OrderType::LIMIT_BUY, ticker, quantity, price);
+        return oms::Order(OrderType::LIMIT_BUY, ticker, quantity, price);
     }
 
-    Order createLimitSellOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
+    oms::Order createLimitSellOrder(std::string ticker = "AAPL", float quantity = 100.0f, float price = 0.0f) 
     {
         if (price == 0.0f) {
             price = broker->getLatestPrice(ticker) * 1.05f; // 5% above current price
         }
-        return Order(OrderType::LIMIT_SELL, ticker, quantity, price);
+        return oms::Order(OrderType::LIMIT_SELL, ticker, quantity, price);
     }
 
     void executeStep() 
@@ -138,7 +138,7 @@ TEST_F(SimulatedBrokerTests, CanGetLatestPrice)
 
 TEST_F(SimulatedBrokerTests, CanPlaceOrder) 
 {
-    Order order = createBuyOrder();
+    oms::Order order = createBuyOrder();
     broker->placeOrder(order);
     
     EXPECT_GT(broker->getPendingOrdersCount(), 0);
@@ -148,7 +148,7 @@ TEST_F(SimulatedBrokerTests, OrdersAreExecuted)
 {
     EXPECT_EQ(broker->getNumTrades(), 0);
     
-    Order buyOrder = createBuyOrder();
+    oms::Order buyOrder = createBuyOrder();
     broker->placeOrder(buyOrder);
     
     executeStep();
@@ -161,7 +161,7 @@ TEST_F(SimulatedBrokerTests, PositionsAreCreated)
     broker->placeOrder(createBuyOrder("AAPL", 100.0f));
     executeStep();
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     
     EXPECT_EQ(position.getTicker(), "AAPL");
     EXPECT_NEAR(position.getQuantity(), 100.0f, 0.001f);
@@ -175,7 +175,7 @@ TEST_F(SimulatedBrokerTests, PositionsAreUpdatedOnMultipleBuys)
     broker->placeOrder(createBuyOrder("AAPL", 50.0f));
     executeStep();
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     
     EXPECT_EQ(position.getTicker(), "AAPL");
     EXPECT_NEAR(position.getQuantity(), 150.0f, 0.001f);
@@ -189,7 +189,7 @@ TEST_F(SimulatedBrokerTests, PositionsAreReducedOnSell)
     broker->placeOrder(createSellOrder("AAPL", 50.0f));
     executeStep();
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     
     EXPECT_EQ(position.getTicker(), "AAPL");
     EXPECT_NEAR(position.getQuantity(), 50.0f, 0.001f);
@@ -200,13 +200,13 @@ TEST_F(SimulatedBrokerTests, PositionsAreRemovedOnFullSell)
     broker->placeOrder(createBuyOrder("AAPL", 100.0f));
     executeStep();
     
-    Position initialPosition = broker->getLatestPosition("AAPL");
+    oms::Position initialPosition = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(initialPosition.getQuantity(), 100.0f, 0.001f);
     
     broker->placeOrder(createSellOrder("AAPL", 100.0f));
     executeStep();
     
-    Position finalPosition = broker->getLatestPosition("AAPL");
+    oms::Position finalPosition = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(finalPosition.getQuantity(), 0.0f, 0.001f);
 }
 
@@ -218,7 +218,7 @@ TEST_F(SimulatedBrokerTests, CashBalanceUpdatedAfterBuy)
     float quantity = 100.0f;
 
     
-    Order order = createBuyOrder("AAPL", quantity, price);
+    oms::Order order = createBuyOrder("AAPL", quantity, price);
     broker->placeOrder(order);
     executeStep();
     
@@ -285,7 +285,7 @@ TEST_F(SimulatedBrokerTests, PnLIsCorrectlyCalculated)
     // double finalPnl = broker->getCurrentEquity() - broker->getStartingCapital();
 
     // Based on:
-    // Order price: 109.064
+    // oms::Order price: 109.064
     // Quantity: 100
 
     EXPECT_NEAR(broker->getPnL(), -6.93, 0.01);
@@ -340,7 +340,7 @@ TEST_F(SimulatedBrokerTests, LimitBuyOrdersExecutedAtCorrectPrice)
     std::cout << "Test LimitBuyOrdersExecutedAtCorrectPrice - Current price: " << currentPrice 
               << ", limit price: " << limitPrice << std::endl;
     
-    Order limitBuy = createLimitBuyOrder("AAPL", quantity, limitPrice);
+    oms::Order limitBuy = createLimitBuyOrder("AAPL", quantity, limitPrice);
     broker->placeOrder(limitBuy);
     
     mockData[broker->getStep()] = MarketCondition(
@@ -359,7 +359,7 @@ TEST_F(SimulatedBrokerTests, LimitBuyOrdersExecutedAtCorrectPrice)
     
     EXPECT_EQ(broker->getNumTrades(), 1);
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), quantity, 0.001f);
     
     // Execution should be exactly at limit price 
@@ -378,7 +378,7 @@ TEST_F(SimulatedBrokerTests, LimitBuyOrdersNotExecutedAboveLimit)
     std::cout << "Test LimitBuyOrdersNotExecutedAboveLimit - Current price: " << currentPrice 
               << ", limit price: " << limitPrice << std::endl;
     
-    Order limitBuy = createLimitBuyOrder("AAPL", quantity, limitPrice);
+    oms::Order limitBuy = createLimitBuyOrder("AAPL", quantity, limitPrice);
     broker->placeOrder(limitBuy);
     
     float aboveLimitPrice = limitPrice + 2.0f;
@@ -398,7 +398,7 @@ TEST_F(SimulatedBrokerTests, LimitBuyOrdersNotExecutedAboveLimit)
     
     EXPECT_EQ(broker->getNumTrades(), 0);
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), 0.0f, 0.001f);
 }
 
@@ -418,7 +418,7 @@ TEST_F(SimulatedBrokerTests, LimitSellOrdersExecutedAtCorrectPrice)
     std::cout << "Test LimitSellOrdersExecutedAtCorrectPrice - Current price: " << currentPrice 
               << ", limit price: " << limitPrice << std::endl;
     
-    Order limitSell = createLimitSellOrder("AAPL", quantity, limitPrice);
+    oms::Order limitSell = createLimitSellOrder("AAPL", quantity, limitPrice);
     broker->placeOrder(limitSell);
     
     float aboveLimitPrice = limitPrice + 1.0f;
@@ -441,14 +441,14 @@ TEST_F(SimulatedBrokerTests, LimitSellOrdersExecutedAtCorrectPrice)
     
     EXPECT_EQ(broker->getNumTrades(), 2); // 1 buy + 1 sell
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), 0.0f, 0.001f);
     
-    const std::vector<Order>& filledOrders = broker->getFilledOrders();
+    const std::vector<oms::Order>& filledOrders = broker->getFilledOrders();
     EXPECT_EQ(filledOrders.size(), 2);
     
     if (filledOrders.size() >= 2) {
-        const Order& sellOrder = filledOrders[1]; // Second order should be the sell
+        const oms::Order& sellOrder = filledOrders[1]; // Second order should be the sell
         EXPECT_NEAR(sellOrder.getPrice(), limitPrice, 1.0f);
     }
 }
@@ -463,7 +463,7 @@ TEST_F(SimulatedBrokerTests, StopLossIsTriggered)
     float buyPrice = 100.0f;
     float quantity = 100.0f;
     float stopLossPercent = 5.0f;
-    Order buyOrder = createBuyOrder("AAPL", quantity, buyPrice);
+    oms::Order buyOrder = createBuyOrder("AAPL", quantity, buyPrice);
     buyOrder.setStopLoss(stopLossPercent);
     broker->placeOrder(buyOrder);
     executeStep();
@@ -492,16 +492,16 @@ TEST_F(SimulatedBrokerTests, StopLossIsTriggered)
     
     executeStep();
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), 0.0f, 0.001f);
     
     EXPECT_EQ(broker->getNumTrades(), 2);
     
-    const std::vector<Order>& filledOrders = broker->getFilledOrders();
+    const std::vector<oms::Order>& filledOrders = broker->getFilledOrders();
     EXPECT_EQ(filledOrders.size(), 2);
     
     if (filledOrders.size() >= 2) {
-        const Order& sellOrder = filledOrders[1]; // Second order should be the stop loss
+        const oms::Order& sellOrder = filledOrders[1]; // Second order should be the stop loss
         EXPECT_TRUE(sellOrder.isSell());
         EXPECT_NEAR(sellOrder.getPrice(), belowStopLossPrice, 0.001f);
     }
@@ -516,7 +516,7 @@ TEST_F(SimulatedBrokerTests, TakeProfitIsTriggered)
     float quantity = 100.0f;
     float takeProfitPercent = 5.0f;
     
-    Order buyOrder = createBuyOrder("AAPL", quantity, buyPrice);
+    oms::Order buyOrder = createBuyOrder("AAPL", quantity, buyPrice);
     buyOrder.setTakeProfit(takeProfitPercent);
     broker->placeOrder(buyOrder);
     executeStep();
@@ -545,17 +545,17 @@ TEST_F(SimulatedBrokerTests, TakeProfitIsTriggered)
     
     executeStep();
     
-    Position position = broker->getLatestPosition("AAPL");
+    oms::Position position = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(position.getQuantity(), 0.0f, 0.001f);
     
     // Verify that both orders were filled
     EXPECT_EQ(broker->getNumTrades(), 2); // 1 buy + 1 take profit sell
     
-    const std::vector<Order>& filledOrders = broker->getFilledOrders();
+    const std::vector<oms::Order>& filledOrders = broker->getFilledOrders();
     EXPECT_EQ(filledOrders.size(), 2);
     
     if (filledOrders.size() >= 2) {
-        const Order& sellOrder = filledOrders[1]; // Second order should be the take profit
+        const oms::Order& sellOrder = filledOrders[1]; // Second order should be the take profit
         EXPECT_TRUE(sellOrder.isSell());
         EXPECT_NEAR(sellOrder.getPrice(), aboveTakeProfitPrice, 0.001f);
     }
@@ -578,10 +578,10 @@ TEST_F(SimulatedBrokerTests, CanHandleMultipleAssets)
     broker->placeOrder(createBuyOrder("GOOG", 10.0f, 1500.0f));
     executeStep();
     
-    Position aaplPosition = broker->getLatestPosition("AAPL");
+    oms::Position aaplPosition = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(aaplPosition.getQuantity(), 100.0f, 0.001f);
     
-    Position googPosition = broker->getLatestPosition("GOOG");
+    oms::Position googPosition = broker->getLatestPosition("GOOG");
     EXPECT_NEAR(googPosition.getQuantity(), 10.0f, 0.001f);
 }
 
@@ -598,11 +598,11 @@ TEST_F(SimulatedBrokerTests, SlippageAffectsExecutionPrice)
         broker.reset();
         broker = std::make_unique<SimulatedBroker>(*marketData);
         broker->setSlippage(slippagePercent);
-        Order order = createBuyOrder("AAPL", quantity, basePrice);
+        oms::Order order = createBuyOrder("AAPL", quantity, basePrice);
         broker->placeOrder(order);
         executeStep();
         
-        Position position = broker->getLatestPosition("AAPL");
+        oms::Position position = broker->getLatestPosition("AAPL");
         executionPrices.push_back(position.getAvgPrice());
     }
     
@@ -633,11 +633,11 @@ TEST_F(SimulatedBrokerTests, SlippageAffectsExecutionPrice)
         // Use same seed for each broker instance
         broker->enableFixedRandomSeed(42);
         
-        Order order = createBuyOrder("AAPL", quantity, basePrice);
+        oms::Order order = createBuyOrder("AAPL", quantity, basePrice);
         broker->placeOrder(order);
         executeStep();
         
-        Position position = broker->getLatestPosition("AAPL");
+        oms::Position position = broker->getLatestPosition("AAPL");
         executionPrices.push_back(position.getAvgPrice());
     }
     
@@ -703,7 +703,7 @@ TEST_F(SimulatedBrokerTests, IntegrationWithMultipleOrdersAndMarketMovements)
     executeStep();
     
     // Verify final state
-    Position finalPosition = broker->getLatestPosition("AAPL");
+    oms::Position finalPosition = broker->getLatestPosition("AAPL");
     EXPECT_NEAR(finalPosition.getQuantity(), 0.0f, 0.001f);
     
     // Calculate expected PnL

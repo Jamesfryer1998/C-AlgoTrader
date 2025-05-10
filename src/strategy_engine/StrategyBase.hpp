@@ -41,7 +41,7 @@ class StrategyBase
             NewOrder = false;
         }
 
-        virtual Order getOrder()
+        virtual oms::Order getOrder()
         {
             NewOrder = false;
             return order; 
@@ -54,7 +54,7 @@ class StrategyBase
 
         // Base strats take in entire list of strat params
         // Specific strats pick and choose from this list
-        Order order;
+        oms::Order order;
         MarketData marketData;
         bool NewOrder = false;
         StrategyAttribute _strategyAttribute;

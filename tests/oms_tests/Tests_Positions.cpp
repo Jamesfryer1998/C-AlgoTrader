@@ -3,7 +3,7 @@
 
 TEST(PositionTests, CanBeInstantiated)
 {
-    Position cut{
+    oms::Position cut{
         "AAPL",
         100.0,
         120.0
@@ -12,7 +12,7 @@ TEST(PositionTests, CanBeInstantiated)
 
 TEST(PositionTests, CanSetAndGetValues)
 {
-    Position cut{
+    oms::Position cut{
         "AAPL",
         100.0,
         120.0

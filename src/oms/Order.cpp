@@ -29,7 +29,7 @@ OrderType stringToOrderType(const string& typeStr) {
 }
 
 // Constructor with OrderType
-Order::Order(
+oms::Order::Order(
     OrderType _type,
     string _ticker,
     float _quantity,
@@ -45,7 +45,7 @@ Order::Order(
 }
 
 // Constructor with string type (for backward compatibility)
-Order::Order(
+oms::Order::Order(
     string _typeStr,
     string _ticker,
     float _quantity,
@@ -60,13 +60,13 @@ Order::Order(
 {
 }
 
-Order::~Order() 
+oms::Order::~Order() 
 {
 }
 
 // Can set negative percentages
 void 
-Order::setStopLoss(float stopLossPercentage) 
+oms::Order::setStopLoss(float stopLossPercentage) 
 {
     if (isSell()) {
         stopLossPrice = ((stopLossPercentage / 100.0) + 1.0) * price;
@@ -77,7 +77,7 @@ Order::setStopLoss(float stopLossPercentage)
 
 // Can set negative percentages
 void 
-Order::setTakeProfit(float takeProfitPercentage) 
+oms::Order::setTakeProfit(float takeProfitPercentage) 
 {
     if (isSell()) {
         takeProfitPrice = (1.0 - (takeProfitPercentage / 100.0)) * price;

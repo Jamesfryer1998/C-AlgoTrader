@@ -270,11 +270,11 @@ Backtester::calculateMetrics()
     metrics.numTrades = broker.getNumTrades();
     
     // Calculate trade statistics from filled orders
-    const std::vector<Order>& filledOrders = broker.getFilledOrders();
+    const std::vector<oms::Order>& filledOrders = broker.getFilledOrders();
     
     // Separate buy and sell orders
-    std::vector<Order> buyOrders;
-    std::vector<Order> sellOrders;
+    std::vector<oms::Order> buyOrders;
+    std::vector<oms::Order> sellOrders;
     
     for (const auto& order : filledOrders) {
         if (order.getType() == OrderType::BUY || order.getType() == OrderType::LIMIT_BUY) {

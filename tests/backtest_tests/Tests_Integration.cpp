@@ -383,7 +383,7 @@ TEST_F(BacktestIntegrationTests, StopLossAndTakeProfitBacktesting) {
     
     // Buy order with stop loss at 5% and take profit at 10%
     float initialPrice = broker->getLatestPrice("AAPL");
-    Order buyOrder("buy", "AAPL", 100.0f, initialPrice);
+    oms::Order buyOrder("buy", "AAPL", 100.0f, initialPrice);
     buyOrder.setStopLoss(5.0f);
     buyOrder.setTakeProfit(10.0f);
     broker->placeOrder(buyOrder);
@@ -397,7 +397,7 @@ TEST_F(BacktestIntegrationTests, StopLossAndTakeProfitBacktesting) {
         broker->nextStep();
         stepsRun++;
         
-        Position position = broker->getLatestPosition("AAPL");
+        oms::Position position = broker->getLatestPosition("AAPL");
         if (position.getQuantity() == 0.0f) {
             orderClosed = true;
             finalPrice = broker->getLatestPrice("AAPL");
@@ -429,15 +429,15 @@ TEST_F(BacktestIntegrationTests, DifferentOrderTypesBacktesting) {
     float currentPrice = broker->getLatestPrice("AAPL");
     
     // Market order - should execute immediately
-    Order marketOrder(OrderType::BUY, "AAPL", 100.0f, currentPrice);
+    oms::Order marketOrder(OrderType::BUY, "AAPL", 100.0f, currentPrice);
     broker->placeOrder(marketOrder);
     
     // Limit buy below market - should not execute until price drops
-    Order limitBuyOrder(OrderType::LIMIT_BUY, "AAPL", 50.0f, currentPrice * 0.95f);
+    oms::Order limitBuyOrder(OrderType::LIMIT_BUY, "AAPL", 50.0f, currentPrice * 0.95f);
     broker->placeOrder(limitBuyOrder);
     
     // Limit sell above market - should execute when price rises
-    Order limitSellOrder(OrderType::LIMIT_SELL, "AAPL", 100.0f, currentPrice * 1.05f);
+    oms::Order limitSellOrder(OrderType::LIMIT_SELL, "AAPL", 100.0f, currentPrice * 1.05f);
     broker->placeOrder(limitSellOrder);
     
     // Run some market steps

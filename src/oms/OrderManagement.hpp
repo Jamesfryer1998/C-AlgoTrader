@@ -18,14 +18,14 @@ class OrderManagement
         OrderManagement();
         ~OrderManagement();
         void removeOrder(int id);
-        void addOrder(Order &order);
+        void addOrder(oms::Order &order);
         void removePosition(int id);
-        void onNewOrder(Order& order);
-        void onOrderExecuted(Order& order);
-        void addPosition(Position &position);
-        vector<Order> getOrders(){ return orders; };
+        void onNewOrder(oms::Order& order);
+        void onOrderExecuted(oms::Order& order);
+        void addPosition(oms::Position &position);
+        vector<oms::Order> getOrders(){ return orders; };
         void reset() { orders.clear(); positions.clear(); };
-        vector<Position> getPositions(){ return positions; };
+        vector<oms::Position> getPositions(){ return positions; };
         void setUp(json configdata, BrokerBase* Broker)
         {
             validator.setParams(configdata);
@@ -34,10 +34,10 @@ class OrderManagement
         void setMarketData(MarketData marketdata) { marketData = marketdata;};
 
         BrokerBase* broker;
-        vector<Order> orders;
+        vector<oms::Order> orders;
         int latestOrderId = 1;
         MarketData marketData;
         int latestPositionId = 1;
         OrderValidator validator;
-        vector<Position> positions;
+        vector<oms::Position> positions;
 };
