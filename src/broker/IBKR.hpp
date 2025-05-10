@@ -1,4 +1,5 @@
 #include "BrokerBase.hpp"
+#include "EClientSocket.h"
 
 #define MAX_CONNECTION_RETRY 5;
 
@@ -13,5 +14,8 @@ class IBKR : public BrokerBase
     float getLatestPrice(std::string ticker);
     int placeOrder(Order order);
     Position getLatestPosition(std::string ticker);
+
+    EClientSocket *m_pClient;
+
 
 };

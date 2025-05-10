@@ -85,7 +85,8 @@
         "regex": "cpp",
         "future": "cpp",
         "span": "cpp",
-        "cassert": "cpp"
+        "cassert": "cpp",
+        "cfloat": "cpp"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }

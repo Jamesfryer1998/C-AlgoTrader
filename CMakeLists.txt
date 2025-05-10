@@ -19,9 +19,30 @@ FetchContent_Declare(
     URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
 )
 
-# Make json available
 FetchContent_MakeAvailable(json)
 
+FetchContent_Declare(
+    twsapi
+    URL https://interactivebrokers.github.io/downloads/twsapi_macunix.1030.01.zip
+)
+
+FetchContent_GetProperties(twsapi)
+if(NOT twsapi_POPULATED)
+    FetchContent_Populate(twsapi)
+
+    # Define a library target manually
+    file(GLOB_RECURSE TWSAPI_SOURCES
+    ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client/*.cpp
+    ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client/*.c)
+
+    add_library(twsapi STATIC ${TWSAPI_SOURCES})
+
+    # Include all necessary subdirectories
+    target_include_directories(twsapi PUBLIC
+    ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client
+
+    )
+endif()
 # Setup CMAKE Module path for other conda packages
 SET(CMAKE_MODULE_PATH $ENV{$CONDA_PREFIX}/lib/cmake)
 if(DEFINED ENV{CONDA_PREFIX} AND NOT DEFINED ENV{CONDA_BUILD})

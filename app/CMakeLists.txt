@@ -8,7 +8,8 @@ target_link_libraries(algo_trader_app
     oms_lib
     strategy_lib
     backtester_lib
-    nlohmann_json)
+    nlohmann_json
+    twsapi)
 
 target_link_libraries(backtest_app 
     util_lib
@@ -16,4 +17,5 @@ target_link_libraries(backtest_app
     oms_lib
     strategy_lib
     backtester_lib
-    nlohmann_json)
+    nlohmann_json
+    twsapi)
