@@ -1,9 +1,13 @@
 #include "IBKR.hpp"
 
 
-IBKR::IBKR()
+IBKR::IBKR() :
+      m_osSignal(2000)//2-seconds timeout
+    , m_pClient(new EClientSocket(this, &m_osSignal))
+	, m_sleepDeadline(0)
+	, m_orderId(0)
+    , m_extraAuth(false)
 {
-
 }
 
 IBKR::~IBKR()
@@ -23,9 +27,31 @@ IBKR::SetUp()
 int
 IBKR::connected(const char* host, int port, int clientId)
 {
-    broker.connect("127.0.0.1", 7497, 8809497);
-    broker.connectAck();
-    sleep(100);
+    std::cout << "We are about to connect to IBKR broker" << std::endl;
+
+    const char* resolvedHost = (host && *host) ? host : "127.0.0.1";
+    std::cout << "Connecting to " << resolvedHost << ":" << port << " clientId:" << clientId << std::endl;
+
+    //! [connect]
+    bool bRes = m_pClient->eConnect(host, port, clientId, false);
+    //! [connect]
+
+    if (bRes) {
+        std::cout << "Connected to " << m_pClient->host()
+                  << ":" << m_pClient->port()
+                  << " clientId:" << clientId << std::endl;
+
+        //! [ereader]
+        m_pReader = std::make_unique<EReader>(m_pClient, &m_osSignal);
+        m_pReader->start();
+        return 1;
+        //! [ereader]
+    } else {
+        std::cout << "Cannot connect to " << m_pClient->host()
+                  << ":" << m_pClient->port()
+                  << " clientId:" << clientId << std::endl;
+    }
+
     return 0;
 }
 
@@ -35,13 +61,6 @@ IBKR::disconnect()
 {
     std::cout<<"We are disconnected from IBKR broker"<< std::endl;
     return 0;
-}
-
-void 
-IBKR::test()
-{
-    broker.historicalDataRequests();
-    broker.processMessages();
 }
 
 
