@@ -33,15 +33,27 @@ if(NOT twsapi_POPULATED)
     # Define a library target manually
     file(GLOB_RECURSE TWSAPI_SOURCES
     ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client/*.cpp
-    ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client/*.c)
+    ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client/*.c
+    ${twsapi_SOURCE_DIR}/IBJts/samples/Cpp/TestCppClient/*.cpp)
 
+    # Remove Decimal.cpp
+    list(REMOVE_ITEM TWSAPI_SOURCES
+        ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client/Decimal.cpp
+        ${twsapi_SOURCE_DIR}/IBJts/samples/Cpp/TestCppClient/Main.cpp
+    )
+    
     add_library(twsapi STATIC ${TWSAPI_SOURCES})
 
+    target_compile_options(twsapi PRIVATE -Wno-switch)
+    
+    # Avoid Decimal usage
+    target_compile_definitions(twsapi PUBLIC SKIP_DECIMAL)
     # Include all necessary subdirectories
     target_include_directories(twsapi PUBLIC
+    ${twsapi_SOURCE_DIR}/IBJts/source/cppclient
     ${twsapi_SOURCE_DIR}/IBJts/source/cppclient/client
+    ${twsapi_SOURCE_DIR}/IBJts/samples/Cpp/TestCppClient)
 
-    )
 endif()
 # Setup CMAKE Module path for other conda packages
 SET(CMAKE_MODULE_PATH $ENV{$CONDA_PREFIX}/lib/cmake)

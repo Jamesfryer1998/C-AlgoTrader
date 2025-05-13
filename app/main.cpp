@@ -3,7 +3,7 @@
 #include "../src/data_access/MarketData.hpp"
 #include "../src/strategy_engine/StrategyEngine.hpp"
 #include "../src/strategy_engine/StrategyFactory.hpp"
-#include "../src/broker/SimulatedBroker.hpp"
+#include "../src/broker/IBKR.hpp"
 
 #define MIN_PER_RUN 1
 
@@ -17,7 +17,10 @@ int main()
     marketData.process(algoConfig);
     StrategyFactory stratFactory(algoConfig);
     StrategyEngine stratEngine;
-    SimulatedBroker broker(marketData); // Change this to IBKR
+
+    IBKR broker;
+	broker.SetUp();
+    broker.test();
 
     stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
     while (true)

@@ -4,6 +4,14 @@
 #include "../oms/Order.hpp"
 #include "../oms/Position.hpp"
 
+#include "EClientSocket.h"
+#include "EReader.h"
+#include "EWrapper.h"
+#include "EReaderOSSignal.h"
+#include "EPosixClientSocketPlatform.h"
+#include "CommonDefs.h"
+#include "TickAttrib.h"
+
 
 class BrokerBase
 {

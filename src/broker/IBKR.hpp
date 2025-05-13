@@ -1,21 +1,32 @@
 #include "BrokerBase.hpp"
-#include "EClientSocket.h"
+#include "TestCppClient.h"
+#include <unistd.h> 
 
 #define MAX_CONNECTION_RETRY 5;
+#define LIVE_TRADING_PORT 7496
+#define PAPER_TRADING_PORT 7497
 
-class IBKR : public BrokerBase 
+using IBKRClient = TestCppClient;
+
+class IBKR : public BrokerBase
 {
-    IBKR();
-    ~IBKR();
+    public:
+        IBKR();
+        ~IBKR();
 
-    void SetUp();
-    int connect();
-    int disconnect();
-    float getLatestPrice(std::string ticker);
-    int placeOrder(oms::Order order);
-    oms::Position getLatestPosition(std::string ticker);
+        void SetUp();
 
-    EClientSocket *m_pClient;
+        void test();
+
+    private:
+        int connect(){ return 1;};
+        int connected(const char* host, int port, int clientId);
+        int disconnect();
+        float getLatestPrice(std::string ticker);
+        int placeOrder(oms::Order order);
+        oms::Position getLatestPosition(std::string ticker);
+
+        IBKRClient broker;
 
 
 };
