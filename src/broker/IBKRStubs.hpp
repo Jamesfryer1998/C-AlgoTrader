@@ -48,7 +48,9 @@ class IBKRStubs : public EWrapper
         void scannerData(int, int, const ContractDetails&, const std::string&, const std::string&, const std::string&, const std::string&) override {}
         void scannerDataEnd(int) override {}
         void realtimeBar(TickerId, long, double, double, double, double, Decimal, Decimal, int) override {}
-        void currentTime(long) override {}
+        void currentTime(long time) override {
+            std::cout << "Time: " << time << std::endl;
+        }
         void fundamentalData(TickerId, const std::string&) override {}
         void deltaNeutralValidation(int, const DeltaNeutralContract&) override {}
         void tickSnapshotEnd(int) override {}

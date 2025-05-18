@@ -111,10 +111,4 @@ void IBKR::getTime()
 {
     std::cout << "Requesting Current Time" << std::endl;
     m_pClient->reqCurrentTime();
-    // m_osSignal.waitForSignal();
-    // errno = 0;
-	// m_pReader->processMsgs();
-
-//     auto test = m_pReader->getMsg();
-//     std::cout << test->begin() << std::endl;
 }
