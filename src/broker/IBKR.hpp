@@ -1,4 +1,5 @@
 #include "BrokerBase.hpp"
+#include "IBKRStubs.hpp"
 #include "EClientSocket.h"
 #include "EReader.h"
 #include "EWrapper.h"
@@ -109,7 +110,7 @@ enum State {
 	ST_RFQOPERATIONS_ACK
 };
 
-class IBKR : public BrokerBase
+class IBKR : public BrokerBase, IBKRStubs
 {
     public:
         IBKR();
@@ -125,6 +126,8 @@ class IBKR : public BrokerBase
         float getLatestPrice(std::string ticker);
         int placeOrder(oms::Order order);
         oms::Position getLatestPosition(std::string ticker);
+
+		void getTime();
 
         //! [socket_declare]
         EReaderOSSignal m_osSignal;

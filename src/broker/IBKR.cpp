@@ -18,10 +18,8 @@ IBKR::~IBKR()
 void
 IBKR::SetUp()
 {
-    // if(!connect())
-        // std::runtime_error("Could not connect to IBKR broker after retries" + MAX_CONNECTION_RETRY);
-
     connected("127.0.0.1", PAPER_TRADING_PORT, 8809497);
+    // getTime();
 }
 
 int
@@ -32,20 +30,16 @@ IBKR::connected(const char* host, int port, int clientId)
     const char* resolvedHost = (host && *host) ? host : "127.0.0.1";
     std::cout << "Connecting to " << resolvedHost << ":" << port << " clientId:" << clientId << std::endl;
 
-    //! [connect]
     bool bRes = m_pClient->eConnect(host, port, clientId, false);
-    //! [connect]
 
     if (bRes) {
         std::cout << "Connected to " << m_pClient->host()
                   << ":" << m_pClient->port()
                   << " clientId:" << clientId << std::endl;
 
-        //! [ereader]
         m_pReader = std::make_unique<EReader>(m_pClient, &m_osSignal);
         m_pReader->start();
         return 1;
-        //! [ereader]
     } else {
         std::cout << "Cannot connect to " << m_pClient->host()
                   << ":" << m_pClient->port()
@@ -64,7 +58,6 @@ IBKR::disconnect()
 }
 
 
-
 float 
 IBKR::getLatestPrice(std::string ticker)
 {
@@ -81,4 +74,16 @@ oms::Position
 IBKR::getLatestPosition(std::string ticker)
 {
     return oms::Position();
+}
+
+void IBKR::getTime()
+{
+    std::cout << "Requesting Current Time" << std::endl;
+    m_pClient->reqCurrentTime();
+    m_osSignal.waitForSignal();
+    errno = 0;
+	m_pReader->processMsgs();
+
+    // auto test = m_pReader->getMsg();
+    // std::cout << test->begin() << std::endl;
 }
