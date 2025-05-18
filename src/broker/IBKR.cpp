@@ -1,4 +1,7 @@
 #include "IBKR.hpp"
+#include <unistd.h> 
+#include <thread>
+
 
 
 IBKR::IBKR() :
@@ -13,13 +16,19 @@ IBKR::IBKR() :
 IBKR::~IBKR()
 {
     disconnect();
+    
+    // destroy the reader before the client
+	if( m_pReader )
+		m_pReader.reset();
+
+	delete m_pClient;
 }
 
-void
+void 
 IBKR::SetUp()
 {
-    connected("127.0.0.1", PAPER_TRADING_PORT, 8809497);
-    // getTime();
+    connected("127.0.0.1", PAPER_TRADING_PORT, 2);
+    getTime();
 }
 
 int
@@ -30,20 +39,41 @@ IBKR::connected(const char* host, int port, int clientId)
     const char* resolvedHost = (host && *host) ? host : "127.0.0.1";
     std::cout << "Connecting to " << resolvedHost << ":" << port << " clientId:" << clientId << std::endl;
 
-    bool bRes = m_pClient->eConnect(host, port, clientId, false);
+    int attempt = 0;
+    bool bRes = false;
+    while (attempt < MAX_CONNECTION_RETRY) 
+    {
+        bRes = m_pClient->eConnect(host, port, clientId, false);
+
+        if(bRes)
+        {
+            break;
+        }
+        ++attempt;
+    }
 
     if (bRes) {
         std::cout << "Connected to " << m_pClient->host()
                   << ":" << m_pClient->port()
                   << " clientId:" << clientId << std::endl;
 
-        m_pReader = std::make_unique<EReader>(m_pClient, &m_osSignal);
-        m_pReader->start();
+        std::thread readerThread([&]() {
+            m_pReader = std::make_unique<EReader>(m_pClient, &m_osSignal);
+            m_pReader->start();
+
+            while (m_pClient->isConnected()) {
+                m_osSignal.waitForSignal();
+                m_pReader->processMsgs();
+            }
+        });
+
+        readerThread.detach();
         return 1;
     } else {
         std::cout << "Cannot connect to " << m_pClient->host()
                   << ":" << m_pClient->port()
-                  << " clientId:" << clientId << std::endl;
+                  << " clientId:" << clientId 
+                  << " after num attepts: " << attempt << std::endl;
     }
 
     return 0;
@@ -53,6 +83,7 @@ IBKR::connected(const char* host, int port, int clientId)
 int
 IBKR::disconnect()
 {
+    m_pClient->eDisconnect();
     std::cout<<"We are disconnected from IBKR broker"<< std::endl;
     return 0;
 }
@@ -80,10 +111,10 @@ void IBKR::getTime()
 {
     std::cout << "Requesting Current Time" << std::endl;
     m_pClient->reqCurrentTime();
-    m_osSignal.waitForSignal();
-    errno = 0;
-	m_pReader->processMsgs();
+    // m_osSignal.waitForSignal();
+    // errno = 0;
+	// m_pReader->processMsgs();
 
-    // auto test = m_pReader->getMsg();
-    // std::cout << test->begin() << std::endl;
+//     auto test = m_pReader->getMsg();
+//     std::cout << test->begin() << std::endl;
 }
