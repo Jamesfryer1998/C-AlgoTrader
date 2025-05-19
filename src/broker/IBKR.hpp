@@ -16,8 +16,9 @@
 enum State {
 	ST_CONNECTED,
     ST_DISCONNECTED,
-
-	
+    ST_REQMKTDATA,
+    ST_ORDERPLACED,
+    ST_CURRENTTIME
 };
 
 class IBKR : public BrokerBase, EWrapper
@@ -127,11 +128,12 @@ class IBKR : public BrokerBase, EWrapper
         int connect() override { return 1;};
         int connected(const char* host, int port, int clientId);
         int disconnect() override;
-        float getLatestPrice(std::string ticker) override;
+        double getLatestPrice(std::string ticker) override;
         int placeOrder(oms::Order order) override;
         oms::Position getLatestPosition(std::string ticker) override;
 
 		void getCurrentTime();
+        std::string ConvertStateToString();
 
         // Socket data
         EReaderOSSignal m_osSignal;

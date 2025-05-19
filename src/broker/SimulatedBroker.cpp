@@ -97,7 +97,7 @@ SimulatedBroker::disconnect()
     return 1;
 }
 
-float 
+double 
 SimulatedBroker::getLatestPrice(std::string ticker)
 {
     // Check if ticker matches our current condition

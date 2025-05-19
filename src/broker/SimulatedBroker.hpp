@@ -21,7 +21,7 @@ class SimulatedBroker : public BrokerBase {
         int connect() override;
         int disconnect() override;
         int placeOrder(oms::Order order) override;
-        float getLatestPrice(std::string ticker) override;
+        double getLatestPrice(std::string ticker) override;
         oms::Position getLatestPosition(std::string ticker) override;
         
         // Simulation specific methods

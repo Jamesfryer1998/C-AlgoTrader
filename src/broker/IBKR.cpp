@@ -1,6 +1,7 @@
 #include "IBKR.hpp"
 #include <unistd.h> 
 #include <thread>
+#include <iomanip>
 
 
 
@@ -29,6 +30,7 @@ IBKR::SetUp()
 {
     if (connected("127.0.0.1", PAPER_TRADING_PORT, 2)) {
         std::cout << "[SetUp] Connected. Waiting for nextValidId..." << std::endl;
+        m_state = ST_CONNECTED;
     } else {
         std::cerr << "[SetUp] Failed to connect to IBKR" << std::endl;
     }
@@ -88,11 +90,13 @@ IBKR::disconnect()
 {
     m_pClient->eDisconnect();
     std::cout<<"We are disconnected from IBKR broker"<< std::endl;
+
+    m_state = ST_DISCONNECTED;
     return 0;
 }
 
 
-float IBKR::getLatestPrice(std::string ticker)
+double IBKR::getLatestPrice(std::string ticker)
 {
     Contract contract;
     contract.symbol = "EUR";
@@ -113,6 +117,8 @@ float IBKR::getLatestPrice(std::string ticker)
 
     m_pClient->reqMktData(tickerId, contract, "", false, false, TagValueListSPtr());
 
+    m_state = ST_REQMKTDATA;
+
     int waitTimeMs = 5000;
     int stepMs = 100;
     int waited = 0;
@@ -129,6 +135,7 @@ float IBKR::getLatestPrice(std::string ticker)
         waited += stepMs;
     }
 
+
     std::cout << "[getLatestPrice] Price not received in time for ticker: " << ticker << std::endl;
     return -1.0f;
 }
@@ -138,29 +145,29 @@ float IBKR::getLatestPrice(std::string ticker)
 int IBKR::placeOrder(oms::Order order)
 {
     Contract contract;
-    contract.symbol = "AAPL";
-    contract.secType = "STK";
-    contract.exchange = "SMART";
-    contract.currency = "USD";
-
+    contract.symbol = "EUR";              // Base currency
+    contract.secType = "CASH";
+    contract.currency = "GBP";           // Quote currency
+    contract.exchange = "IDEALPRO";
 
     Order ibOrder;
-    ibOrder.action = "BUY";
-    ibOrder.totalQuantity = 1;
+    ibOrder.action = "BUY";              // Buy EUR (Sell GBP)
+    ibOrder.totalQuantity = Decimal(100.0);        // e.g., buy 1000 EUR
     ibOrder.orderType = "MKT";
-
-    // You might want to set these too:
     ibOrder.transmit = true;
 
-    int currentOrderId = m_orderId++;  // Assign unique order ID
+    int currentOrderId = m_orderId++;    // Assign unique order ID
 
-    std::cout << "Placing order " << currentOrderId << " for " << "AAPL"
-              << " (" << ibOrder.action << " " << 1 << ")" << std::endl;
+    std::cout << "Placing order " << currentOrderId << " for EUR/GBP"
+              << " (" << ibOrder.action << " " << ibOrder.totalQuantity << ")" << std::endl;
 
     m_pClient->placeOrder(currentOrderId, contract, ibOrder);
 
+    m_state = ST_ORDERPLACED;
+
     return currentOrderId;
 }
+
 
 oms::Position
 IBKR::getLatestPosition(std::string ticker)
@@ -172,6 +179,7 @@ void IBKR::getCurrentTime()
 {
     std::cout << "Requesting Current Time" << std::endl;
     m_pClient->reqCurrentTime();
+    m_state = ST_CURRENTTIME;
 }
 
 
@@ -187,11 +195,11 @@ IBKR::currentTime(long time)
 
 void IBKR::tickPrice(TickerId tickerId, TickType field, double price, const TickAttrib& attribs)
 {
-
     if (field == TickType::LAST || field == TickType::CLOSE || field == TickType::ASK || field == TickType::BID) {
         std::lock_guard<std::mutex> lock(m_priceMutex);
         m_lastPrices[tickerId] = price;
-        std::cout << "tickPrice: TickerId=" << tickerId 
+        std::cout << std::fixed << std::setprecision(5)
+                << "tickPrice: TickerId=" << tickerId 
                 << ", field=" << field 
                 << ", price=" << price << std::endl;
     }
@@ -219,8 +227,10 @@ void IBKR::orderStatus(OrderId orderId, const std::string& status, Decimal fille
 }
 
 void IBKR::error(int id, int code, const std::string& msg, const std::string& json) {
+    
+    std::string stateString = ConvertStateToString();
     if(id != -1)
-        std::cout << "[ERROR] id=" << id << ", code=" << code << ", msg=" << msg << std::endl;
+        std::cout << "[ERROR] id=" << id << ", code=" << code <<  ", state=" << stateString << ", msg=" << msg << std::endl;
 }
 
 void IBKR::connectionClosed() {
@@ -240,6 +250,25 @@ void IBKR::nextValidId(OrderId orderId)
     }).detach();
 
     // Uncomment to place order
-    oms::Order order;
-    placeOrder(order);
+    // oms::Order order;
+    // placeOrder(order);
+}
+
+std::string
+IBKR::ConvertStateToString()
+{
+    switch (m_state) {
+        case ST_CONNECTED:
+            return "ST_CONNECTED";
+        case ST_DISCONNECTED:
+            return "ST_DISCONNECTED";
+        case ST_REQMKTDATA:
+            return "ST_REQMKTDATA";
+        case ST_ORDERPLACED:
+            return "ST_ORDERPLACED";
+        case ST_CURRENTTIME:
+            return "ST_CURRENTTIME";
+        default:
+            return "UNKNOWN_STATE";
+    }
 }
