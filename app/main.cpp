@@ -20,7 +20,6 @@ int main()
 
     IBKR broker;
 	broker.SetUp(algoConfig);
-    // broker.test();
 
     stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
     while (true)

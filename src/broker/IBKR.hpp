@@ -8,6 +8,7 @@
 #include "TickAttrib.h"
 #include "Order.h"
 #include "../util/Config.hpp"
+#include <unordered_set>
 
 #define MAX_CONNECTION_RETRY 5
 #define RETRY_DELAY_SECONDS 2
@@ -34,8 +35,8 @@ class IBKR : public BrokerBase, EWrapper
         void tickPrice(TickerId, TickType, double, const TickAttrib&) override;
         void tickSize(TickerId, TickType, Decimal) override;
         void tickOptionComputation(TickerId, TickType, int, double, double, double, double, double, double, double, double) override {}
-        void tickGeneric(TickerId, TickType, double) override;
-        void tickString(TickerId, TickType, const std::string&) override;
+        void tickGeneric(TickerId, TickType, double) override {}
+        void tickString(TickerId, TickType, const std::string&) override {}
         void tickEFP(TickerId, TickType, double, const std::string&, double, int, const std::string&, double, double) override {}
         void orderStatus(OrderId, const std::string&, Decimal, Decimal, double, int, int, double, int, const std::string&, double) override;
         void openOrder(OrderId, const Contract&, const Order&, const OrderState&) override {}
@@ -131,6 +132,7 @@ class IBKR : public BrokerBase, EWrapper
         int connected(const char* host, int port, int clientId);
         int disconnect() override;
         double getLatestPrice(std::string ticker) override;
+        void cancelMarketData(TickerId tickerId);
         int placeOrder(oms::Order order) override;
         oms::Position getLatestPosition(std::string ticker) override;
 
@@ -155,6 +157,11 @@ class IBKR : public BrokerBase, EWrapper
         TickerId m_nextTickerId = 1001; // Arbitrary starting ID
 
         std::condition_variable m_priceUpdated;
+        std::unordered_set<TickerId> m_activeMarketData;
+
+        std::mutex m_readyMutex;
+        std::condition_variable m_readyCond;
+        bool m_isReady = false;
 
 
 };

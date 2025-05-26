@@ -129,11 +129,28 @@ IBKR::disconnect()
 
 double IBKR::getLatestPrice(std::string ticker)
 {
+    {
+        std::unique_lock<std::mutex> lock(m_readyMutex);
+        if (!m_isReady) {
+            std::cout << "[getLatestPrice] Waiting for nextValidId..." << std::endl;
+            m_readyCond.wait(lock, [this] { return m_isReady; });
+        }
+    }
+
+    // Now it's safe to send requests
     Contract contract;
-    contract.symbol = "EUR";
-    contract.secType = "CASH";
-    contract.currency = "GBP";
-    contract.exchange = "IDEALPRO";
+
+    if (ticker == "EURGBP") {
+        contract.symbol = "EUR";
+        contract.secType = "CASH";
+        contract.currency = "GBP";
+        contract.exchange = "IDEALPRO";
+    } else {
+        contract.symbol = ticker;
+        contract.secType = "STK";
+        contract.currency = "USD";
+        contract.exchange = "SMART";
+    }
 
     TickerId tickerId;
     {
@@ -147,30 +164,40 @@ double IBKR::getLatestPrice(std::string ticker)
     }
 
     m_pClient->reqMktData(tickerId, contract, "", false, false, TagValueListSPtr());
-
     m_state = ST_REQMKTDATA;
 
     int waitTimeMs = 5000;
     int stepMs = 100;
     int waited = 0;
-    while (waited < waitTimeMs) 
-    {
+    while (waited < waitTimeMs) {
         if (m_lastPrices.count(tickerId) > 0) {
             double price = m_lastPrices[tickerId];
-            if (price > 0.0) {  // skip -1.0 and invalid
+            if (price > 0.0) {
                 std::cout << "[getLatestPrice] Got price: " << price << std::endl;
-                return static_cast<float>(price);
+                cancelMarketData(tickerId);
+                return price;
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(stepMs));
         waited += stepMs;
     }
 
-
     std::cout << "[getLatestPrice] Price not received in time for ticker: " << ticker << std::endl;
-    return -1.0f;
+    return -1.0;
 }
 
+
+void IBKR::cancelMarketData(TickerId tickerId)
+{
+    {
+        std::lock_guard<std::mutex> lock(m_priceMutex);
+        m_lastPrices.erase(tickerId);
+        m_activeMarketData.erase(tickerId);
+    }
+
+    std::cout << "[cancelMarketData] Cancelling market data for TickerId: " << tickerId << std::endl;
+    m_pClient->cancelMktData(tickerId);
+}
 
 
 int IBKR::placeOrder(oms::Order order)
@@ -240,14 +267,6 @@ void IBKR::tickSize(TickerId tickerId, TickType field, Decimal size) {
     // std::cout << "[tickSize] id=" << tickerId << ", field=" << field << ", size=" << size << std::endl;
 }
 
-void IBKR::tickString(TickerId tickerId, TickType field, const std::string& value) {
-    std::cout << "[tickString] id=" << tickerId << ", field=" << field << ", value=" << value << std::endl;
-}
-
-void IBKR::tickGeneric(TickerId tickerId, TickType field, double value) {
-    std::cout << "[tickGeneric] id=" << tickerId << ", field=" << field << ", value=" << value << std::endl;
-}
-
 void IBKR::orderStatus(OrderId orderId, const std::string& status, Decimal filled,
                        Decimal remaining, double avgFillPrice, int permId,
                        int parentId, double lastFillPrice, int clientId,
@@ -273,16 +292,11 @@ void IBKR::nextValidId(OrderId orderId)
     std::cout << "[nextValidId] Received Order ID: " << orderId << std::endl;
     m_orderId = orderId;
 
-    // Now it’s safe to send API requests
-    getCurrentTime();
-    std::thread([this]() {
-        float price = this->getLatestPrice("IBKR");
-        std::cout << "[nextValidId] IBKR price: " << price << std::endl;
-    }).detach();
-
-    // Uncomment to place order
-    // oms::Order order;
-    // placeOrder(order);
+    {
+        std::lock_guard<std::mutex> lock(m_readyMutex);
+        m_isReady = true;
+    }
+    m_readyCond.notify_all();
 }
 
 std::string

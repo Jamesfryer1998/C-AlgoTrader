@@ -38,7 +38,9 @@ void OrderManagement::removePosition(int id)
 
 void OrderManagement::onNewOrder(oms::Order& order)
 {
-    double latestPrice = broker->getLatestPrice(order.getTicker());
+    std::cout << "We are in onNewOrder" << std::endl;
+    
+    double latestPrice = broker->getLatestPrice("EURGBP");
     if (latestPrice!= 0) {
         order.setPrice(latestPrice);
     }
