@@ -41,9 +41,15 @@ void OrderManagement::onNewOrder(oms::Order& order)
     std::cout << "We are in onNewOrder" << std::endl;
     
     // Update price from IBKR with tick price before we validate
-    double latestPrice = broker->getLatestPrice("EURGBP");
+    // double latestPrice = broker->getLatestPrice("EURGBP");
+    // if (latestPrice!= 0) {
+    //     // order.setPrice(latestPrice);
+    // }
+
+    // When we are ready
+    double latestPrice = broker->getLatestPrice(order.getTicker());
     if (latestPrice!= 0) {
-        // order.setPrice(latestPrice);
+        order.setPrice(latestPrice);
     }
 
     bool orderValid = validator.validateOrder(order, marketData, positions);

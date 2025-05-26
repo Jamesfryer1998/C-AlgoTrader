@@ -75,28 +75,28 @@ int main(int argc, char* argv[]) {
         backtester.enableDetailedLogging(detailedLogging);
         backtester.setNumThreads(numThreads);
         
-        // Set date range if provided
-        if (!startDate.empty() && !endDate.empty()) {
-            backtester.setDateRange(startDate, endDate);
-        } else if (!startDate.empty()) {
-            // Get current date for end date
-            auto now = std::chrono::system_clock::now();
-            auto timeT = std::chrono::system_clock::to_time_t(now);
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&timeT), "%Y-%m-%d");
-            backtester.setDateRange(startDate, ss.str());
-        } else if (!endDate.empty()) {
-            // Calculate start date (7 days before end date)
-            std::tm endTm = {};
-            std::istringstream endDateStream(endDate);
-            endDateStream >> std::get_time(&endTm, "%Y-%m-%d");
-            auto endTimePoint = std::chrono::system_clock::from_time_t(std::mktime(&endTm));
-            auto startTimePoint = endTimePoint - std::chrono::hours(24 * 7);
-            auto startTimeT = std::chrono::system_clock::to_time_t(startTimePoint);
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
-            backtester.setDateRange(ss.str(), endDate);
-        }
+        // // Set date range if provided
+        // if (!startDate.empty() && !endDate.empty()) {
+        //     backtester.setDateRange(startDate, endDate);
+        // } else if (!startDate.empty()) {
+        //     // Get current date for end date
+        //     auto now = std::chrono::system_clock::now();
+        //     auto timeT = std::chrono::system_clock::to_time_t(now);
+        //     std::stringstream ss;
+        //     ss << std::put_time(std::localtime(&timeT), "%Y-%m-%d");
+        //     backtester.setDateRange(startDate, ss.str());
+        // } else if (!endDate.empty()) {
+        //     // Calculate start date (7 days before end date)
+        //     std::tm endTm = {};
+        //     std::istringstream endDateStream(endDate);
+        //     endDateStream >> std::get_time(&endTm, "%Y-%m-%d");
+        //     auto endTimePoint = std::chrono::system_clock::from_time_t(std::mktime(&endTm));
+        //     auto startTimePoint = endTimePoint - std::chrono::hours(24 * 7);
+        //     auto startTimeT = std::chrono::system_clock::to_time_t(startTimePoint);
+        //     std::stringstream ss;
+        //     ss << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
+        //     backtester.setDateRange(ss.str(), endDate);
+        // }
         
         if (!outputFile.empty()) {
             backtester.saveResultsToFile(outputFile);

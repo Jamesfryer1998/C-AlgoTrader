@@ -244,6 +244,12 @@ int IBKR::placeOrder(oms::Order order)
     return currentOrderId;
 }
 
+void
+IBKR::syncPositions()
+{
+    
+}
+
 
 oms::Position
 IBKR::getLatestPosition(std::string ticker)

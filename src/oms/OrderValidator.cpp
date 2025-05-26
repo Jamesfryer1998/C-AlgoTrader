@@ -23,27 +23,27 @@ bool OrderValidator::validateOrder(const oms::Order& order, MarketData& marketDa
     float totalHeldPositions = getTotalHeldQuantity(order, positions);
     
     if (!isValidOrderType(order)) {
-        std::cerr << "[OrderValidator] Validation failed: Invalid order type." << std::endl;
+        std::cout << "[OrderValidator] Validation failed: Invalid order type." << std::endl;
         return false;
     }
     if (!isValidPrice(order, marketData)) {
-        std::cerr << "[OrderValidator] Validation failed: Invalid price." << std::endl;
+        std::cout << "[OrderValidator] Validation failed: Invalid price." << std::endl;
         return false;
     }
     if (!isValidQuantity(order)) {
-        std::cerr << "[OrderValidator] Validation failed: Invalid quantity." << std::endl;
+        std::cout << "[OrderValidator] Validation failed: Invalid quantity." << std::endl;
         return false;
     }
     if (!checkMaxPositionSize(order, totalHeldPositions)) {
-        std::cerr << "[OrderValidator] Validation failed: Exceeds max position size." << std::endl;
+        std::cout << "[OrderValidator] Validation failed: Exceeds max position size." << std::endl;
         return false;
     }
     if (!checkStopLoss(order, marketData)) {
-        std::cerr << "[OrderValidator] Validation failed: Invalid stop loss level." << std::endl;
+        std::cout << "[OrderValidator] Validation failed: Invalid stop loss level." << std::endl;
         return false;
     }
     if (!checkTakeProfit(order, marketData)) {
-        std::cerr << "[OrderValidator] Validation failed: Invalid take profit level." << std::endl;
+        std::cout << "[OrderValidator] Validation failed: Invalid take profit level." << std::endl;
         return false;
     }
     // if (!checkTickSize(order, marketData)) {
@@ -51,7 +51,7 @@ bool OrderValidator::validateOrder(const oms::Order& order, MarketData& marketDa
     //     return false;
     // }
     if (!checkSlippage(order, marketData)) {
-        std::cerr << "[OrderValidator] Validation failed: Slippage too high." << std::endl;
+        std::cout << "[OrderValidator] Validation failed: Slippage too high." << std::endl;
         return false;
     }
 

@@ -136,9 +136,10 @@ class IBKR : public BrokerBase, EWrapper
         double getLatestPrice(std::string ticker) override;
         void cancelMarketData(TickerId tickerId);
         int placeOrder(oms::Order order) override;
+        void syncPositions();
         oms::Position getLatestPosition(std::string ticker) override;
 
-		void getCurrentTime();
+        void getCurrentTime();
         std::string ConvertStateToString();
 
         // Socket data
