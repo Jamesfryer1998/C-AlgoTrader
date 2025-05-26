@@ -7,6 +7,7 @@
 #include "CommonDefs.h"
 #include "TickAttrib.h"
 #include "Order.h"
+#include "../util/Config.hpp"
 
 #define MAX_CONNECTION_RETRY 5
 #define RETRY_DELAY_SECONDS 2
@@ -27,7 +28,7 @@ class IBKR : public BrokerBase, EWrapper
         IBKR();
         ~IBKR();
 
-        void SetUp();
+        void SetUp(json configData);
 
         // Ewrapper abstract override
         void tickPrice(TickerId, TickType, double, const TickAttrib&) override;
@@ -125,6 +126,7 @@ class IBKR : public BrokerBase, EWrapper
 
 
     private:
+        int verifyTradingPort(json configData);
         int connect() override { return 1;};
         int connected(const char* host, int port, int clientId);
         int disconnect() override;

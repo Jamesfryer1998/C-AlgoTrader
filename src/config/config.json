@@ -7,6 +7,7 @@
     "max_position_size": 10.0,
     "max_exposure": 5.0,
     "slippage_tolerance": 2.0,
+    "IBKR_Trading_Type": "PAPER",
     "strategies": [
         {
             "name": "RSI",

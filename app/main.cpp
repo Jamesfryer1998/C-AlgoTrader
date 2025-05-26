@@ -19,7 +19,7 @@ int main()
     StrategyEngine stratEngine;
 
     IBKR broker;
-	broker.SetUp();
+	broker.SetUp(algoConfig);
     // broker.test();
 
     stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);

@@ -25,14 +25,45 @@ IBKR::~IBKR()
 	delete m_pClient;
 }
 
-void 
-IBKR::SetUp()
+int 
+IBKR::verifyTradingPort(json configData)
 {
-    if (connected("127.0.0.1", PAPER_TRADING_PORT, 2)) {
+    int port = PAPER_TRADING_PORT;
+
+    if(configData["IBKR_Trading_Type"] == "PAPER")
+        port = PAPER_TRADING_PORT;
+    else if(configData["IBKR_Trading_Type"] == "LIVE")
+    {
+        port = LIVE_TRADING_PORT;
+
+        std::cerr << " ************************** [WARNING] **************************" << std::endl;
+        std::cerr << "You are attempting to connect to the LIVE trading environment." << std::endl;
+        std::cerr << "This will execute REAL trades. Do you want to continue? (y/n): ";
+
+        std::string response;
+        std::getline(std::cin, response);
+
+        if (response != "y" && response != "Y")
+        {
+            throw std::runtime_error("Aborted: User chose not to proceed with LIVE trading. Please change to PAPER trading.");
+        }
+    }
+    
+    return port;
+}
+
+void 
+IBKR::SetUp(json configData)
+{
+    int port = verifyTradingPort(configData);
+    
+    if (connected("127.0.0.1", port, 2)) {
         std::cout << "[SetUp] Connected. Waiting for nextValidId..." << std::endl;
         m_state = ST_CONNECTED;
     } else {
         std::cerr << "[SetUp] Failed to connect to IBKR" << std::endl;
+        if(port == LIVE_TRADING_PORT)
+            std::cerr << "[SetUp] Check you are connected to correct IBKR PAPER/LIVE" << std::endl;
     }
 }
 

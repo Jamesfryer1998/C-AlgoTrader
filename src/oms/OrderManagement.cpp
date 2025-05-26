@@ -2,8 +2,6 @@
 
 #include "OrderManagement.hpp"
 
-// OrderValidator* OrderManagement::validator = new OrderValidator();
-
 OrderManagement::OrderManagement() 
 {
 }
@@ -11,11 +9,6 @@ OrderManagement::OrderManagement()
 OrderManagement::~OrderManagement() 
 {
 }
-
-// OrderManagement::setBroker(BrokerAPI brokerApi)
-// {
-//     broker = brokerApi;
-// }
 
 void
 OrderManagement::addOrder(oms::Order &order)
@@ -45,7 +38,11 @@ void OrderManagement::removePosition(int id)
 
 void OrderManagement::onNewOrder(oms::Order& order)
 {
-    // Wait for new order to be added to orders from strat engine
+    double latestPrice = broker->getLatestPrice(order.getTicker());
+    if (latestPrice!= 0) {
+        order.setPrice(latestPrice);
+    }
+
     bool orderValid = validator.validateOrder(order, marketData, positions);
     if(orderValid)
     {
@@ -54,8 +51,10 @@ void OrderManagement::onNewOrder(oms::Order& order)
         // connect with Broker API to place order here
         if (broker->placeOrder(order))
         {
-            oms::Position newPosition = broker->getLatestPosition(order.getTicker());
-            addPosition(newPosition);
+            // oms::Position newPosition = broker->getLatestPosition(order.getTicker());
+            // addPosition(newPosition);
+
+            onOrderExecuted(order);
         }
     }
 }
