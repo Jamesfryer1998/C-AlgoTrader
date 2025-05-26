@@ -126,30 +126,42 @@ IBKR::disconnect()
     return 0;
 }
 
+Contract IBKR::buildCurrencyContract(const std::string& symbol) 
+{
+    Contract contract;
+    contract.symbol = symbol;
+    contract.secType = "CASH";
+    contract.currency = "GBP";
+    contract.exchange = "IDEALPRO";
+    return contract;
+}
+
+Contract IBKR::buildStockContract(const std::string& symbol) 
+{
+    Contract contract;
+    contract.symbol = symbol;
+    contract.secType = "STK";
+    contract.currency = "USD";
+    contract.exchange = "SMART";
+    return contract;
+}
+
 
 double IBKR::getLatestPrice(std::string ticker)
 {
-    {
-        std::unique_lock<std::mutex> lock(m_readyMutex);
-        if (!m_isReady) {
-            std::cout << "[getLatestPrice] Waiting for nextValidId..." << std::endl;
-            m_readyCond.wait(lock, [this] { return m_isReady; });
-        }
+    std::unique_lock<std::mutex> lock(m_readyMutex);
+    if (!m_isReady) {
+        std::cout << "[getLatestPrice] Waiting for nextValidId..." << std::endl;
+        m_readyCond.wait(lock, [this] { return m_isReady; });
     }
 
     // Now it's safe to send requests
     Contract contract;
 
     if (ticker == "EURGBP") {
-        contract.symbol = "EUR";
-        contract.secType = "CASH";
-        contract.currency = "GBP";
-        contract.exchange = "IDEALPRO";
+        contract = buildCurrencyContract("EUR");
     } else {
-        contract.symbol = ticker;
-        contract.secType = "STK";
-        contract.currency = "USD";
-        contract.exchange = "SMART";
+        contract = buildStockContract(ticker);
     }
 
     TickerId tickerId;
@@ -202,6 +214,12 @@ void IBKR::cancelMarketData(TickerId tickerId)
 
 int IBKR::placeOrder(oms::Order order)
 {
+    std::unique_lock<std::mutex> lock(m_readyMutex);
+    if (!m_isReady) {
+        std::cout << "[placeOrder] Waiting for nextValidId..." << std::endl;
+        m_readyCond.wait(lock, [this] { return m_isReady; });
+    }
+    
     Contract contract;
     contract.symbol = "EUR";              // Base currency
     contract.secType = "CASH";

@@ -131,6 +131,8 @@ class IBKR : public BrokerBase, EWrapper
         int connect() override { return 1;};
         int connected(const char* host, int port, int clientId);
         int disconnect() override;
+        Contract buildCurrencyContract(const std::string &symbol);
+        Contract buildStockContract(const std::string &symbol);
         double getLatestPrice(std::string ticker) override;
         void cancelMarketData(TickerId tickerId);
         int placeOrder(oms::Order order) override;
