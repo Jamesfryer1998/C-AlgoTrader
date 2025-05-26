@@ -5,7 +5,7 @@
 #include "../src/strategy_engine/StrategyFactory.hpp"
 #include "../src/broker/IBKR.hpp"
 
-#define MIN_PER_RUN 1
+#define MIN_PER_RUN 0.1
 
 using namespace std;
 

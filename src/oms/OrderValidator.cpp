@@ -22,17 +22,42 @@ bool OrderValidator::validateOrder(const oms::Order& order, MarketData& marketDa
 {
     float totalHeldPositions = getTotalHeldQuantity(order, positions);
     
-    if(!isValidOrderType(order)) return false;
-    if(!isValidPrice(order, marketData)) return false;
-    if(!isValidQuantity(order)) return false;
-    if(!checkMaxPositionSize(order, totalHeldPositions)) return false;
-    if(!checkStopLoss(order, marketData)) return false;
-    if(!checkTakeProfit(order, marketData)) return false;
-    // if(!checkTickSize(order, marketData))) return false;
-    if(!checkSlippage(order, marketData)) return false;
+    if (!isValidOrderType(order)) {
+        std::cerr << "[OrderValidator] Validation failed: Invalid order type." << std::endl;
+        return false;
+    }
+    if (!isValidPrice(order, marketData)) {
+        std::cerr << "[OrderValidator] Validation failed: Invalid price." << std::endl;
+        return false;
+    }
+    if (!isValidQuantity(order)) {
+        std::cerr << "[OrderValidator] Validation failed: Invalid quantity." << std::endl;
+        return false;
+    }
+    if (!checkMaxPositionSize(order, totalHeldPositions)) {
+        std::cerr << "[OrderValidator] Validation failed: Exceeds max position size." << std::endl;
+        return false;
+    }
+    if (!checkStopLoss(order, marketData)) {
+        std::cerr << "[OrderValidator] Validation failed: Invalid stop loss level." << std::endl;
+        return false;
+    }
+    if (!checkTakeProfit(order, marketData)) {
+        std::cerr << "[OrderValidator] Validation failed: Invalid take profit level." << std::endl;
+        return false;
+    }
+    // if (!checkTickSize(order, marketData)) {
+    //     std::cerr << "[OrderValidator] Validation failed: Invalid tick size." << std::endl;
+    //     return false;
+    // }
+    if (!checkSlippage(order, marketData)) {
+        std::cerr << "[OrderValidator] Validation failed: Slippage too high." << std::endl;
+        return false;
+    }
 
     return true;  // Passes all checks
 }
+
 
 bool
 OrderValidator::isValidOrderType(const oms::Order& order)
@@ -78,20 +103,11 @@ OrderValidator::checkMaxPositionSize(const oms::Order& order, float totalHeldQua
     float newTotal = totalHeldQuantity + (order.isBuy() ? order.getQuantity() : 0.0f);
 
     return (newTotal <= maxPositionSize);
-    return (order.getQuantity() <= maxPositionSize);
 }
 
 bool
 OrderValidator::checkStopLoss(const oms::Order& order, MarketData& marketData)
 {
-    // Add stop loss into strategy config
-    // When creating a order from a strategy, set the stop loss, this will be a %
-    // E.g. price of 100, stop loss of 10%, stop_loss_price = 90
-
-    // TODO: Decide
-    // Maybe need to have some user input here
-    // If price has fallen too far maybe we dont want to do the trade?
-
     // This also forces us to use stoploss and take profit values which is probs a good thing
     if(order.getStopLossPrice() == 0) return false;
     if(order.getStopLossPrice() == marketData.getLastClosePrice()) return false;
