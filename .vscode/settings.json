@@ -86,7 +86,8 @@
         "future": "cpp",
         "span": "cpp",
         "cassert": "cpp",
-        "cfloat": "cpp"
+        "cfloat": "cpp",
+        "ranges": "cpp"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }
