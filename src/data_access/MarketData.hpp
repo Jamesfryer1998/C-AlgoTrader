@@ -21,12 +21,6 @@ class MarketData
         ~MarketData();
         
         /**
-         * Process market data from default sources
-         * @param configData Configuration for data processing
-         */
-        void process(json configData);
-        
-        /**
          * Process market data for a specific date range
          * @param configData Configuration for data processing
          * @param startDate Start date for the data range

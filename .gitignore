@@ -2,5 +2,5 @@
 /.vscode
 /data
 .DS_Store
-src/pyhton/__pycache__/
+src/python/__pycache__/
 TODO.txt

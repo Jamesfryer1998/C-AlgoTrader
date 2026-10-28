@@ -132,11 +132,13 @@ The **Data Reader** is responsible for:
 
 </details>  
 
-The **Data Flow** diagram illustrates how data moves through the system:  
-1. **Python fetches market data** and saves it to a CSV file  
+The **Data Flow** diagram illustrates how data moves through the system when **backtesting**:  
+1. **Python fetches market data** (`src/python/main.py`) and saves it to a CSV file  
 2. **C++ reads the CSV** and processes market conditions  
 3. **Strategies analyze the data** and generate trading signals  
-4. **Orders are sent to the OMS**, which manages execution via the broker  
+4. **Orders are sent to the OMS**, which manages execution via the simulated broker  
+
+When trading **live**, steps 1 and 2 are replaced by the Alpaca WebSocket stream and orders go to Alpaca (see System Overview).  
 
 ---
 

@@ -28,7 +28,6 @@ bool OrderValidator::validateOrder(const Order& order, MarketData& marketData, s
     if(!checkMaxPositionSize(order, totalHeldPositions)) return false;
     if(!checkStopLoss(order, marketData)) return false;
     if(!checkTakeProfit(order, marketData)) return false;
-    // if(!checkTickSize(order, marketData))) return false;
     if(!checkSlippage(order, marketData)) return false;
 
     return true;  // Passes all checks
@@ -127,14 +126,6 @@ OrderValidator::checkTakeProfit(const Order& order, MarketData& marketData)
     }
 
     return true;
-}
-
-bool
-OrderValidator::checkTickSize(const Order& order, MarketData& marketData)
-{
-    return true; // TODO: Implement
-    // Will need to test with certain exchanges
-    // Tick size will also change based on the commondity/security we trade
 }
 
 bool OrderValidator::checkSlippage(const Order& order, MarketData& marketData) 

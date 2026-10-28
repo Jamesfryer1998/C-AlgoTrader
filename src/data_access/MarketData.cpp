@@ -18,14 +18,6 @@ MarketData::~MarketData()
 }
 
 void
-MarketData::process(json configData)
-{
-    std::cout << "Processing Market Data" << std::endl;
-    string filePath = generateFilePath(configData);
-    loadData(filePath);
-}
-
-void
 MarketData::processForDateRange(json configData, const std::string& startDate, const std::string& endDate)
 {
     std::cout << "Processing Market Data for date range from " << startDate << " to " << endDate << std::endl;

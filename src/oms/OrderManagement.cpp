@@ -2,8 +2,6 @@
 
 #include "OrderManagement.hpp"
 
-// OrderValidator* OrderManagement::validator = new OrderValidator();
-
 OrderManagement::OrderManagement() 
 {
 }
@@ -11,11 +9,6 @@ OrderManagement::OrderManagement()
 OrderManagement::~OrderManagement() 
 {
 }
-
-// OrderManagement::setBroker(BrokerAPI brokerApi)
-// {
-//     broker = brokerApi;
-// }
 
 void
 OrderManagement::addOrder(Order &order)
@@ -67,19 +60,4 @@ void OrderManagement::syncPosition(const string& ticker)
 
     if (latest.getQuantity() != 0)
         addPosition(latest);
-}
-
-        
-void OrderManagement::onOrderExecuted(Order& order)
-{
-    // Order passes back from Broker API saying we have executed
-    // Create position from order and add to positions
-    // Strats will then use positions to make decisions    
-    Position newPosition{
-        order.getTicker(),
-        order.getQuantity(),
-        order.getPrice() // Broker will change this to average price 
-    };
-
-    addPosition(newPosition);
 }

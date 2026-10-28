@@ -63,7 +63,6 @@ class SimulatedBroker : public BrokerBase {
         // For testing
         bool useFixedSeed;
         unsigned int randomSeed;
-        void setRandomSeed(unsigned int seed);
         
         // Market data
         MarketData& marketData;

@@ -68,21 +68,6 @@ Config::getProjectRoot()
 }
 
 string
-Config::getAbsolutePath(const std::string& relativePath)
-{
-    // If the path is already absolute, return it as is
-    if (!relativePath.empty() && relativePath[0] == '/') {
-        return relativePath;
-    }
-    
-    // Otherwise, combine it with the project root
-    std::filesystem::path projectRoot = getProjectRoot();
-    std::filesystem::path fullPath = projectRoot / relativePath;
-    
-    return fullPath.string();
-}
-
-string
 Config::getTestPath(const std::string& relativeTestPath)
 {
     // First, check for the file in the current directory

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 class DataDownload:
     def __init__(self):
-        config_file_path = "src/config/algo_trader.json"
+        config_file_path = "src/config/config.json"
         config_data = self.load_json(config_file_path)
         self.base_data_dir = config_data["marketDataBasePath"]
         self.data_base_file_name = config_data["baseDataFileName"]

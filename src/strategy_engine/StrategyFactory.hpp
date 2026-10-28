@@ -9,7 +9,6 @@
 class StrategyFactory
 {
     public: 
-        StrategyFactory();
         StrategyFactory(string filePath);
         StrategyFactory(const json& configData);
         ~StrategyFactory(){};
@@ -23,5 +22,4 @@ class StrategyFactory
 
         Config config;
         json strategyData;
-        string formatStrategyPath();
 };  

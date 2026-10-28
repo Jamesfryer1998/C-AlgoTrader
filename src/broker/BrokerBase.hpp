@@ -18,8 +18,4 @@ class BrokerBase
         virtual Position getLatestPosition(std::string ticker) = 0;
 
         std::string brokerName;
-
-    private:
-        bool connected;
-
 };

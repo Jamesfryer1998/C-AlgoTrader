@@ -20,7 +20,5 @@ class MEANREV : public StrategyBase {
                 throw std::runtime_error("MEANREV oexit_threshold not set");
             if(!_strategyAttribute.moving_average_period)
                 throw std::runtime_error("MEANREV moving_average_period not set");
-        }  
-
-        StrategyAttribute getAttributes(){ return _strategyAttribute;}  
+        }
 };

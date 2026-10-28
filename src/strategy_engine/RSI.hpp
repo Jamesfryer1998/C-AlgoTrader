@@ -218,8 +218,6 @@ class RSI : public StrategyBase {
             std::cout << "===================\n" << std::endl;
         }
 
-        StrategyAttribute getAttributes() { return _strategyAttribute; }
-        
     private:
         float rsi;
         string decision;

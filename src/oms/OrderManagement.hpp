@@ -21,7 +21,6 @@ class OrderManagement
         void addOrder(Order &order);
         void removePosition(int id);
         void onNewOrder(Order& order);
-        void onOrderExecuted(Order& order);
         void syncPosition(const string& ticker);
         void addPosition(Position &position);
         vector<Order> getOrders(){ return orders; };

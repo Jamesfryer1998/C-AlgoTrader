@@ -60,9 +60,6 @@ StrategyEngine::setMarketData(MarketData& inputData)
 void
 StrategyEngine::executeStrategies()
 {   
-    Order order;
-    std::vector<Order> proposedOrders;
-    
     // Check if marketData pointer is valid
     if (marketData == nullptr) {
         std::cerr << "ERROR: marketData pointer is null in StrategyEngine::executeStrategies()" << std::endl;
@@ -78,14 +75,9 @@ StrategyEngine::executeStrategies()
         if(strat->onNewOrder())
         {
             Order order = strat->getOrder();
-            // proposedOrders.push_back(order);
             oms->onNewOrder(order);
         }
     }
-
-    // if(DecideToMakeTrade(proposedOrders))
-    //     oms->onNewOrder(order);
-
 }
 
 void
@@ -97,23 +89,4 @@ StrategyEngine::printStategies()
     {
         std::cout << "  -> "  << strat->_strategyAttribute.name << std::endl;
     }
-}
-
-bool
-StrategyEngine::DecideToMakeTrade(std::vector<Order> proposedOrders)
-{
-    string orderType;
-    for (auto& order : proposedOrders) 
-    {
-        if(orderType.size() == 0)
-        {
-            orderType = order.getTypeAsString();
-        }
-        else if(orderType!= order.getTypeAsString())
-        {
-            return false;
-        }
-    }
-
-    return true;
 }
