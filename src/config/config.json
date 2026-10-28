@@ -7,6 +7,13 @@
     "max_position_size": 10.0,
     "max_exposure": 5.0,
     "slippage_tolerance": 2.0,
+    "alpaca": {
+        "data_feed": "iex",
+        "trading_url": "https://paper-api.alpaca.markets",
+        "dry_run": false,
+        "warmup_bars": 100,
+        "max_bars": 500
+    },
     "strategies": [
         {
             "name": "RSI",

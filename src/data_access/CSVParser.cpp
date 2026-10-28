@@ -1,6 +1,7 @@
 #include "CSVParser.hpp"
 
 #include <fstream>
+#include <filesystem>
 
 
 CSVParser::CSVParser()
@@ -70,7 +71,7 @@ std::vector<std::string> CSVParser::tokenise(std::string csvLine, char separator
     do{
         end = csvLine.find_first_of(separator, start);
         if (start == csvLine.length() || start == end) break;
-        if (end >= 0 ) token = csvLine.substr(start, end - start);
+        if (end != std::string::npos) token = csvLine.substr(start, end - start);
         else token = csvLine.substr(start, csvLine.length() - start);
         tokens.push_back(token);
         start = end + 1;

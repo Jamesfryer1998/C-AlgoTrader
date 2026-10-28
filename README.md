@@ -23,12 +23,37 @@ cmake ..
 make -j4
 ```
 
-### To Run
-```sh
-# Run from the project root directory
-./build_run.sh
-```
-This script builds and runs the trading system.
+### To Run (live, Alpaca)
+The trading app now streams real-time 1-minute bars from Alpaca and sends orders to Alpaca's API.
+No Python, CSV files or broker desktop app are needed.
+
+1. Create a free account at [alpaca.markets](https://alpaca.markets) and generate **paper trading** API keys.
+2. Put the keys in your shell (e.g. in `~/.zshrc`), never in the repo:
+   ```sh
+   export APCA_API_KEY_ID=your_key_id
+   export APCA_API_SECRET_KEY=your_secret_key
+   ```
+3. Build and run from the project root:
+   ```sh
+   ./build_run.sh
+   ```
+   Stop it with `Ctrl+C`.
+
+Settings live in the `"alpaca"` block of `src/config/config.json`:
+
+| Key | Meaning |
+|---|---|
+| `data_feed` | `"iex"` free real-time feed, `"sip"` all exchanges (paid plan), `"test"` fake symbol FAKEPACA that streams 24/7 for checking the wiring (orders are only printed) |
+| `trading_url` | `https://paper-api.alpaca.markets` (paper) or `https://api.alpaca.markets` (real money) |
+| `dry_run` | `true` prints orders instead of sending them |
+| `warmup_bars` | Recent bars loaded at start-up so strategies have history straight away |
+| `max_bars` | How many recent bars to keep in memory |
+
+Outside US market hours, set `"data_feed": "test"` to see bars flowing.
+See [doc/realtime_data_and_brokers.md](doc/realtime_data_and_brokers.md) for why Alpaca, prices and speeds.
+
+On macOS the WebSocket library uses Apple's built-in TLS, so there is nothing extra to install.
+On Linux install OpenSSL headers first (`sudo apt install libssl-dev`).
 
 ### To Run Backtester
 ```sh
@@ -51,6 +76,7 @@ Individual test executables are located in subdirectories:
 ./build/tests/broker_tests/broker_tests
 ./build/tests/backtest_tests/backtest_tests
 ./build/tests/util_tests/util_tests
+./build/tests/alpaca_tests/alpaca_tests
 ```
 
 ### To Debug Crash
@@ -71,10 +97,15 @@ bt
 </details>  
 
 The **System Overview** provides a high-level architecture of the trading platform. It includes:  
-- **Data Fetching** (Python script fetching market data)  
-- **Data Storage** (CSV files for historical data)  
+- **Live Data** (Alpaca WebSocket pushes a 1-minute bar the moment each minute closes, `src/alpaca/AlpacaStream`)  
+- **Historical Data** (Python script + CSV files, used by the backtester)  
 - **C++ Backend** (Processes data, runs strategies, and manages orders)  
-- **Broker API Integration** (Executes trades)  
+- **Broker API Integration** (Alpaca REST API executes trades, `src/alpaca/AlpacaBroker`)  
+
+Live flow, all in one process:
+```
+Alpaca WebSocket --(bar)--> MarketData --> Strategies (RSI/MACD/MEANREV) --(signal)--> OMS --> Alpaca REST order
+```
 
 ---
 

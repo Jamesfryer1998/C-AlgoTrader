@@ -1,7 +1,6 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.14)
 
 project(algo_trader)
-set(CMAKE_CXX_FLAGS "-g -Wall -Werror -Wextra -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-lambda-capture")
 set(CMAKE_CXX_STANDARD 23)
 
 # Install gtest which now lives on head.
@@ -21,6 +20,20 @@ FetchContent_Declare(
 
 # Make json available
 FetchContent_MakeAvailable(json)
+
+# IXWebSocket: small C++ WebSocket + HTTP client, used to talk to Alpaca.
+# TLS: macOS uses Apple's built-in TLS (nothing to install). Linux uses OpenSSL (libssl-dev).
+set(USE_TLS ON CACHE BOOL "" FORCE)
+set(USE_ZLIB OFF CACHE BOOL "" FORCE)
+set(IXWEBSOCKET_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    ixwebsocket
+    URL https://github.com/machinezone/IXWebSocket/archive/refs/tags/v11.4.6.tar.gz
+)
+FetchContent_MakeAvailable(ixwebsocket)
+
+# Our warning flags are set AFTER fetching third-party code so -Werror only applies to our code.
+set(CMAKE_CXX_FLAGS "-g -Wall -Werror -Wextra -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-lambda-capture")
 
 # Setup CMAKE Module path for other conda packages
 SET(CMAKE_MODULE_PATH $ENV{$CONDA_PREFIX}/lib/cmake)

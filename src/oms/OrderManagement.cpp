@@ -53,11 +53,20 @@ void OrderManagement::onNewOrder(Order& order)
 
         // connect with Broker API to place order here
         if (broker->placeOrder(order))
-        {
-            Position newPosition = broker->getLatestPosition(order.getTicker());
-            addPosition(newPosition);
-        }
+            syncPosition(order.getTicker());
     }
+}
+
+// Ask the broker what we actually hold for this ticker and make that our one position for it.
+// Called after each order, and at start-up so positions from a previous run are not forgotten.
+void OrderManagement::syncPosition(const string& ticker)
+{
+    Position latest = broker->getLatestPosition(ticker);
+
+    std::erase_if(positions, [&ticker](Position& position) { return position.getTicker() == ticker; });
+
+    if (latest.getQuantity() != 0)
+        addPosition(latest);
 }
 
         

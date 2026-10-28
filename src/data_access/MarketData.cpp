@@ -178,6 +178,16 @@ MarketData::update(std::vector<MarketCondition>& marketData)
     data = marketData;
 }
 
+void
+MarketData::addBar(const MarketCondition& bar, size_t maxBars)
+{
+    data.push_back(bar);
+
+    // Drop the oldest bars so memory (and the copies strategies take) stay small
+    if (maxBars > 0 && data.size() > maxBars)
+        data.erase(data.begin(), data.begin() + (data.size() - maxBars));
+}
+
 vector<MarketCondition>
 MarketData::getData() const
 {

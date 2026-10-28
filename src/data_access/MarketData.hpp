@@ -52,6 +52,13 @@ class MarketData
          * @param marketData New market data
          */
         void update(std::vector<MarketCondition>& marketData);
+
+        /**
+         * Append one new bar (used by live trading).
+         * @param bar The newest market condition
+         * @param maxBars Keep only the newest maxBars bars (0 = keep everything)
+         */
+        void addBar(const MarketCondition& bar, size_t maxBars = 0);
         
         /**
          * Get all market data
