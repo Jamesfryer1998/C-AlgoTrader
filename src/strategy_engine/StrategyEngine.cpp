@@ -58,18 +58,46 @@ StrategyEngine::executeStrategies()
         return;
     }
 
-    // Maybe thread this, thread for each strategy
+    // 1. Ask every strategy for its view of this bar
+    std::vector<Order> proposals;
     for (auto& strat : strategyList) 
     {
         strat->supplyData(*marketData);
         strat->execute();
 
         if(strat->onNewOrder())
+            proposals.push_back(strat->getOrder());
+    }
+
+    // 2. Only trade if the strategies that want to trade agree with each other
+    Order order;
+    if (chooseOrder(proposals, order))
+        oms->onNewOrder(order);
+}
+
+bool
+StrategyEngine::chooseOrder(const std::vector<Order>& proposals, Order& chosen)
+{
+    if (proposals.empty())
+        return false;
+
+    const Order& first = proposals.front();
+    for (const auto& proposal : proposals)
+    {
+        if (proposal.getTicker() != first.getTicker() || proposal.isBuy() != first.isBuy())
         {
-            Order order = strat->getOrder();
-            oms->onNewOrder(order);
+            std::cout << "Strategies disagree (" << first.getTypeAsString() << " vs "
+                      << proposal.getTypeAsString() << " on " << proposal.getTicker()
+                      << "), no order sent" << std::endl;
+            return false;
         }
     }
+
+    if (proposals.size() > 1)
+        std::cout << proposals.size() << " strategies agree: " << first.getTypeAsString() << std::endl;
+
+    chosen = first;
+    return true;
 }
 
 void

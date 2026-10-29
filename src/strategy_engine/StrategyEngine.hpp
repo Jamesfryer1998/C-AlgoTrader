@@ -23,6 +23,11 @@ class StrategyEngine
         // Get the order management system
         OrderManagement* getOms() { return oms;};
 
+        // Given the orders every strategy proposed this bar, decide which (if any) to send.
+        // All proposals must agree on ticker and direction (all buys or all sells); if they disagree,
+        // nothing is sent. When they agree, the first strategy's order is sent once (not once per strategy).
+        static bool chooseOrder(const std::vector<Order>& proposals, Order& chosen);
+
     private:
         // Execute strategies on current market data
         void executeStrategies();

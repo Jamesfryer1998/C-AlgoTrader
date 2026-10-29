@@ -50,3 +50,42 @@ TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
 //     cut.setUp(jsonConfig, stratFactory, marketData, &broker);
 //     auto oms = cut.getOms();
 // }
+
+// ---------- Strategies must agree before an order is sent ----------
+
+TEST(StrategyConsensusTests, NoProposalsMeansNoOrder)
+{
+    Order chosen;
+    EXPECT_FALSE(StrategyEngine::chooseOrder({}, chosen));
+}
+
+TEST(StrategyConsensusTests, SingleStrategyOrderIsSent)
+{
+    Order chosen;
+    std::vector<Order> proposals = {Order(OrderType::BUY, "NVDA", 1, 100)};
+    ASSERT_TRUE(StrategyEngine::chooseOrder(proposals, chosen));
+    EXPECT_EQ(chosen.getTypeAsString(), "BUY");
+}
+
+TEST(StrategyConsensusTests, AgreeingStrategiesSendOneOrder)
+{
+    Order chosen;
+    std::vector<Order> proposals = {Order(OrderType::SELL, "NVDA", 1, 100), Order(OrderType::SELL, "NVDA", 2, 101)};
+    ASSERT_TRUE(StrategyEngine::chooseOrder(proposals, chosen));
+    EXPECT_EQ(chosen.getTypeAsString(), "SELL");
+    EXPECT_FLOAT_EQ(chosen.getQuantity(), 1); // the first strategy's order, sent once
+}
+
+TEST(StrategyConsensusTests, DisagreeingStrategiesSendNothing)
+{
+    Order chosen;
+    std::vector<Order> proposals = {Order(OrderType::BUY, "NVDA", 1, 100), Order(OrderType::SELL, "NVDA", 1, 100)};
+    EXPECT_FALSE(StrategyEngine::chooseOrder(proposals, chosen));
+}
+
+TEST(StrategyConsensusTests, LimitBuyAgreesWithMarketBuy)
+{
+    Order chosen;
+    std::vector<Order> proposals = {Order(OrderType::BUY, "NVDA", 1, 100), Order(OrderType::LIMIT_BUY, "NVDA", 1, 99)};
+    EXPECT_TRUE(StrategyEngine::chooseOrder(proposals, chosen));
+}
