@@ -20,6 +20,12 @@ using json = nlohmann::json;
  * Config (src/config/config.json -> "alpaca"):
  *   "history_feed": "sip" -> all US exchanges. Free on the Basic plan for anything older than 15 minutes.
  *                   "iex" -> IEX only (matches the free live stream, much lower volumes)
+ *   "history_adjustment": "split" (default) -> prices adjusted for stock splits, so NVDA's 10-for-1 split in
+ *                   June 2024 doesn't look like a 90% crash. "raw" = prices as traded at the time.
+ *
+ * Downloads go a month at a time (so 10 years never sits in memory at once), retry when Alpaca's rate
+ * limit is hit, and remember which months are finished in data/.alpaca_history_<TICKER>.json so
+ * running it again only fetches what's missing.
  */
 class AlpacaHistory
 {
@@ -47,6 +53,11 @@ class AlpacaHistory
         std::string feed;
         std::string dataUrl;
         std::string fileBaseName;
+        std::string adjustment;
         bool regularHoursOnly;
+
+        // Download one calendar month (clipped to the requested range). Returns bars written or -1.
+        int downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const std::string& startDate,
+                          const std::string& endDate, const std::string& dataDir, bool overwrite);
         AlpacaClient client;
 };
