@@ -35,7 +35,7 @@ class AlpacaBroker : public BrokerBase
         bool reportsRealPositions() const override { return !dryRun; }
 
         // The JSON body we POST to /v2/orders (public so it can be unit tested)
-        static json buildOrderJson(const Order& order);
+        static json buildOrderJson(const Order& order);   // includes client_order_id if the order has one
 
     private:
         AlpacaClient client;

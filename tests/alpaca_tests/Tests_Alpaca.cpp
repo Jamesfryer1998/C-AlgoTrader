@@ -110,3 +110,12 @@ TEST(MarketDataLiveTests, AddBarKeepsOnlyNewestBars)
     EXPECT_EQ(data.front().DateTime, "t7");
     EXPECT_EQ(data.back().DateTime, "t9");
 }
+
+TEST(AlpacaBrokerTests, ClientOrderIdIsSentWhenSet)
+{
+    Order order(OrderType::BUY, "NVDA", 1, 100.0f);
+    EXPECT_FALSE(AlpacaBroker::buildOrderJson(order).contains("client_order_id"));
+
+    order.setClientOrderId("algo-12-1793300000");
+    EXPECT_EQ(AlpacaBroker::buildOrderJson(order)["client_order_id"], "algo-12-1793300000");
+}

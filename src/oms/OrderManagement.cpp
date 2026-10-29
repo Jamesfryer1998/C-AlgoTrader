@@ -1,5 +1,8 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <ctime>
 
 #include "OrderManagement.hpp"
 
@@ -37,27 +40,70 @@ void OrderManagement::removePosition(int id)
     std::erase_if(positions, [id](Position& position) { return position.getId() == id; });
 }
 
+// Wall-clock time now, e.g. 2026-10-29T18:31:00.123Z
+static std::string utcNowMillis()
+{
+    auto now = std::chrono::system_clock::now();
+    std::time_t seconds = std::chrono::system_clock::to_time_t(now);
+    int millis = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
+    std::tm tm{};
+    gmtime_r(&seconds, &tm);
+    char text[64];
+    std::snprintf(text, sizeof(text), "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
+                  tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, millis);
+    return text;
+}
+
 void OrderManagement::onNewOrder(Order& order)
 {
-    // Wait for new order to be added to orders from strat engine
     if (marketData == nullptr)
     {
         std::cerr << "ERROR - OMS has no market data, call setMarketData first" << std::endl;
         return;
     }
 
-    bool orderValid = validator.validateOrder(order, *marketData, positions);
-    if(orderValid)
-    {
-        addOrder(order);
+    // Every order the strategies produce gets the next number, whether or not it is sent
+    int ourId = latestOrderId;
 
-        // connect with Broker API to place order here
-        if (broker->placeOrder(order))
+    if (!validator.validateOrder(order, *marketData, positions))
+    {
+        latestOrderId++;
+        if (store)
         {
-            recordTrade(order);
-            syncPosition(order.getTicker());
+            std::cout << "Order " << ourId << " (" << order.getTypeAsString() << " " << order.getQuantity()
+                      << " " << order.getTicker() << ") blocked by risk checks: " << validator.lastFailure << std::endl;
+            TradeRecord trade = makeRecord(order, ourId);
+            trade.status = "blocked";
+            trade.note = validator.lastFailure;
+            saveTrade(trade);
         }
+        return;
     }
+
+    // Live: tell the broker our id so its order can be matched to ours (unique across restarts)
+    if (store)
+        order.setClientOrderId("algo-" + std::to_string(ourId) + "-" + std::to_string(std::time(nullptr)));
+
+    addOrder(order);   // takes ourId
+    std::string sentAt = utcNowMillis();
+
+    // ---- The order goes out here. Nothing before this line touches the disk or the network. ----
+    bool accepted = broker->placeOrder(order);
+
+    // Everything below happens after the order has been sent
+    const BrokerBase::OrderReceipt& receipt = broker->lastReceipt;
+    TradeRecord trade = makeRecord(order, ourId);
+    trade.sentAtUtc = sentAt;
+    trade.orderClass = receipt.orderClass;
+    trade.brokerOrderId = receipt.brokerOrderId;
+    trade.brokerStatus = receipt.brokerStatus;
+    trade.roundTripMs = receipt.roundTripMs;
+    trade.note = receipt.error;
+    trade.status = !accepted ? "rejected" : (receipt.brokerStatus == "dry_run" ? "dry_run" : "sent");
+    saveTrade(trade);
+
+    if (accepted)
+        syncPosition(order.getTicker());
 }
 
 // Ask the broker what we actually hold for this ticker and make that our one position for it.
@@ -84,38 +130,55 @@ void OrderManagement::enablePersistence(TradeStore* tradeStore, PerformanceTrack
     if (!store)
         return;
 
-    // Replay every saved trade so order ids and the P&L book carry on from the last run
+    // Replay saved trades so order numbers and the P&L book carry on from the last run
     std::vector<TradeRecord> trades = store->loadTrades();
+    int replayed = 0;
     for (const auto& trade : trades)
     {
+        latestOrderId = std::max(latestOrderId, trade.ourId + 1);
+        if (!trade.changedPosition())
+            continue;   // blocked / rejected orders never changed anything
+
         Order order(stringToOrderType(trade.type), trade.ticker, trade.quantity, trade.price);
-        addOrder(order);
+        order.setId(trade.ourId);
+        orders.push_back(order);
         if (tracker)
             tracker->recordFill(trade.ticker, trade.isBuy(), trade.quantity, trade.price);
+        replayed++;
     }
 
     // Last known positions (the broker's view replaces these when syncPosition runs)
     for (Position position : store->loadPositions())
         addPosition(position);
 
-    std::cout << "Restored " << trades.size() << " trade(s) and " << positions.size()
-              << " position(s) from " << store->getDirectory() << std::endl;
+    std::cout << "Restored " << trades.size() << " order record(s) (" << replayed << " that changed a position) and "
+              << positions.size() << " position(s) from " << store->getDirectory()
+              << ". Next order id: " << latestOrderId << std::endl;
 }
 
-void OrderManagement::recordTrade(const Order& order)
+TradeRecord OrderManagement::makeRecord(const Order& order, int ourId) const
 {
     TradeRecord trade;
+    trade.ourId = ourId;
     trade.time = (marketData && !marketData->getData().empty()) ? marketData->getCurrentData().DateTime : "";
+    trade.strategy = order.getStrategy();
     trade.ticker = order.getTicker();
+    trade.side = order.isBuy() ? "buy" : "sell";
     trade.type = order.getTypeAsString();
     trade.quantity = order.getQuantity();
     trade.price = order.getPrice();
     trade.stopLoss = order.getStopLossPrice();
     trade.takeProfit = order.getTakeProfitPrice();
+    trade.clientOrderId = order.getClientOrderId();
+    return trade;
+}
 
+// Queue the line for trades.csv (written on the store's background thread) and update the P&L book
+void OrderManagement::saveTrade(const TradeRecord& trade)
+{
     if (store)
         store->appendTrade(trade);
-    if (tracker)
+    if (tracker && trade.changedPosition())
         tracker->recordFill(trade.ticker, trade.isBuy(), trade.quantity, trade.price);
 }
 
@@ -127,13 +190,24 @@ void OrderManagement::reconcileWithBroker(const string& ticker, float brokerQuan
     if (!tracker || !broker->reportsRealPositions() || !marketData || marketData->getData().empty())
         return;
 
-    double difference = brokerQuantity - tracker->getPositionQuantity(ticker);
+    double ours = tracker->getPositionQuantity(ticker);
+    double difference = brokerQuantity - ours;
     if (std::fabs(difference) < 1e-6)
         return;
 
     float price = marketData->getLastClosePrice();
     Order adjustment(difference > 0 ? OrderType::BUY : OrderType::SELL, ticker, std::fabs(difference), price);
-    std::cout << "Position adjusted to match the broker (" << ticker << " " << tracker->getPositionQuantity(ticker)
-              << " -> " << brokerQuantity << ", e.g. a stop loss or take profit filled) at ~$" << price << std::endl;
-    recordTrade(adjustment);
+    adjustment.setStrategy("broker");
+
+    TradeRecord trade = makeRecord(adjustment, latestOrderId++);
+    trade.sentAtUtc = utcNowMillis();
+    trade.status = "adjustment";
+    char quantities[96];
+    std::snprintf(quantities, sizeof(quantities), "broker holds %g but our records had %g", brokerQuantity, ours);
+    trade.note = std::string(quantities)
+               + " (e.g. a stop loss / take profit filled at the broker, or trades from before records were kept)";
+
+    std::cout << "Position adjusted to match the broker (" << ticker << " " << ours << " -> " << brokerQuantity
+              << ") at ~$" << price << std::endl;
+    saveTrade(trade);
 }

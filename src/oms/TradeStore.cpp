@@ -4,26 +4,146 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 
 static const char* TRADES_FILE = "trades.csv";
 static const char* POSITIONS_FILE = "positions.csv";
 static const char* PERFORMANCE_FILE = "performance.json";
 
-static std::vector<std::string> splitCsv(const std::string& line)
+const std::vector<std::string> TradeStore::TRADE_COLUMNS = {
+    "our_id", "time", "sent_at_utc", "strategy", "ticker", "side", "type", "order_class",
+    "quantity", "price", "stop_loss", "take_profit", "status", "broker_status",
+    "client_order_id", "broker_order_id", "round_trip_ms", "note"
+};
+
+namespace
 {
-    std::vector<std::string> fields;
-    std::stringstream stream(line);
-    std::string field;
-    while (std::getline(stream, field, ','))
-        fields.push_back(field);
-    return fields;
+    std::vector<std::string> splitCsv(const std::string& line)
+    {
+        std::vector<std::string> fields;
+        std::stringstream stream(line);
+        std::string field;
+        while (std::getline(stream, field, ','))
+            fields.push_back(field);
+        if (!line.empty() && line.back() == ',')
+            fields.push_back("");
+        return fields;
+    }
+
+    std::string joinColumns(const std::vector<std::string>& columns)
+    {
+        std::string header;
+        for (size_t i = 0; i < columns.size(); i++)
+            header += (i ? "," : "") + columns[i];
+        return header;
+    }
+
+    // Free text (error messages) must not break the CSV
+    std::string clean(std::string text)
+    {
+        for (char& c : text)
+            if (c == ',' || c == '\n' || c == '\r')
+                c = ';';
+        return text;
+    }
+
+    std::string formatTrade(const TradeRecord& t)
+    {
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(4)
+            << t.ourId << "," << t.time << "," << t.sentAtUtc << "," << clean(t.strategy) << ","
+            << t.ticker << "," << t.side << "," << t.type << "," << t.orderClass << ","
+            << t.quantity << "," << t.price << "," << t.stopLoss << "," << t.takeProfit << ","
+            << t.status << "," << clean(t.brokerStatus) << "," << t.clientOrderId << "," << t.brokerOrderId << ","
+            << std::setprecision(1) << t.roundTripMs << "," << clean(t.note) << "\n";
+        return out.str();
+    }
+
+    double toDouble(const std::string& text)
+    {
+        try { return text.empty() ? 0.0 : std::stod(text); }
+        catch (const std::exception&) { return 0.0; }
+    }
+
+    // Read trades.csv by column name, so files written with older column layouts still load
+    std::vector<TradeRecord> readTrades(const std::string& filePath)
+    {
+        std::vector<TradeRecord> trades;
+        std::ifstream file(filePath);
+        std::string line;
+        if (!std::getline(file, line))
+            return trades;
+
+        std::vector<std::string> header = splitCsv(line);
+        std::map<std::string, size_t> column;
+        for (size_t i = 0; i < header.size(); i++)
+            column[header[i]] = i;
+
+        int lineNumber = 0;
+        while (std::getline(file, line))
+        {
+            if (line.empty())
+                continue;
+            lineNumber++;
+            std::vector<std::string> f = splitCsv(line);
+            auto get = [&](const std::string& name) -> std::string {
+                auto it = column.find(name);
+                return (it != column.end() && it->second < f.size()) ? f[it->second] : "";
+            };
+
+            TradeRecord t;
+            t.ourId = static_cast<int>(toDouble(get("our_id")));
+            if (t.ourId == 0)
+                t.ourId = lineNumber;
+            t.time = get("time");
+            t.sentAtUtc = get("sent_at_utc");
+            t.strategy = get("strategy");
+            t.ticker = get("ticker");
+            t.type = get("type");
+            t.side = get("side");
+            if (t.side.empty())   // older files had no side column
+                t.side = (t.type == "BUY" || t.type == "LIMIT_BUY" || t.type == "STOP_BUY") ? "buy" : "sell";
+            t.orderClass = get("order_class");
+            t.quantity = toDouble(get("quantity"));
+            t.price = toDouble(get("price"));
+            t.stopLoss = toDouble(get("stop_loss"));
+            t.takeProfit = toDouble(get("take_profit"));
+            t.status = get("status");
+            t.brokerStatus = get("broker_status");
+            t.clientOrderId = get("client_order_id");
+            t.brokerOrderId = get("broker_order_id");
+            t.roundTripMs = toDouble(get("round_trip_ms"));
+            t.note = get("note");
+
+            if (t.ticker.empty() || t.quantity <= 0)
+            {
+                std::cerr << "WARNING - Skipping bad line in trades.csv: " << line << std::endl;
+                continue;
+            }
+            trades.push_back(t);
+        }
+        return trades;
+    }
 }
 
 TradeStore::TradeStore(const std::string& dir)
 : directory(dir)
 {
     std::filesystem::create_directories(directory);
+    upgradeOldTradesFile();
+    writer = std::thread(&TradeStore::writerLoop, this);
+}
+
+TradeStore::~TradeStore()
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        stopping = true;
+    }
+    wake.notify_one();
+    if (writer.joinable())
+        writer.join();   // the loop finishes every queued job before exiting
 }
 
 std::string
@@ -31,6 +151,51 @@ TradeStore::path(const std::string& fileName) const
 {
     return (std::filesystem::path(directory) / fileName).string();
 }
+
+// ---------- background writer ----------
+
+void
+TradeStore::enqueue(std::function<void()> job)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        jobs.push_back(std::move(job));
+    }
+    wake.notify_one();
+}
+
+void
+TradeStore::writerLoop()
+{
+    std::unique_lock<std::mutex> lock(mutex);
+    while (true)
+    {
+        wake.wait(lock, [this] { return stopping || !jobs.empty(); });
+        if (jobs.empty() && stopping)
+            return;
+
+        std::function<void()> job = std::move(jobs.front());
+        jobs.pop_front();
+        busy = true;
+
+        lock.unlock();
+        job();            // the disk write, done without holding the lock
+        lock.lock();
+
+        busy = false;
+        if (jobs.empty())
+            idle.notify_all();
+    }
+}
+
+void
+TradeStore::flush()
+{
+    std::unique_lock<std::mutex> lock(mutex);
+    idle.wait(lock, [this] { return jobs.empty() && !busy; });
+}
+
+// ---------- writes (queued) ----------
 
 void
 TradeStore::writeAtomically(const std::string& fileName, const std::string& contents)
@@ -52,22 +217,21 @@ TradeStore::writeAtomically(const std::string& fileName, const std::string& cont
 void
 TradeStore::appendTrade(const TradeRecord& trade)
 {
+    std::string line = formatTrade(trade);   // format now, write later
     std::string filePath = path(TRADES_FILE);
-    bool isNew = !std::filesystem::exists(filePath);
 
-    std::ofstream file(filePath, std::ios::app);
-    if (!file)
-    {
-        std::cerr << "WARNING - Could not write " << filePath << std::endl;
-        return;
-    }
-    if (isNew)
-        file << "time,ticker,type,quantity,price,stop_loss,take_profit\n";
-
-    file << std::fixed << std::setprecision(4)
-         << trade.time << "," << trade.ticker << "," << trade.type << "," << trade.quantity << ","
-         << trade.price << "," << trade.stopLoss << "," << trade.takeProfit << "\n";
-    file.flush();
+    enqueue([filePath, line] {
+        bool isNew = !std::filesystem::exists(filePath);
+        std::ofstream file(filePath, std::ios::app);
+        if (!file)
+        {
+            std::cerr << "WARNING - Could not write " << filePath << std::endl;
+            return;
+        }
+        if (isNew)
+            file << joinColumns(TRADE_COLUMNS) << "\n";
+        file << line;
+    });
 }
 
 void
@@ -77,46 +241,54 @@ TradeStore::savePositions(const std::vector<Position>& positions)
     out << "ticker,quantity,avg_price\n" << std::fixed << std::setprecision(4);
     for (const auto& position : positions)
         out << position.getTicker() << "," << position.getQuantity() << "," << position.getAvgPrice() << "\n";
-    writeAtomically(POSITIONS_FILE, out.str());
+
+    std::string contents = out.str();
+    enqueue([this, contents] { writeAtomically(POSITIONS_FILE, contents); });
 }
 
 void
 TradeStore::savePerformance(const json& performance)
 {
-    writeAtomically(PERFORMANCE_FILE, performance.dump(2) + "\n");
+    std::string contents = performance.dump(2) + "\n";
+    enqueue([this, contents] { writeAtomically(PERFORMANCE_FILE, contents); });
+}
+
+// ---------- reads (start-up only) ----------
+
+// Files written before the extra columns existed are rewritten in the new layout, keeping every trade
+void
+TradeStore::upgradeOldTradesFile()
+{
+    std::string filePath = path(TRADES_FILE);
+    std::ifstream file(filePath);
+    std::string header;
+    if (!file || !std::getline(file, header) || header == joinColumns(TRADE_COLUMNS))
+        return;
+    file.close();
+
+    std::vector<TradeRecord> trades = readTrades(filePath);
+    std::ostringstream out;
+    out << joinColumns(TRADE_COLUMNS) << "\n";
+    for (TradeRecord t : trades)
+    {
+        if (t.status.empty())
+        {
+            // Old files only held trades that changed the position. No stop loss/take profit = broker adjustment.
+            t.status = (t.stopLoss == 0 && t.takeProfit == 0) ? "adjustment" : "sent";
+            t.note = "from older trades.csv format";
+        }
+        out << formatTrade(t);
+    }
+    std::filesystem::copy_file(filePath, filePath + ".old", std::filesystem::copy_options::overwrite_existing);
+    writeAtomically(TRADES_FILE, out.str());
+    std::cout << "Upgraded " << filePath << " to the new column layout (" << trades.size()
+              << " trade(s) kept, original saved as trades.csv.old)" << std::endl;
 }
 
 std::vector<TradeRecord>
 TradeStore::loadTrades() const
 {
-    std::vector<TradeRecord> trades;
-    std::ifstream file(path(TRADES_FILE));
-    std::string line;
-    std::getline(file, line); // header
-
-    while (std::getline(file, line))
-    {
-        std::vector<std::string> f = splitCsv(line);
-        if (f.size() != 7)
-            continue;
-        try
-        {
-            TradeRecord t;
-            t.time = f[0];
-            t.ticker = f[1];
-            t.type = f[2];
-            t.quantity = std::stod(f[3]);
-            t.price = std::stod(f[4]);
-            t.stopLoss = std::stod(f[5]);
-            t.takeProfit = std::stod(f[6]);
-            trades.push_back(t);
-        }
-        catch (const std::exception&)
-        {
-            std::cerr << "WARNING - Skipping bad line in trades.csv: " << line << std::endl;
-        }
-    }
-    return trades;
+    return readTrades(path(TRADES_FILE));
 }
 
 std::vector<Position>

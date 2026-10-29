@@ -14,6 +14,9 @@ class OrderValidator
         bool validateOrder(const Order& order, const MarketData& marketData, std::vector<Position>& positions);
 
         void setParams(json configData);
+
+        // Why the last validateOrder() call returned false (empty if it passed)
+        std::string lastFailure;
         float getTotalHeldQuantity(const Order& order, std::vector<Position>& positions);
 
         // Validation methods

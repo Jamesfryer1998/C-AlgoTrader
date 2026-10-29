@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "OrderValidator.hpp"
 
 void 
@@ -21,14 +22,28 @@ OrderValidator::setParams(json configData)
 bool OrderValidator::validateOrder(const Order& order, const MarketData& marketData, std::vector<Position>& positions)
 {
     float totalHeldPositions = getTotalHeldQuantity(order, positions);
-    
-    if(!isValidOrderType(order)) return false;
-    if(!isValidPrice(order, marketData)) return false;
-    if(!isValidQuantity(order)) return false;
-    if(!checkMaxPositionSize(order, totalHeldPositions)) return false;
-    if(!checkStopLoss(order, marketData)) return false;
-    if(!checkTakeProfit(order, marketData)) return false;
-    if(!checkSlippage(order, marketData)) return false;
+    lastFailure.clear();
+
+    auto fail = [this](const std::string& reason) { lastFailure = reason; return false; };
+    auto num = [](double value) { char text[32]; std::snprintf(text, sizeof(text), "%g", value); return std::string(text); };
+    std::string price = num(order.getPrice());
+    std::string close = num(marketData.getLastClosePrice());
+
+    if(!isValidOrderType(order))
+        return fail("order type " + order.getTypeAsString() + " not allowed");
+    if(!isValidPrice(order, marketData))
+        return fail("price " + price + " too far from last close " + close);
+    if(!isValidQuantity(order))
+        return fail("quantity " + num(order.getQuantity()) + " not between 0 and max_position_size " + num(maxPositionSize));
+    if(!checkMaxPositionSize(order, totalHeldPositions))
+        return fail("holding " + num(totalHeldPositions) + " + " + num(order.getQuantity())
+                    + " would exceed max_position_size " + num(maxPositionSize));
+    if(!checkStopLoss(order, marketData))
+        return fail("stop loss " + num(order.getStopLossPrice()) + " missing or on the wrong side of " + close);
+    if(!checkTakeProfit(order, marketData))
+        return fail("take profit " + num(order.getTakeProfitPrice()) + " missing or on the wrong side of " + close);
+    if(!checkSlippage(order, marketData))
+        return fail("slippage between price " + price + " and last close " + close + " above slippage_tolerance");
 
     return true;  // Passes all checks
 }
@@ -134,7 +149,6 @@ bool OrderValidator::checkSlippage(const Order& order, const MarketData& marketD
     double lastClose = marketData.getLastClosePrice();
     
     double slippage = std::abs(orderPrice - lastClose) / ((orderPrice + lastClose) / 2) * 100.0;
-    std::cerr<<slippage<<std::endl;
 
     return slippage <= slippageTolerance;
 }

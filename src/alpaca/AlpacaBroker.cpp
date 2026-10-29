@@ -1,6 +1,8 @@
 #include "AlpacaBroker.hpp"
 
+#include <chrono>
 #include <cmath>
+#include <iomanip>
 #include <cstdio>
 #include <iostream>
 
@@ -105,6 +107,10 @@ AlpacaBroker::buildOrderJson(const Order& order)
         body["type"] = "market";
     }
 
+    // Our id, so Alpaca's order can be matched to the line in data/live/trades.csv
+    if (!order.getClientOrderId().empty())
+        body["client_order_id"] = order.getClientOrderId();
+
     // If the strategy set a stop loss and take profit, let Alpaca manage them for us (a "bracket"
     // order). They then trigger on Alpaca's servers even if this program is offline.
     if (order.getStopLossPrice() > 0 && order.getTakeProfitPrice() > 0)
@@ -121,25 +127,37 @@ int
 AlpacaBroker::placeOrder(Order order)
 {
     json body = buildOrderJson(order);
+    lastReceipt = OrderReceipt();
+    lastReceipt.orderClass = body.value("order_class", "simple");
 
     if (dryRun)
     {
         std::cout << "DRY RUN - would send order: " << body.dump() << std::endl;
+        lastReceipt.brokerStatus = "dry_run";
         return 1;
     }
 
+    auto started = std::chrono::steady_clock::now();
     HttpResult result = client.post(tradingUrl + "/v2/orders", body);
+    lastReceipt.roundTripMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+
     if (!result.ok())
     {
+        lastReceipt.brokerStatus = "rejected";
+        lastReceipt.error = "HTTP " + std::to_string(result.status) + ": " + result.error;
         std::cerr << "ERROR - Alpaca rejected order (" << result.status << "): " << result.error
                   << "\n  Order sent: " << body.dump() << std::endl;
         return 0;
     }
 
+    lastReceipt.brokerOrderId = result.body.value("id", "");
+    lastReceipt.brokerStatus = result.body.value("status", "");
+
     std::cout << "Order sent to Alpaca: " << body.value("side", "") << " " << body.value("qty", "")
               << " " << order.getTicker()
-              << " | id " << result.body.value("id", "?")
-              << " | status " << result.body.value("status", "?") << std::endl;
+              << " | id " << lastReceipt.brokerOrderId
+              << " | status " << lastReceipt.brokerStatus
+              << " | " << std::fixed << std::setprecision(1) << lastReceipt.roundTripMs << " ms" << std::endl;
     return 1;
 }
 

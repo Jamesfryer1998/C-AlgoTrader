@@ -57,9 +57,29 @@ While running, the app saves its state to `data/live/` (`data/live_dry_run/` for
 
 | File | Contents |
 |---|---|
-| `trades.csv` | Every order sent, one line each (bar time, type, quantity, price, stop loss, take profit) |
+| `trades.csv` | Every order the strategies produced, one line each, whatever happened to it (see below) |
 | `positions.csv` | Current positions, rewritten when they change |
 | `performance.json` | Latest P&L snapshot: realised / unrealised P&L, ROI, drawdown, Sharpe, win rate |
+
+`trades.csv` columns:
+
+| Column | Meaning |
+|---|---|
+| `our_id` | Our order number. Every attempt gets one, and numbering carries on after a restart |
+| `time` | Bar the decision was made on (New York time) |
+| `sent_at_utc` | Wall-clock time the order was sent, to the millisecond |
+| `strategy` | Strategy that produced it (`RSI+MACD` if several agreed, `broker` for adjustments) |
+| `ticker`, `side`, `type`, `order_class` | e.g. `NVDA`, `buy`, `BUY`, `bracket` |
+| `quantity`, `price` | Price is the bar close when decided (an estimate of the fill) |
+| `stop_loss`, `take_profit` | Bracket prices sent with the order |
+| `status` | `sent`, `rejected` (by Alpaca), `blocked` (by our risk checks), `adjustment`, `dry_run` |
+| `broker_status` | Alpaca's own status, e.g. `accepted` |
+| `client_order_id` | Our id as sent to Alpaca, e.g. `algo-12-1793300000`: search for it on Alpaca's dashboard |
+| `broker_order_id` | Alpaca's id for the order |
+| `round_trip_ms` | Time to send the order and get Alpaca's reply |
+| `note` | Why it was blocked/rejected, or why an adjustment was made |
+
+Lines are written by a background thread after the order has gone out, so saving never delays an order.
 
 On the next start the trades are replayed, so P&L and order numbering carry on. Each bar the app also checks
 its position with Alpaca; if Alpaca filled a stop loss or take profit by itself, the difference is recorded as a

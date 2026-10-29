@@ -48,7 +48,8 @@ class OrderManagement
         vector<Position> positions;
 
     private:
-        void recordTrade(const Order& order);
+        TradeRecord makeRecord(const Order& order, int ourId) const;
+        void saveTrade(const TradeRecord& trade);
         void reconcileWithBroker(const string& ticker, float brokerQuantity);
 
         TradeStore* store = nullptr;

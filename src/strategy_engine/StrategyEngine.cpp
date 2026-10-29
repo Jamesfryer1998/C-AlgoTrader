@@ -65,7 +65,11 @@ StrategyEngine::executeStrategies()
         strat->execute();
 
         if(strat->onNewOrder())
-            proposals.push_back(strat->getOrder());
+        {
+            Order proposal = strat->getOrder();
+            proposal.setStrategy(strat->_strategyAttribute.name);
+            proposals.push_back(proposal);
+        }
     }
 
     // 2. Only trade if the strategies that want to trade agree with each other
@@ -96,6 +100,13 @@ StrategyEngine::chooseOrder(const std::vector<Order>& proposals, Order& chosen)
         std::cout << proposals.size() << " strategies agree: " << first.getTypeAsString() << std::endl;
 
     chosen = first;
+
+    // Record every strategy that agreed, e.g. "RSI+MACD"
+    std::string names;
+    for (const auto& proposal : proposals)
+        if (!proposal.getStrategy().empty())
+            names += (names.empty() ? "" : "+") + proposal.getStrategy();
+    chosen.setStrategy(names);
     return true;
 }
 

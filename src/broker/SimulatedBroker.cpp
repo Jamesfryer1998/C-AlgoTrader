@@ -121,6 +121,10 @@ SimulatedBroker::placeOrder(Order order)
 {
     // Add order to pending orders queue
     pendingOrders.push_back(order);
+    lastReceipt = OrderReceipt();
+    lastReceipt.brokerOrderId = "sim-" + std::to_string(pendingOrders.size() + filledOrders.size());
+    lastReceipt.brokerStatus = "accepted";
+    lastReceipt.orderClass = "simple";
     
     // Update to ensure we're using the most current timestamp from MarketData
     // Get fresh current data from MarketData to ensure timestamp consistency
