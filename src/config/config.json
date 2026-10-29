@@ -1,6 +1,4 @@
 {
-    "run_interval": 10,
-    "collectInterval": "1m",
     "marketDataBasePath": "data/",
     "baseDataFileName": "marketData",
     "ticker": "NVDA",
@@ -11,6 +9,7 @@
         "data_feed": "iex",
         "trading_url": "https://paper-api.alpaca.markets",
         "dry_run": false,
+        "history_feed": "sip",
         "warmup_bars": 100,
         "max_bars": 500
     },

@@ -11,7 +11,7 @@ using json = nlohmann::json;
  * AlpacaBroker
  *
  * Sends orders to Alpaca over its REST API. Nothing needs to be running on your computer
- * apart from this program (unlike IBKR's TWS / Gateway).
+ * apart from this program.
  *
  * Config (src/config/config.json -> "alpaca"):
  *   "trading_url": "https://paper-api.alpaca.markets"  -> paper trading (fake money)

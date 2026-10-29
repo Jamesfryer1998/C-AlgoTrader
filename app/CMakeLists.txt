@@ -10,6 +10,7 @@ target_link_libraries(algo_trader_app
     nlohmann_json)
 
 target_link_libraries(backtest_app 
+    alpaca_lib
     util_lib
     data_access_lib
     oms_lib

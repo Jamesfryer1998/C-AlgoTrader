@@ -1,8 +1,11 @@
 #include <iostream>
 #include <unistd.h>
 #include <string>
+#include "../src/alpaca/AlpacaHistory.hpp"
 #include "../src/backtest/Backtester.hpp"
 #include "../src/util/Config.hpp"
+#include "../src/util/DotEnv.hpp"
+#include "../src/util/MarketTime.hpp"
 
 void printUsage() {
     std::cout << "AlgoTrader Backtester" << std::endl;
@@ -18,6 +21,8 @@ void printUsage() {
     std::cout << "  --threads <num>          Number of threads to use (default: all available cores)" << std::endl;
     std::cout << "  --detailed               Enable detailed logging during backtest" << std::endl;
     std::cout << "  --output <filename>      Save results to CSV file" << std::endl;
+    std::cout << "  --download               Download the date range from Alpaca into data/ first (skips days already saved)" << std::endl;
+    std::cout << "  --download-only          Download the date range from Alpaca and exit without backtesting" << std::endl;
     std::cout << "  --help                   Display this help message" << std::endl;
 }
 
@@ -31,6 +36,8 @@ int main(int argc, char* argv[]) {
     std::string startDate = "";
     std::string endDate = "";
     int numThreads = 0;  // 0 means use all available cores
+    bool download = false;
+    bool downloadOnly = false;
     
     // Parse command line arguments
     for (int i = 1; i < argc; i++) {
@@ -55,6 +62,11 @@ int main(int argc, char* argv[]) {
             endDate = argv[++i];
         } else if (arg == "--threads" && i + 1 < argc) {
             numThreads = std::stoi(argv[++i]);
+        } else if (arg == "--download") {
+            download = true;
+        } else if (arg == "--download-only") {
+            download = true;
+            downloadOnly = true;
         } else {
             std::cerr << "Unknown argument: " << arg << std::endl;
             printUsage();
@@ -75,27 +87,25 @@ int main(int argc, char* argv[]) {
         backtester.enableDetailedLogging(detailedLogging);
         backtester.setNumThreads(numThreads);
         
-        // Set date range if provided
-        if (!startDate.empty() && !endDate.empty()) {
-            backtester.setDateRange(startDate, endDate);
-        } else if (!startDate.empty()) {
-            // Get current date for end date
-            auto now = std::chrono::system_clock::now();
-            auto timeT = std::chrono::system_clock::to_time_t(now);
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&timeT), "%Y-%m-%d");
-            backtester.setDateRange(startDate, ss.str());
-        } else if (!endDate.empty()) {
-            // Calculate start date (7 days before end date)
-            std::tm endTm = {};
-            std::istringstream endDateStream(endDate);
-            endDateStream >> std::get_time(&endTm, "%Y-%m-%d");
-            auto endTimePoint = std::chrono::system_clock::from_time_t(std::mktime(&endTm));
-            auto startTimePoint = endTimePoint - std::chrono::hours(24 * 7);
-            auto startTimeT = std::chrono::system_clock::to_time_t(startTimePoint);
-            std::stringstream ss;
-            ss << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
-            backtester.setDateRange(ss.str(), endDate);
+        // Date range: default is the last 7 days ending today
+        std::time_t now = std::time(nullptr);
+        if (endDate.empty())
+            endDate = MarketTime::datePart(MarketTime::toNewYorkTime(now));
+        if (startDate.empty())
+            startDate = MarketTime::datePart(MarketTime::formatUtc(MarketTime::parseDate(endDate) - 7 * 24 * 3600));
+        backtester.setDateRange(startDate, endDate);
+
+        // Optionally fetch the data from Alpaca first
+        if (download) {
+            DotEnv::load(config.getProjectRoot() + "/.env");
+            std::string dataDir = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/");
+            AlpacaHistory history(algoConfig);
+            if (history.downloadToCsv(startDate, endDate, dataDir) < 0) {
+                std::cerr << "Download failed - check your keys in .env and the dates" << std::endl;
+                return 1;
+            }
+            if (downloadOnly)
+                return 0;
         }
         
         if (!outputFile.empty()) {

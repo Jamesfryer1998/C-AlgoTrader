@@ -18,7 +18,7 @@
  *                                                          └─(signal)──> OMS ──> Alpaca REST order
  *
  * Nothing runs on a timer: each new bar triggers one decision as soon as it arrives.
- * No Python, no CSV files and no desktop app needed.
+ * No CSV files and no desktop app needed.
  *
  * Alpaca keys are read from .env in the project root (copy .env.example to .env and fill it in).
  */

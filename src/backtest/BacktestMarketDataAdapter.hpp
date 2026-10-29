@@ -35,7 +35,8 @@ public:
      * @param configData Configuration for data loading
      * @param numThreads Number of threads to use for processing
      */
-    void loadHistoricalDataParallel(const json& configData, int numThreads);
+    void loadHistoricalDataParallel(const json& configData, int numThreads,
+                                    const std::string& startDate = "", const std::string& endDate = "");
     
     /**
      * Load mock data for backtesting (primarily for testing)

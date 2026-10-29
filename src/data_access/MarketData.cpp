@@ -54,7 +54,7 @@ MarketData::processForDateRange(json configData, const std::string& startDate, c
 }
 
 void
-MarketData::processParallel(json configData, int numThreads)
+MarketData::processParallel(json configData, int numThreads, const std::string& requestedStart, const std::string& requestedEnd)
 {
     // If numThreads is 0, use the number of hardware threads available
     if (numThreads <= 0) {
@@ -81,6 +81,12 @@ MarketData::processParallel(json configData, int numThreads)
     if (configData.contains("backtest_start_date") && configData.contains("backtest_end_date")) {
         startDate = configData["backtest_start_date"];
         endDate = configData["backtest_end_date"];
+    }
+
+    // A range passed in (e.g. from backtest_app --start-date/--end-date) wins
+    if (!requestedStart.empty() && !requestedEnd.empty()) {
+        startDate = requestedStart;
+        endDate = requestedEnd;
     }
     
     // Get data directory

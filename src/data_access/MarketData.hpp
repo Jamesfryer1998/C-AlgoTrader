@@ -33,7 +33,8 @@ class MarketData
          * @param configData Configuration for data processing
          * @param numThreads Number of threads to use (0 = auto)
          */
-        void processParallel(json configData, int numThreads = 0);
+        void processParallel(json configData, int numThreads = 0,
+                             const std::string& startDate = "", const std::string& endDate = "");
         
         /**
          * Load data from a specific file

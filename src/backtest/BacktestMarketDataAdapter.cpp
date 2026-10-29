@@ -38,12 +38,13 @@ BacktestMarketDataAdapter::loadHistoricalData(const json& configData, const std:
 }
 
 void 
-BacktestMarketDataAdapter::loadHistoricalDataParallel(const json& configData, int numThreads)
+BacktestMarketDataAdapter::loadHistoricalDataParallel(const json& configData, int numThreads,
+                                                      const std::string& startDate, const std::string& endDate)
 {
     validateMarketData();
     
     // Use the MarketData instance to load historical data in parallel
-    marketData->processParallel(configData, numThreads);
+    marketData->processParallel(configData, numThreads, startDate, endDate);
     
     // Store the full dataset for our own use
     fullDataset = marketData->getData();
@@ -93,14 +94,18 @@ BacktestMarketDataAdapter::next()
     // Get the current market condition at the current index
     MarketCondition currentCondition = fullDataset[currentIndex];
     
-    // Update the MarketData instance with the accumulated data up to the current index
-    // This way strategies can access historical data points
-    std::vector<MarketCondition> accumulatedData(fullDataset.begin(), fullDataset.begin() + currentIndex + 1);
-    marketData->update(accumulatedData);
+    // MarketData holds every bar up to the current index so strategies can see history.
+    // Append just the new bar rather than rebuilding the whole list each step (that made long backtests O(n^2)).
+    if (currentIndex == 0) {
+        std::vector<MarketCondition> firstBar = { currentCondition };
+        marketData->update(firstBar);
+    } else {
+        marketData->addBar(currentCondition);
+    }
     
     // Advance the index
     std::cout << "DEBUG: Processing timepoint [" << currentCondition.DateTime 
-              << "] at index " << currentIndex << " (data size: " << accumulatedData.size() << ")" << std::endl;
+              << "] at index " << currentIndex << " (data size: " << marketData->getData().size() << ")" << std::endl;
     currentIndex++;
 }
 

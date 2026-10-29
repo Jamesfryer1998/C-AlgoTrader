@@ -112,7 +112,7 @@ Backtester::run()
         // Process market data with date range and parallel processing
         if (numThreads > 0) {
             std::cout << "Using " << numThreads << " threads for processing" << std::endl;
-            marketDataAdapter.loadHistoricalDataParallel(algoConfig, numThreads);
+            marketDataAdapter.loadHistoricalDataParallel(algoConfig, numThreads, startDate, endDate);
         } else {
             std::cout << "Using all available cores for processing" << std::endl;
             marketDataAdapter.loadHistoricalData(algoConfig, startDate, endDate);

@@ -25,7 +25,7 @@ make -j4
 
 ### To Run (live, Alpaca)
 The trading app now streams real-time 1-minute bars from Alpaca and sends orders to Alpaca's API.
-No Python, CSV files or broker desktop app are needed.
+No CSV files or broker desktop app are needed.
 
 1. Create a free account at [alpaca.markets](https://alpaca.markets) and generate **paper trading** API keys.
 2. Put the keys in a `.env` file in the project root (git ignores it, so they never get committed):
@@ -59,8 +59,14 @@ On Linux install OpenSSL headers first (`sudo apt install libssl-dev`).
 ### To Run Backtester
 ```sh
 # Run from the project root directory
-./build_run_backtest.sh
+./build_run_backtest.sh --start-date 2026-10-01 --end-date 2026-10-28 --download
 ```
+`--download` fetches any days in the range that aren't already in `data/` from Alpaca first
+(uses the keys in `.env`). Use `--download-only` to just fetch data. One CSV per trading day is saved as
+`data/marketData_<TICKER>_<YYYY-MM-DD>.csv`, in New York exchange time, regular hours only.
+
+By default history comes from Alpaca's `sip` feed (all US exchanges, free for data older than 15 minutes).
+Set `"history_feed": "iex"` in the `"alpaca"` config block to match the free live stream instead.
 
 ### Running Tests
 ```sh
@@ -99,7 +105,7 @@ bt
 
 The **System Overview** provides a high-level architecture of the trading platform. It includes:  
 - **Live Data** (Alpaca WebSocket pushes a 1-minute bar the moment each minute closes, `src/alpaca/AlpacaStream`)  
-- **Historical Data** (Python script + CSV files, used by the backtester)  
+- **Historical Data** (downloaded from Alpaca into CSV files in `data/`, used by the backtester)  
 - **C++ Backend** (Processes data, runs strategies, and manages orders)  
 - **Broker API Integration** (Alpaca REST API executes trades, `src/alpaca/AlpacaBroker`)  
 
@@ -134,7 +140,7 @@ The **Data Reader** is responsible for:
 </details>  
 
 The **Data Flow** diagram illustrates how data moves through the system when **backtesting**:  
-1. **Python fetches market data** (`src/python/main.py`) and saves it to a CSV file  
+1. **`backtest_app --download` fetches 1-minute bars from Alpaca** and saves one CSV per day in `data/`  
 2. **C++ reads the CSV** and processes market conditions  
 3. **Strategies analyze the data** and generate trading signals  
 4. **Orders are sent to the OMS**, which manages execution via the simulated broker  

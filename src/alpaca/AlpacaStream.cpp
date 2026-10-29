@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include "../util/MarketTime.hpp"
 
 AlpacaStream::AlpacaStream(const json& config)
 {
@@ -118,7 +119,7 @@ AlpacaStream::handleAlpacaMessage(const json& message)
     if (type == "b") // A new 1-minute bar
     {
         MarketCondition bar = parseBar(message, symbol);
-        std::cout << "\n[" << bar.DateTime << " UTC] " << bar.Ticker
+        std::cout << "\n[" << bar.DateTime << " New York] " << bar.Ticker
                   << " close " << std::fixed << std::setprecision(2) << bar.Close
                   << " vol " << bar.Volume
                   << " | arrived " << std::setprecision(2)
@@ -156,13 +157,10 @@ AlpacaStream::handleAlpacaMessage(const json& message)
 MarketCondition
 AlpacaStream::parseBar(const json& bar, const std::string& symbol)
 {
-    // Alpaca time "2026-10-28T14:31:00Z" -> our CSV style "2026-10-28 14:31:00" (UTC)
-    std::string time = bar.value("t", "");
-    if (time.size() >= 19)
-    {
-        time = time.substr(0, 19);
-        time[10] = ' ';
-    }
+    // Alpaca time "2026-10-28T14:31:00Z" (UTC) -> New York exchange time "2026-10-28 10:31:00",
+    // the same clock as the CSV files the backtester uses
+    std::time_t utc = MarketTime::parseUtc(bar.value("t", ""));
+    std::string time = utc >= 0 ? MarketTime::toNewYorkTime(utc) : "";
 
     return MarketCondition(
         time,
@@ -176,13 +174,11 @@ AlpacaStream::parseBar(const json& bar, const std::string& symbol)
 double
 AlpacaStream::secondsSinceBarClose(const std::string& barStartUtc)
 {
-    std::tm tm{};
-    std::istringstream in(barStartUtc.substr(0, 19));
-    in >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
-    if (in.fail())
+    std::time_t barStart = MarketTime::parseUtc(barStartUtc);
+    if (barStart < 0)
         return 0.0;
 
-    auto barClose = std::chrono::system_clock::from_time_t(timegm(&tm)) + std::chrono::minutes(1);
+    auto barClose = std::chrono::system_clock::from_time_t(barStart) + std::chrono::minutes(1);
     auto delay = std::chrono::system_clock::now() - barClose;
     return std::chrono::duration<double>(delay).count();
 }

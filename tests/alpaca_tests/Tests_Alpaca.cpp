@@ -70,7 +70,7 @@ TEST(AlpacaStreamTests, ParseStreamBar)
 
     MarketCondition condition = AlpacaStream::parseBar(bar, "NVDA");
 
-    EXPECT_EQ(condition.DateTime, "2026-10-28 14:31:00");
+    EXPECT_EQ(condition.DateTime, "2026-10-28 10:31:00"); // 14:31 UTC = 10:31 New York (EDT)
     EXPECT_EQ(condition.Ticker, "NVDA");
     EXPECT_FLOAT_EQ(condition.Open, 181.5f);
     EXPECT_FLOAT_EQ(condition.Close, 181.9f);
@@ -87,7 +87,7 @@ TEST(AlpacaStreamTests, ParseRestBarWithoutSymbolUsesOurSymbol)
     MarketCondition condition = AlpacaStream::parseBar(bar, "NVDA");
 
     EXPECT_EQ(condition.Ticker, "NVDA");
-    EXPECT_EQ(condition.DateTime, "2026-10-27 19:59:00");
+    EXPECT_EQ(condition.DateTime, "2026-10-27 15:59:00"); // 19:59 UTC = 15:59 New York (EDT)
 }
 
 TEST(AlpacaStreamTests, TestFeedUsesFakeSymbol)
