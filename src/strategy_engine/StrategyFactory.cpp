@@ -58,12 +58,19 @@ StrategyFactory::generateStrategies()
         if(!active)
             continue;
 
+        std::unique_ptr<StrategyBase> strategy;
         if(name == "RSI")
-            strategies.push_back(std::make_unique<RSI>(attributes));
+            strategy = std::make_unique<RSI>(attributes);
         else if (name == "MACD")
-            strategies.push_back(std::make_unique<MACD>(attributes));
+            strategy = std::make_unique<MACD>(attributes);
         else if (name == "MEANREV")
-            strategies.push_back(std::make_unique<MEANREV>(attributes));
+            strategy = std::make_unique<MEANREV>(attributes);
+        else
+            throw std::runtime_error("Unknown strategy in config: " + name);
+
+        // Check the settings once here, so a bad config fails at start-up rather than on every bar
+        strategy->validate();
+        strategies.push_back(std::move(strategy));
     }
     return strategies;
 }

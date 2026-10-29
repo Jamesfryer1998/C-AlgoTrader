@@ -34,20 +34,20 @@ class StrategyAttribute
         }
 
         // RSI
-        int period;
-        double oversold_threshold;
-        double overbought_threshold;
+        int period = 0;
+        double oversold_threshold = 0;
+        double overbought_threshold = 0;
 
         // MACD
-        int short_period;
-        int long_period;
-        int signal_period;
+        int short_period = 0;
+        int long_period = 0;
+        int signal_period = 0;
 
         // MEANREV
-        int lookback_period;
-        double exit_threshold;
-        double entry_threshold;
-        int moving_average_period;
+        int lookback_period = 0;
+        double exit_threshold = 0;
+        double entry_threshold = 0;
+        int moving_average_period = 0;
 
         // Common
         string name;

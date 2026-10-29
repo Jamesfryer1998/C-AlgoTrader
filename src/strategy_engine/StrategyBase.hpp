@@ -17,6 +17,8 @@ class StrategyBase
 
         virtual ~StrategyBase() = default;
         virtual void execute() = 0;
+
+        // Throws if a required setting is missing. Called once, when the factory creates the strategy.
         virtual void validate() = 0;
 
         virtual bool onNewOrder()

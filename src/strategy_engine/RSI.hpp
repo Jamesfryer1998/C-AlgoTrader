@@ -11,7 +11,6 @@ class RSI : public StrategyBase {
         
         void execute() override 
         {
-            validate();
             run();
         }
 
@@ -74,8 +73,6 @@ class RSI : public StrategyBase {
             return std::round(rsi * 100) / 100;
         }
 
-    private:
-
         void validate() override
         {
             if(!_strategyAttribute.period)
@@ -85,6 +82,8 @@ class RSI : public StrategyBase {
             if(!_strategyAttribute.oversold_threshold)
                 throw std::runtime_error("RSI oversold threshold not set");
         }
+
+    private:
 
         void run()
         {

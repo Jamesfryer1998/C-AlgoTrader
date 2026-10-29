@@ -46,3 +46,33 @@ TEST_F(StrategyFactoryTests, StrategyFactory_GenerateStrategies)
     EXPECT_EQ("RSI", strats[0].get()->_strategyAttribute.name);
     EXPECT_EQ("MACD", strats[1].get()->_strategyAttribute.name);
 }
+// ---------- Validation happens once, when strategies are created ----------
+
+TEST(StrategyFactoryValidation, ThrowsAtCreationWhenActiveStrategyMissingSettings)
+{
+    json config = {{"strategies", {{{"name", "RSI"}, {"active", 1}}}}}; // no period / thresholds
+    StrategyFactory factory(config);
+    EXPECT_THROW(factory.generateStrategies(), std::runtime_error);
+}
+
+TEST(StrategyFactoryValidation, InactiveStrategyIsNotValidated)
+{
+    json config = {{"strategies", {{{"name", "MACD"}, {"active", 0}}}}};
+    StrategyFactory factory(config);
+    EXPECT_NO_THROW(factory.generateStrategies());
+}
+
+TEST(StrategyFactoryValidation, ThrowsOnUnknownStrategyName)
+{
+    json config = {{"strategies", {{{"name", "BOLLINGER"}, {"active", 1}}}}};
+    StrategyFactory factory(config);
+    EXPECT_THROW(factory.generateStrategies(), std::runtime_error);
+}
+
+TEST(StrategyFactoryValidation, ValidStrategiesAreCreated)
+{
+    json config = {{"strategies", {{{"name", "RSI"}, {"active", 1}, {"period", 14},
+                                    {"overbought_threshold", 70.0}, {"oversold_threshold", 30.0}}}}};
+    StrategyFactory factory(config);
+    EXPECT_EQ(factory.generateStrategies().size(), 1u);
+}
