@@ -14,6 +14,7 @@
 #include "../strategy_engine/StrategyFactory.hpp"
 #include "../broker/SimulatedBroker.hpp"
 #include "BacktestMarketDataAdapter.hpp"
+#include "../oms/PerformanceTracker.hpp"
 
 /**
  * Performance metrics for backtesting results
@@ -23,6 +24,9 @@ struct PerformanceMetrics {
     double finalEquity;
     double totalPnL;
     double totalPnLPercent;
+    double realisedPnL;
+    double unrealisedPnL;
+    double commissionPaid;
     double maxDrawdownPercent;
     double sharpeRatio;
     int numTrades;
@@ -92,7 +96,8 @@ private:
     
     // Performance tracking
     PerformanceMetrics metrics;
-    std::vector<double> dailyReturns;
+    PerformanceTracker tracker;               // works out P&L, Sharpe, drawdown from the broker's fills
+    size_t fillsRecorded = 0;                 // how many of the broker's fills the tracker has seen
     std::vector<std::pair<std::string, double>> equityCurve;
     std::map<std::string, std::vector<double>> customMetrics;
     
@@ -104,10 +109,7 @@ private:
     void printReport();
     void saveResults();
     
-    // Calculation helpers
-    double calculateSharpeRatio();
-    double calculateMaxDrawdown();
-    double calculateAnnualizedReturn();
+    void recordNewFills();
     
     // Utility methods
     std::string getCurrentTimestamp() const;

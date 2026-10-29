@@ -202,8 +202,9 @@ Backtester::initializeBacktest()
 {
     // Reset performance tracking
     equityCurve.clear();
-    dailyReturns.clear();
     customMetrics.clear();
+    tracker = PerformanceTracker(broker.getStartingCapital(), PerformanceTracker::MINUTE_BARS_PER_YEAR);
+    fillsRecorded = 0;
     
     // Log initial state
     metrics.startingCapital = broker.getStartingCapital();
@@ -236,16 +237,21 @@ Backtester::executeTimeStep()
     
     // Add to equity curve using current timestamp
     equityCurve.push_back({timestamp, broker.getCurrentEquity()});
-    
-    // Calculate daily return and add to returns vector (if equity has changed)
-    if (equityCurve.size() >= 2) {
-        double prevEquity = equityCurve[equityCurve.size() - 2].second;
-        double currentEquity = equityCurve[equityCurve.size() - 1].second;
-        
-        if (prevEquity != 0) {
-            double dailyReturn = (currentEquity - prevEquity) / prevEquity;
-            dailyReturns.push_back(dailyReturn);
-        }
+
+    // Feed this bar's fills and closing price to the performance tracker
+    recordNewFills();
+    tracker.markPrice(currentData.Ticker, currentData.Close);
+    tracker.recordEquity();
+}
+
+void
+Backtester::recordNewFills()
+{
+    const std::vector<Order>& fills = broker.getFilledOrders();
+    for (; fillsRecorded < fills.size(); fillsRecorded++) {
+        const Order& fill = fills[fillsRecorded];
+        tracker.recordFill(fill.getTicker(), fill.isBuy(), fill.getQuantity(), fill.getPrice(),
+                           broker.getCommissionPerTrade());
     }
 }
 
@@ -263,184 +269,30 @@ Backtester::logPerformance()
 void
 Backtester::calculateMetrics() 
 {
-    // Basic metrics
+    PerformanceSummary summary = tracker.summary();
+
     metrics.finalEquity = broker.getCurrentEquity();
     metrics.totalPnL = broker.getPnL();
     metrics.totalPnLPercent = (metrics.finalEquity - metrics.startingCapital) / metrics.startingCapital * 100.0;
     metrics.numTrades = broker.getNumTrades();
-    
-    // Calculate trade statistics from filled orders
-    const std::vector<Order>& filledOrders = broker.getFilledOrders();
-    
-    // Separate buy and sell orders
-    std::vector<Order> buyOrders;
-    std::vector<Order> sellOrders;
-    
-    for (const auto& order : filledOrders) {
-        if (order.getType() == OrderType::BUY || order.getType() == OrderType::LIMIT_BUY) {
-            buyOrders.push_back(order);
-        } else {
-            sellOrders.push_back(order);
-        }
-    }
-    
-    // Match buys and sells to determine profitable trades
-    // This is a simplified approach - in a real system, you'd need to match
-    // buy and sell orders properly considering partial fills, multiple sells
-    // for a single position, etc.
-    
-    std::vector<double> tradeProfits;
-    
-    for (const auto& buyOrder : buyOrders) {
-        for (const auto& sellOrder : sellOrders) {
-            if (buyOrder.getTicker() == sellOrder.getTicker()) {
-                // Calculate profit for this pair
-                double buyValue = buyOrder.getQuantity() * buyOrder.getPrice();
-                double sellValue = sellOrder.getQuantity() * sellOrder.getPrice();
-                double profit = sellValue - buyValue;
-                
-                tradeProfits.push_back(profit);
-                break; // Move to next buy order
-            }
-        }
-    }
-    
-    // Calculate trade statistics
-    metrics.winningTrades = std::count_if(tradeProfits.begin(), tradeProfits.end(),
-                                         [](double profit) { return profit > 0; });
-    metrics.losingTrades = std::count_if(tradeProfits.begin(), tradeProfits.end(),
-                                        [](double profit) { return profit <= 0; });
-    
-    // Calculate win rate
-    if (tradeProfits.size() > 0) {
-        metrics.winRate = static_cast<double>(metrics.winningTrades) / tradeProfits.size() * 100.0;
-    } else {
-        metrics.winRate = 0;
-    }
-    
-    // Calculate average win and loss
-    std::vector<double> winningTrades;
-    std::vector<double> losingTrades;
-    
-    for (double profit : tradeProfits) {
-        if (profit > 0) {
-            winningTrades.push_back(profit);
-        } else if (profit < 0) {
-            losingTrades.push_back(profit);
-        }
-    }
-    
-    if (!winningTrades.empty()) {
-        metrics.avgWin = std::accumulate(winningTrades.begin(), winningTrades.end(), 0.0) / winningTrades.size();
-    } else {
-        metrics.avgWin = 0;
-    }
-    
-    if (!losingTrades.empty()) {
-        metrics.avgLoss = std::accumulate(losingTrades.begin(), losingTrades.end(), 0.0) / losingTrades.size();
-    } else {
-        metrics.avgLoss = 0;
-    }
-    
-    // Calculate profit factor
-    double grossProfit = std::accumulate(winningTrades.begin(), winningTrades.end(), 0.0);
-    double grossLoss = std::fabs(std::accumulate(losingTrades.begin(), losingTrades.end(), 0.0));
-    
-    if (grossLoss > 0) {
-        metrics.profitFactor = grossProfit / grossLoss;
-    } else {
-        metrics.profitFactor = grossProfit > 0 ? std::numeric_limits<double>::infinity() : 0;
-    }
-    
-    // Calculate Sharpe ratio, max drawdown, and annualized return
-    metrics.sharpeRatio = calculateSharpeRatio();
-    metrics.maxDrawdownPercent = calculateMaxDrawdown();
-    metrics.annualizedReturn = calculateAnnualizedReturn();
-}
 
-double
-Backtester::calculateSharpeRatio() 
-{
-    if (dailyReturns.empty()) {
-        return 0.0;
-    }
-    
-    // Calculate mean return
-    double meanReturn = std::accumulate(dailyReturns.begin(), dailyReturns.end(), 0.0) / dailyReturns.size();
-    
-    // Calculate standard deviation
-    double sq_sum = std::inner_product(dailyReturns.begin(), dailyReturns.end(), dailyReturns.begin(), 0.0,
-                                     std::plus<>(), [meanReturn](double x, double y) {
-                                         return (x - meanReturn) * (y - meanReturn);
-                                     });
-    
-    double stddev = std::sqrt(sq_sum / dailyReturns.size());
-    
-    // Risk-free rate (simplified - in real system you'd use actual risk-free rate)
-    double riskFreeRate = 0.0;
-    
-    // Calculate daily Sharpe ratio
-    double dailySharpe;
-    if (stddev == 0.0) {
-        dailySharpe = 0.0;
-    } else {
-        dailySharpe = (meanReturn - riskFreeRate) / stddev;
-    }
-    
-    // Annualize the Sharpe ratio (assuming 252 trading days per year)
-    return dailySharpe * std::sqrt(252);
-}
+    metrics.realisedPnL = summary.realisedPnL;
+    metrics.unrealisedPnL = summary.unrealisedPnL;
+    metrics.commissionPaid = summary.commissionPaid;
+    metrics.winningTrades = summary.winningTrades;
+    metrics.losingTrades = summary.losingTrades;
+    metrics.winRate = summary.winRatePercent;
+    metrics.avgWin = summary.avgWin;
+    metrics.avgLoss = summary.avgLoss;
+    metrics.profitFactor = summary.profitFactor;
+    metrics.sharpeRatio = summary.sharpeRatio;
+    metrics.maxDrawdownPercent = summary.maxDrawdownPercent;
+    metrics.annualizedReturn = summary.annualisedReturnPercent;
 
-double
-Backtester::calculateMaxDrawdown() 
-{
-    if (equityCurve.empty()) {
-        return 0.0;
-    }
-    
-    double maxDrawdown = 0.0;
-    double peak = equityCurve[0].second;
-    
-    for (const auto& point : equityCurve) {
-        double equity = point.second;
-        
-        if (equity > peak) {
-            peak = equity;
-        }
-        
-        double drawdown = (peak - equity) / peak * 100.0;
-        maxDrawdown = std::max(maxDrawdown, drawdown);
-    }
-    
-    return maxDrawdown;
-}
-
-double
-Backtester::calculateAnnualizedReturn() 
-{
-    if (equityCurve.size() < 2) {
-        return 0.0;
-    }
-    
-    // Get first and last equity values
-    double startEquity = equityCurve.front().second;
-    double endEquity = equityCurve.back().second;
-    
-    // Calculate total return
-    double totalReturn = (endEquity - startEquity) / startEquity;
-    
-    // Estimate the number of trading days in the simulation
-    int tradingDays = equityCurve.size();
-    
-    // Calculate annualized return (assuming 252 trading days per year)
-    double yearsElapsed = static_cast<double>(tradingDays) / 252.0;
-    
-    if (yearsElapsed <= 0) {
-        return totalReturn * 100.0; // Just return total return as percentage if period is too short
-    }
-    
-    // Calculate annualized return
-    return (std::pow(1.0 + totalReturn, 1.0 / yearsElapsed) - 1.0) * 100.0;
+    // The tracker and the broker keep separate books; they should always agree on equity
+    if (std::fabs(summary.equity - metrics.finalEquity) > 0.01)
+        std::cerr << "WARNING: performance tracker equity " << summary.equity
+                  << " differs from broker equity " << metrics.finalEquity << std::endl;
 }
 
 void 
@@ -453,6 +305,9 @@ Backtester::printReport()
     std::cout << "Final equity: " << formatCurrency(metrics.finalEquity) << std::endl;
     std::cout << "Total P&L: " << formatCurrency(metrics.totalPnL) 
               << " (" << formatPercent(metrics.totalPnLPercent) << "%)" << std::endl;
+    std::cout << "  - Realised: " << formatCurrency(metrics.realisedPnL)
+              << " | Unrealised: " << formatCurrency(metrics.unrealisedPnL)
+              << " | Commission: " << formatCurrency(-metrics.commissionPaid) << std::endl;
     std::cout << "Execution time: " << metrics.executionTime.count() << " seconds" << std::endl;
     
     // Performance metrics
@@ -463,7 +318,8 @@ Backtester::printReport()
     
     // Trade statistics
     std::cout << "\nTrade statistics:" << std::endl;
-    std::cout << "- Total trades: " << metrics.numTrades << std::endl;
+    std::cout << "- Total fills: " << metrics.numTrades << std::endl;
+    std::cout << "- Closed trades (fills that closed or reduced a position):" << std::endl;
     std::cout << "- Winning trades: " << metrics.winningTrades 
               << " (" << formatPercent(metrics.winRate) << "%)" << std::endl;
     std::cout << "- Losing trades: " << metrics.losingTrades << std::endl;
@@ -492,6 +348,9 @@ Backtester::saveResults()
     outFile << "Final equity: " << formatCurrency(metrics.finalEquity) << "\n";
     outFile << "Total P&L: " << formatCurrency(metrics.totalPnL) 
             << " (" << formatPercent(metrics.totalPnLPercent) << "%)\n";
+    outFile << "Realised P&L: " << formatCurrency(metrics.realisedPnL) << "\n";
+    outFile << "Unrealised P&L: " << formatCurrency(metrics.unrealisedPnL) << "\n";
+    outFile << "Commission: " << formatCurrency(metrics.commissionPaid) << "\n";
     outFile << "Execution time: " << metrics.executionTime.count() << " seconds\n\n";
     
     // Performance metrics
