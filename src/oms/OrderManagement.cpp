@@ -39,7 +39,13 @@ void OrderManagement::removePosition(int id)
 void OrderManagement::onNewOrder(Order& order)
 {
     // Wait for new order to be added to orders from strat engine
-    bool orderValid = validator.validateOrder(order, marketData, positions);
+    if (marketData == nullptr)
+    {
+        std::cerr << "ERROR - OMS has no market data, call setMarketData first" << std::endl;
+        return;
+    }
+
+    bool orderValid = validator.validateOrder(order, *marketData, positions);
     if(orderValid)
     {
         addOrder(order);

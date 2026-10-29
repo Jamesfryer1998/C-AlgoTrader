@@ -37,15 +37,16 @@ class StrategyBase
             return order; 
         };
 
-        virtual void supplyData(MarketData& marketdata)
+        // Strategies read the engine's MarketData directly (no copy). It must outlive the strategy run.
+        virtual void supplyData(const MarketData& marketdata)
         {
-            marketData = marketdata;
+            marketData = &marketdata;
         }
 
         // Base strats take in entire list of strat params
         // Specific strats pick and choose from this list
         Order order;
-        MarketData marketData;
+        const MarketData* marketData = nullptr;
         bool NewOrder = false;
         StrategyAttribute _strategyAttribute;
 

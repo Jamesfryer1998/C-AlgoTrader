@@ -41,20 +41,12 @@ StrategyEngine::run()
         return;
     }
     
-    // Update the market data with the latest data
-    // In live mode, this will fetch new data
-    // In backtest mode, the data is updated by the adapter
-    setMarketData(*marketData);
+    // Strategies and the OMS all read the same MarketData object (no copies).
+    // Live: main() adds each new bar to it. Backtest: the adapter updates it.
     oms->setMarketData(*marketData);
     
     // Execute all active strategies
     executeStrategies();
-}
-
-void
-StrategyEngine::setMarketData(MarketData& inputData)
-{
-    marketConditions = inputData.getData();
 }
 
 void

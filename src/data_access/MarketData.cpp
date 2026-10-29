@@ -180,7 +180,7 @@ MarketData::addBar(const MarketCondition& bar, size_t maxBars)
         data.erase(data.begin(), data.begin() + (data.size() - maxBars));
 }
 
-vector<MarketCondition>
+const vector<MarketCondition>&
 MarketData::getData() const
 {
     return data;
@@ -212,7 +212,7 @@ MarketData::getDataDirectory()
 }
 
 float
-MarketData::getLastClosePrice()
+MarketData::getLastClosePrice() const
 {
     if (data.empty()) {
         throw std::runtime_error("No market data available");
@@ -223,7 +223,7 @@ MarketData::getLastClosePrice()
 }
 
 MarketCondition
-MarketData::getCurrentData()
+MarketData::getCurrentData() const
 {
     if (data.empty()) {
         throw std::runtime_error("No market data available");

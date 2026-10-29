@@ -58,7 +58,7 @@ class MarketData
          * Get all market data
          * @return Vector of market conditions
          */
-        std::vector<MarketCondition> getData() const;
+        const std::vector<MarketCondition>& getData() const;
         
         /**
          * Generate file path for data based on configuration
@@ -77,13 +77,13 @@ class MarketData
          * Get the last (most recent) close price
          * @return Close price as float
          */
-        float getLastClosePrice();
+        float getLastClosePrice() const;
         
         /**
          * Get the most recent market condition
          * @return Most recent market condition
          */
-        MarketCondition getCurrentData();
+        MarketCondition getCurrentData() const;
 
     private:
         std::vector<MarketCondition> data;

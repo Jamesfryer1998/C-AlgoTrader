@@ -55,7 +55,7 @@ void
 SimulatedBroker::process()
 {
     // Check for valid market data
-    auto data = marketData.getData();
+    const auto& data = marketData.getData();
     if(data.size() == 0)
     {
         throw std::runtime_error("No market data found");
@@ -63,7 +63,12 @@ SimulatedBroker::process()
 
     // Always refresh the current condition to ensure we're using the latest data
     // This is critical for timestamp consistency between strategy signals and order execution
-    currentCondition = marketData.getData()[step];
+    if (step >= static_cast<int>(data.size()))
+    {
+        throw std::runtime_error("SimulatedBroker: no market data for step " + std::to_string(step)
+                                 + " (only " + std::to_string(data.size()) + " bars)");
+    }
+    currentCondition = data[step];
     simulationTime = currentCondition.DateTime;
     
     // Log the current time step being processed

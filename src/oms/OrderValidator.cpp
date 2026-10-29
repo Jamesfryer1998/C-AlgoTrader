@@ -18,7 +18,7 @@ OrderValidator::setParams(json configData)
                 << "slippageTolerance=" << slippageTolerance << std::endl;
 }
 
-bool OrderValidator::validateOrder(const Order& order, MarketData& marketData, std::vector<Position>& positions)
+bool OrderValidator::validateOrder(const Order& order, const MarketData& marketData, std::vector<Position>& positions)
 {
     float totalHeldPositions = getTotalHeldQuantity(order, positions);
     
@@ -46,7 +46,7 @@ OrderValidator::isValidOrderType(const Order& order)
             type == OrderType::STOP_SELL);
 }
 
-bool OrderValidator::isValidPrice(const Order& order, MarketData& marketData)
+bool OrderValidator::isValidPrice(const Order& order, const MarketData& marketData)
 {
     double orderPrice = order.getPrice();
     double lastClose = marketData.getLastClosePrice();
@@ -81,7 +81,7 @@ OrderValidator::checkMaxPositionSize(const Order& order, float totalHeldQuantity
 }
 
 bool
-OrderValidator::checkStopLoss(const Order& order, MarketData& marketData)
+OrderValidator::checkStopLoss(const Order& order, const MarketData& marketData)
 {
     // Add stop loss into strategy config
     // When creating a order from a strategy, set the stop loss, this will be a %
@@ -108,7 +108,7 @@ OrderValidator::checkStopLoss(const Order& order, MarketData& marketData)
 }
 
 bool
-OrderValidator::checkTakeProfit(const Order& order, MarketData& marketData)
+OrderValidator::checkTakeProfit(const Order& order, const MarketData& marketData)
 {
     // TODO: Decide
     // Maybe need to have some user input here
@@ -128,7 +128,7 @@ OrderValidator::checkTakeProfit(const Order& order, MarketData& marketData)
     return true;
 }
 
-bool OrderValidator::checkSlippage(const Order& order, MarketData& marketData) 
+bool OrderValidator::checkSlippage(const Order& order, const MarketData& marketData) 
 {
     double orderPrice = order.getPrice();
     double lastClose = marketData.getLastClosePrice();

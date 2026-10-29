@@ -31,12 +31,12 @@ class OrderManagement
             validator.setParams(configdata);
             broker = Broker;
         };
-        void setMarketData(MarketData marketdata) { marketData = marketdata;};
+        void setMarketData(const MarketData& marketdata) { marketData = &marketdata; };
 
         BrokerBase* broker;
         vector<Order> orders;
         int latestOrderId = 1;
-        MarketData marketData;
+        const MarketData* marketData = nullptr; // owned by the caller, not copied
         int latestPositionId = 1;
         OrderValidator validator;
         vector<Position> positions;

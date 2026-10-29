@@ -14,14 +14,9 @@ class RSI : public StrategyBase {
             run();
         }
 
-        void supplyData(MarketData& marketdata) override
+        const MarketData& getData() const
         {
-            marketData = marketdata;
-        }
-
-        MarketData getData()
-        {
-            return marketData;
+            return *marketData;
         }
 
         float calculateRSI(const std::vector<float>& closes)
@@ -119,7 +114,7 @@ class RSI : public StrategyBase {
         std::vector<float> getRecentCloses(int period)
         {
             std::vector<float> closes;
-            const auto& data = marketData.getData();
+            const auto& data = marketData->getData();
             int dataSize = static_cast<int>(data.size());
             
             if (data.empty() || period <= 0) 
@@ -202,7 +197,7 @@ class RSI : public StrategyBase {
 
         MarketCondition getCurrentMarketCondition()
         {
-            return marketData.getCurrentData();
+            return marketData->getCurrentData();
         }
 
         void logDecision(MarketCondition currentCondition, float rsi, float quantity)
@@ -220,5 +215,4 @@ class RSI : public StrategyBase {
     private:
         float rsi;
         string decision;
-        MarketData marketData;
 };

@@ -11,7 +11,7 @@ class OrderValidator
     public:
         OrderValidator(){};
 
-        bool validateOrder(const Order& order, MarketData& marketData, std::vector<Position>& positions);
+        bool validateOrder(const Order& order, const MarketData& marketData, std::vector<Position>& positions);
 
         void setParams(json configData);
         float getTotalHeldQuantity(const Order& order, std::vector<Position>& positions);
@@ -19,10 +19,10 @@ class OrderValidator
         // Validation methods
         bool isValidQuantity(const Order& order);
         bool isValidOrderType(const Order& order);
-        bool isValidPrice(const Order& order, MarketData& marketData);
-        bool checkStopLoss(const Order& order, MarketData& marketData);
-        bool checkSlippage(const Order& order, MarketData& marketData);
-        bool checkTakeProfit(const Order& order, MarketData& marketData);
+        bool isValidPrice(const Order& order, const MarketData& marketData);
+        bool checkStopLoss(const Order& order, const MarketData& marketData);
+        bool checkSlippage(const Order& order, const MarketData& marketData);
+        bool checkTakeProfit(const Order& order, const MarketData& marketData);
         bool checkMaxPositionSize(const Order& order, float totalHeldQuantity);
 
     private:
