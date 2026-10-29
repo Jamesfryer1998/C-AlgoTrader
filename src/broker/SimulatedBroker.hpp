@@ -56,7 +56,7 @@ class SimulatedBroker : public BrokerBase {
         void checkStopLosses();
         void checkTakeProfits();
         void updatePortfolioValue();
-        void executeOrder(Order& order);
+        bool executeOrder(Order& order); // false = not filled yet (limit price not reached)
         bool checkOrderValidity(const Order& order) const;
         void updatePositions(const Order& order, double executionPrice);
         

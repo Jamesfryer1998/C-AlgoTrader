@@ -147,10 +147,8 @@ SimulatedBroker::processOrders()
     std::vector<Order> remainingOrders;
     
     for (auto& order : pendingOrders) {
-        if (checkOrderValidity(order)) {
-            executeOrder(order);
-        } else {
-            // Keep invalid orders for the next cycle
+        // Keep orders that can't be filled yet (e.g. a limit price not reached) for the next bar
+        if (!checkOrderValidity(order) || !executeOrder(order)) {
             remainingOrders.push_back(order);
         }
     }
@@ -171,7 +169,7 @@ SimulatedBroker::checkOrderValidity(const Order& order) const
     return true;
 }
 
-void
+bool
 SimulatedBroker::executeOrder(Order& order)
 {
     // Get current price for the ticker
@@ -205,12 +203,12 @@ SimulatedBroker::executeOrder(Order& order)
         // Cannot execute buy limit order above limit price
         std::cout << "Limit Buy order not executed: Market price $" << executionPrice 
                   << " above limit price $" << order.getPrice() << std::endl;
-        return;
+        return false;
     } else if (order.getType() == OrderType::LIMIT_SELL && executionPrice < order.getPrice()) {
         // Cannot execute sell limit order below limit price
         std::cout << "Limit Sell order not executed: Market price $" << executionPrice 
                   << " below limit price $" << order.getPrice() << std::endl;
-        return;
+        return false;
     }
     
     // Apply commission cost
@@ -236,6 +234,7 @@ SimulatedBroker::executeOrder(Order& order)
     }
     
     std::cout << std::endl;
+    return true;
 }
 
 void
