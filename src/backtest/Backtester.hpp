@@ -59,6 +59,17 @@ public:
      * Run the backtest simulation
      */
     void run();
+
+    /**
+     * Run the backtest over bars you already have in memory (oldest first). The bars are only read,
+     * never copied, so many backtests can share one dataset (the optimiser does this).
+     * Strategies see a rolling window of the newest bars, exactly like live trading.
+     */
+    void runOn(const std::vector<MarketCondition>& bars);
+
+    // Bars kept in memory for strategies (default 1000; strategies only look back a fixed amount)
+    void setWindowBars(size_t bars) { windowBars = bars; }
+    SimulatedBroker& getBroker() { return broker; }
     
     // Configuration methods
     void setStartingCapital(double capital);
@@ -93,6 +104,7 @@ private:
     std::string endDate;
     int numThreads;
     bool useDirectData;
+    size_t windowBars = 1000;
     
     // Performance tracking
     PerformanceMetrics metrics;
@@ -103,7 +115,7 @@ private:
     
     // Simulation methods
     void initializeBacktest();
-    void executeTimeStep();
+    void executeTimeStep(const MarketCondition& bar);
     void logPerformance();
     void calculateMetrics();
     void printReport();

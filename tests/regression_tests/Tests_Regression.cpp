@@ -44,19 +44,43 @@ namespace
         return data;
     }
 
-    json makeConfig()
+    json makeConfig(const json& strategy)
     {
         return {
             {"ticker", "NVDA"},
             {"max_position_size", 10},
             {"max_exposure", 5.0},
             {"slippage_tolerance", 2.0},
-            {"strategies", {{
-                {"name", "RSI"}, {"active", 1}, {"period", 14},
-                {"overbought_threshold", 70.0}, {"oversold_threshold", 30.0},
-                {"stop_loss", 2}, {"take_profit", 2}
-            }}}
+            {"strategies", json::array({strategy})}
         };
+    }
+
+    const json RSI_SETTINGS = {{"name", "RSI"}, {"active", 1}, {"period", 14},
+                               {"overbought_threshold", 70.0}, {"oversold_threshold", 30.0},
+                               {"stop_loss", 2}, {"take_profit", 2}};
+    const json MACD_SETTINGS = {{"name", "MACD"}, {"active", 1}, {"short_period", 12}, {"long_period", 26},
+                                {"signal_period", 9}, {"signal_type", "crossover"}, {"stop_loss", 2}, {"take_profit", 2}};
+    const json MEANREV_SETTINGS = {{"name", "MEANREV"}, {"active", 1}, {"lookback_period", 30},
+                                   {"moving_average_period", 30}, {"entry_threshold", 2.0}, {"exit_threshold", 0.5},
+                                   {"stop_loss", 2}, {"take_profit", 2}};
+
+    // Full backtest with zero slippage and $1 commission (deterministic)
+    PerformanceMetrics backtest(const json& strategy)
+    {
+        json config = makeConfig(strategy);
+        std::vector<MarketCondition> market = makeMarket();
+        Backtester backtester(config);
+        backtester.setStartingCapital(100000.0);
+        backtester.setCommissionPerTrade(1.0);
+        backtester.setSlippagePercentage(0.0);
+        backtester.runOn(market);
+        PerformanceMetrics m = backtester.getPerformanceMetrics();
+        std::printf("REGRESSION VALUES backtest %s: fills=%d finalEquity=%.2f realised=%.2f unrealised=%.2f "
+                    "commission=%.2f wins=%d losses=%d maxDD=%.4f sharpe=%.4f\n",
+                    strategy["name"].get<std::string>().c_str(), m.numTrades, m.finalEquity, m.realisedPnL,
+                    m.unrealisedPnL, m.commissionPaid, m.winningTrades, m.losingTrades, m.maxDrawdownPercent, m.sharpeRatio);
+        EXPECT_NEAR(m.totalPnL, m.realisedPnL + m.unrealisedPnL - m.commissionPaid, 0.01) << "books must balance";
+        return m;
     }
 
     // Broker for the live-path test: fills instantly at the order price and records every order
@@ -79,42 +103,48 @@ namespace
     };
 }
 
-TEST(RegressionTests, FullBacktestResultsUnchanged)
+TEST(RegressionTests, RsiBacktestUnchanged)
 {
-    json config = makeConfig();
-    std::vector<MarketCondition> market = makeMarket();
+    PerformanceMetrics m = backtest(RSI_SETTINGS);
+    EXPECT_EQ(m.numTrades, 1069);
+    EXPECT_NEAR(m.finalEquity, 99265.17, 0.01);
+    EXPECT_NEAR(m.realisedPnL, 327.99, 0.01);
+    EXPECT_NEAR(m.unrealisedPnL, 6.17, 0.01);
+    EXPECT_EQ(m.winningTrades, 335);
+    EXPECT_EQ(m.losingTrades, 123);
+    EXPECT_NEAR(m.maxDrawdownPercent, 0.7504, 1e-3);
+    EXPECT_NEAR(m.sharpeRatio, -31.0787, 1e-2);
+}
 
-    Backtester backtester(config);
-    backtester.setStartingCapital(100000.0);
-    backtester.setCommissionPerTrade(1.0);
-    backtester.setSlippagePercentage(0.0);   // no randomness
-    backtester.setMarketData(market);
-    backtester.run();
+TEST(RegressionTests, MacdBacktestUnchanged)
+{
+    PerformanceMetrics m = backtest(MACD_SETTINGS);
+    EXPECT_EQ(m.numTrades, 105);
+    EXPECT_NEAR(m.finalEquity, 100019.97, 0.01);
+    EXPECT_NEAR(m.realisedPnL, 124.35, 0.01);
+    EXPECT_NEAR(m.unrealisedPnL, 0.62, 0.01);
+    EXPECT_EQ(m.winningTrades, 48);
+    EXPECT_EQ(m.losingTrades, 4);
+    EXPECT_NEAR(m.maxDrawdownPercent, 0.0069, 1e-3);
+    EXPECT_NEAR(m.sharpeRatio, 7.7947, 1e-2);
+}
 
-    const PerformanceMetrics& m = backtester.getPerformanceMetrics();
-    std::printf("REGRESSION VALUES backtest: fills=%d finalEquity=%.2f realised=%.2f unrealised=%.2f "
-                "commission=%.2f wins=%d losses=%d maxDD=%.4f sharpe=%.4f\n",
-                m.numTrades, m.finalEquity, m.realisedPnL, m.unrealisedPnL, m.commissionPaid,
-                m.winningTrades, m.losingTrades, m.maxDrawdownPercent, m.sharpeRatio);
-
-    // Pinned results (see the comment at the top before changing these)
-    EXPECT_EQ(m.numTrades, 2770);
-    EXPECT_NEAR(m.finalEquity, 97243.66, 0.01);
-    EXPECT_NEAR(m.realisedPnL, 13.66, 0.01);
+TEST(RegressionTests, MeanReversionBacktestUnchanged)
+{
+    PerformanceMetrics m = backtest(MEANREV_SETTINGS);
+    EXPECT_EQ(m.numTrades, 129);
+    EXPECT_NEAR(m.finalEquity, 99756.39, 0.01);
+    EXPECT_NEAR(m.realisedPnL, -114.61, 0.01);
     EXPECT_NEAR(m.unrealisedPnL, 0.00, 0.01);
-    EXPECT_NEAR(m.commissionPaid, 2770.00, 0.01);
-    EXPECT_EQ(m.winningTrades, 3);
-    EXPECT_EQ(m.losingTrades, 0);
-    EXPECT_NEAR(m.maxDrawdownPercent, 2.7622, 1e-3);
-    EXPECT_NEAR(m.sharpeRatio, -452.4447, 1e-2);
-
-    // Books must balance: P&L = realised + unrealised - commission
-    EXPECT_NEAR(m.totalPnL, m.realisedPnL + m.unrealisedPnL - m.commissionPaid, 0.01);
+    EXPECT_EQ(m.winningTrades, 30);
+    EXPECT_EQ(m.losingTrades, 30);
+    EXPECT_NEAR(m.maxDrawdownPercent, 0.2436, 1e-3);
+    EXPECT_NEAR(m.sharpeRatio, -63.9260, 1e-2);
 }
 
 TEST(RegressionTests, LiveDecisionPathUnchanged)
 {
-    json config = makeConfig();
+    json config = makeConfig(RSI_SETTINGS);
     std::vector<MarketCondition> market = makeMarket();
 
     MarketData marketData;
@@ -140,9 +170,9 @@ TEST(RegressionTests, LiveDecisionPathUnchanged)
     std::printf("\n");
 
     // Pinned results (see the comment at the top before changing these)
-    EXPECT_EQ(broker.orders.size(), 1367u);
-    EXPECT_EQ(buys, 660);
-    EXPECT_EQ(sells, 707);
+    EXPECT_EQ(broker.orders.size(), 1026u);
+    EXPECT_EQ(buys, 508);
+    EXPECT_EQ(sells, 518);
     ASSERT_GE(broker.orders.size(), 5u);
     std::vector<float> firstPrices = {204.7699f, 205.5798f, 205.0379f, 204.5833f, 205.4272f};
     for (size_t i = 0; i < firstPrices.size(); i++) {

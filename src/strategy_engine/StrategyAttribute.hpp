@@ -26,6 +26,8 @@ class StrategyAttribute
             exit_threshold = stratJson.contains("exit_threshold") ? stratJson["exit_threshold"].get<double>() : 0;
             moving_average_period = stratJson.contains("moving_average_period") ? stratJson["moving_average_period"].get<int>() : 0;
 
+            if (stratJson.contains("signal_type")) signal_type = stratJson["signal_type"];
+
             if (stratJson.contains("name")) name = stratJson["name"];
             if (stratJson.contains("price_type")) price_type = stratJson["price_type"];
             if (stratJson.contains("trade_size")) trade_size = stratJson["trade_size"];
@@ -42,6 +44,7 @@ class StrategyAttribute
         int short_period = 0;
         int long_period = 0;
         int signal_period = 0;
+        string signal_type = "crossover";   // "crossover" (MACD vs signal line) or "zero_cross" (MACD vs 0)
 
         // MEANREV
         int lookback_period = 0;

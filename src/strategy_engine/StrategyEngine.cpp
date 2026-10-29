@@ -1,5 +1,6 @@
 #include "StrategyEngine.hpp"
 #include "StrategyFactory.hpp"
+#include "../util/Log.hpp"
 
 
 StrategyEngine::StrategyEngine()
@@ -16,17 +17,17 @@ StrategyEngine::~StrategyEngine()
 void 
 StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, MarketData &marketdata, BrokerBase* broker)
 {    
-    std::cout << "Setting up Strategy Engine..." << std::endl;
+    Log::out() << "Setting up Strategy Engine..." << std::endl;
     configData = configdata;
     oms->setUp(configData, broker);
     strategyList = stratFactory.generateStrategies();
     marketData = &marketdata; // Store a pointer to the MarketData object
 
-    std::cout << "  --> Config Data set" << std::endl;
-    std::cout << "  --> OMS set" << std::endl;
-    std::cout << "  --> Broker set " << broker->brokerName << std::endl;
-    std::cout << "  --> Strategies generated" << std::endl;
-    std::cout << "  --> MarketData set\n" << std::endl;
+    Log::out() << "  --> Config Data set" << std::endl;
+    Log::out() << "  --> OMS set" << std::endl;
+    Log::out() << "  --> Broker set " << broker->brokerName << std::endl;
+    Log::out() << "  --> Strategies generated" << std::endl;
+    Log::out() << "  --> MarketData set\n" << std::endl;
 
     printStategies();
 }
@@ -89,7 +90,7 @@ StrategyEngine::chooseOrder(const std::vector<Order>& proposals, Order& chosen)
     {
         if (proposal.getTicker() != first.getTicker() || proposal.isBuy() != first.isBuy())
         {
-            std::cout << "Strategies disagree (" << first.getTypeAsString() << " vs "
+            Log::out() << "Strategies disagree (" << first.getTypeAsString() << " vs "
                       << proposal.getTypeAsString() << " on " << proposal.getTicker()
                       << "), no order sent" << std::endl;
             return false;
@@ -97,7 +98,7 @@ StrategyEngine::chooseOrder(const std::vector<Order>& proposals, Order& chosen)
     }
 
     if (proposals.size() > 1)
-        std::cout << proposals.size() << " strategies agree: " << first.getTypeAsString() << std::endl;
+        Log::out() << proposals.size() << " strategies agree: " << first.getTypeAsString() << std::endl;
 
     chosen = first;
 
@@ -113,10 +114,10 @@ StrategyEngine::chooseOrder(const std::vector<Order>& proposals, Order& chosen)
 void
 StrategyEngine::printStategies()
 {
-    std::cout << "Loaded strategies:" << std::endl;
+    Log::out() << "Loaded strategies:" << std::endl;
 
     for (auto& strat : strategyList) 
     {
-        std::cout << "  -> "  << strat->_strategyAttribute.name << std::endl;
+        Log::out() << "  -> "  << strat->_strategyAttribute.name << std::endl;
     }
 }

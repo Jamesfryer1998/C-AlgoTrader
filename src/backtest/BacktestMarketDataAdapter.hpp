@@ -72,6 +72,9 @@ public:
      * @return Total number of data points
      */
     size_t getDataSize() const;
+
+    // Every bar loaded, oldest first
+    const std::vector<MarketCondition>& getFullDataset() const { return fullDataset; }
     
     /**
      * Get the current data point without advancing

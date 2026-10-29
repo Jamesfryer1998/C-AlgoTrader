@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <vector>
 #include "../oms/Order.hpp"
 #include "StrategyAttribute.hpp"
 #include "../data_access/MarketData.hpp"
@@ -50,7 +51,35 @@ class StrategyBase
         bool NewOrder = false;
         StrategyAttribute _strategyAttribute;
 
-    private:
+    protected:
+        // ---- Helpers shared by every strategy ----
 
+        // The last `count` closing prices, oldest first. Empty if there aren't that many bars yet.
+        std::vector<float> recentCloses(int count) const
+        {
+            std::vector<float> closes;
+            if (!marketData || count <= 0)
+                return closes;
+            const auto& data = marketData->getData();
+            if (static_cast<int>(data.size()) < count)
+                return closes;
+            closes.reserve(count);
+            for (size_t i = data.size() - count; i < data.size(); i++)
+                closes.push_back(data[i].Close);
+            return closes;
+        }
 
+        // The newest bar
+        const MarketCondition& currentBar() const { return marketData->getData().back(); }
+
+        // Raise a market order at the current bar's close, with this strategy's stop loss / take profit
+        void signal(OrderType type, float quantity = 1)
+        {
+            const MarketCondition& bar = currentBar();
+            Order newOrder(type, bar.Ticker, quantity, bar.Close);
+            newOrder.setStopLoss(_strategyAttribute.stop_loss);
+            newOrder.setTakeProfit(_strategyAttribute.take_profit);
+            order = newOrder;
+            NewOrder = true;
+        }
 };

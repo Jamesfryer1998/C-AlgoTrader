@@ -43,6 +43,16 @@ class SimulatedBroker : public BrokerBase {
         double getSlippagePercentage() const { return slippagePercentage; }
         double getCommissionPerTrade() const { return commissionPerTrade; }
         
+        // How slippage is applied to each fill:
+        //   Random  - uniformly random between -slippage and +slippage (the original behaviour)
+        //   Adverse - always against us: buys fill slippage higher, sells slippage lower (like paying the spread)
+        enum class SlippageMode { Random, Adverse };
+        void setSlippageMode(SlippageMode mode) { slippageMode = mode; }
+
+        // true: each step uses the newest bar in MarketData (for a rolling window of bars, as the
+        // Backtester and live trading use). false: step N uses bar N (the original behaviour).
+        void followLatestBar(bool follow) { useLatestBar = follow; }
+
         // Custom order handling
         void setSlippage(double slippagePerc);
         void setStartingCapital(double capital);
@@ -73,6 +83,15 @@ class SimulatedBroker : public BrokerBase {
         std::vector<Order> pendingOrders;
         std::vector<Order> cancelledOrders;
         
+        // Stop loss / take profit prices for each OPEN position (from the order that opened or last added to it).
+        // Cleared when the position closes, so old orders can never trigger exits on a new position.
+        struct ExitLevels { double stopLoss = 0; double takeProfit = 0; };
+        std::map<std::string, ExitLevels> exitLevels;
+        void updateExitLevels(const Order& order);
+        void exitPosition(const std::string& ticker, double quantity, const char* reason, double level);
+        SlippageMode slippageMode = SlippageMode::Random;
+        bool useLatestBar = false;
+
         // Positions and portfolio
         std::vector<Position> positionHistory;
         std::map<std::string, Position> positionsByTicker;

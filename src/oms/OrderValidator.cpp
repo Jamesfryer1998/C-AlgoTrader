@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdio>
 #include "OrderValidator.hpp"
 
@@ -36,8 +37,8 @@ bool OrderValidator::validateOrder(const Order& order, const MarketData& marketD
     if(!isValidQuantity(order))
         return fail("quantity " + num(order.getQuantity()) + " not between 0 and max_position_size " + num(maxPositionSize));
     if(!checkMaxPositionSize(order, totalHeldPositions))
-        return fail("holding " + num(totalHeldPositions) + " + " + num(order.getQuantity())
-                    + " would exceed max_position_size " + num(maxPositionSize));
+        return fail("holding " + num(totalHeldPositions) + ", " + (order.isBuy() ? "buying " : "selling ") + num(order.getQuantity())
+                    + " would take the position beyond max_position_size " + num(maxPositionSize));
     if(!checkStopLoss(order, marketData))
         return fail("stop loss " + num(order.getStopLossPrice()) + " missing or on the wrong side of " + close);
     if(!checkTakeProfit(order, marketData))
@@ -89,10 +90,16 @@ OrderValidator::isValidQuantity(const Order& order)
 bool
 OrderValidator::checkMaxPositionSize(const Order& order, float totalHeldQuantity)
 {
-    float newTotal = totalHeldQuantity + (order.isBuy() ? order.getQuantity() : 0.0f);
+    // Position after this order: + long, - short
+    float signedQuantity = order.isBuy() ? order.getQuantity() : -order.getQuantity();
+    float after = totalHeldQuantity + signedQuantity;
 
-    return (newTotal <= maxPositionSize);
-    return (order.getQuantity() <= maxPositionSize);
+    // An order that makes the position smaller is always allowed (e.g. selling when over the limit)
+    if (std::fabs(after) < std::fabs(totalHeldQuantity))
+        return true;
+
+    // Otherwise the position must stay within the limit, long or short
+    return std::fabs(after) <= maxPositionSize;
 }
 
 bool

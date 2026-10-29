@@ -1,4 +1,5 @@
 #include "SimulatedBroker.hpp"
+#include "../util/Log.hpp"
 #include <algorithm>
 #include <random>
 #include <cmath>
@@ -24,7 +25,7 @@ SimulatedBroker::SimulatedBroker(MarketData& marketdata)
     randomSeed = 42; // Default seed
     
     // Log the default settings
-    std::cout << "SimulatedBroker initialized with:"
+    Log::out() << "SimulatedBroker initialized with:"
               << "\n  - Starting capital: $" << startingCapital
               << "\n  - Commission: $" << commissionPerTrade << " per trade"
               << "\n  - Slippage: ±" << (slippagePercentage * 100.0) << "% (random variation)"
@@ -37,13 +38,13 @@ void SimulatedBroker::enableFixedRandomSeed(unsigned int seed)
 {
     useFixedSeed = true;
     randomSeed = seed;
-    std::cout << "Using fixed random seed: " << seed << " for deterministic testing" << std::endl;
+    Log::out() << "Using fixed random seed: " << seed << " for deterministic testing" << std::endl;
 }
 
 void SimulatedBroker::enableDetailedLogging(bool enable)
 {
     detailedLogging = enable;
-    std::cout << "SimulatedBroker: Detailed logging " << (enable ? "enabled" : "disabled") << std::endl;
+    Log::out() << "SimulatedBroker: Detailed logging " << (enable ? "enabled" : "disabled") << std::endl;
 }
 
 SimulatedBroker::~SimulatedBroker()
@@ -63,16 +64,23 @@ SimulatedBroker::process()
 
     // Always refresh the current condition to ensure we're using the latest data
     // This is critical for timestamp consistency between strategy signals and order execution
-    if (step >= static_cast<int>(data.size()))
+    if (useLatestBar)
     {
-        throw std::runtime_error("SimulatedBroker: no market data for step " + std::to_string(step)
-                                 + " (only " + std::to_string(data.size()) + " bars)");
+        currentCondition = data.back();
     }
-    currentCondition = data[step];
+    else
+    {
+        if (step >= static_cast<int>(data.size()))
+        {
+            throw std::runtime_error("SimulatedBroker: no market data for step " + std::to_string(step)
+                                     + " (only " + std::to_string(data.size()) + " bars)");
+        }
+        currentCondition = data[step];
+    }
     simulationTime = currentCondition.DateTime;
     
     // Log the current time step being processed
-    std::cout << "SimulatedBroker processing time step: " << simulationTime << std::endl;
+    Log::out() << "SimulatedBroker processing time step: " << simulationTime << std::endl;
     
     // Process pending orders with latest market data
     processOrders();
@@ -88,17 +96,17 @@ SimulatedBroker::process()
 int
 SimulatedBroker::connect()
 {
-    std::cout << "Connected to simulated broker with $" << startingCapital << " capital" << std::endl;
+    Log::out() << "Connected to simulated broker with $" << startingCapital << " capital" << std::endl;
     return 1;
 }
 
 int
 SimulatedBroker::disconnect()
 {
-    std::cout << "Disconnected from simulated broker" << std::endl;
-    std::cout << "Final equity: $" << currentEquity << std::endl;
-    std::cout << "Total P&L: $" << (currentEquity - startingCapital) << std::endl;
-    std::cout << "Total trades: " << totalTrades << std::endl;
+    Log::out() << "Disconnected from simulated broker" << std::endl;
+    Log::out() << "Final equity: $" << currentEquity << std::endl;
+    Log::out() << "Total P&L: $" << (currentEquity - startingCapital) << std::endl;
+    Log::out() << "Total trades: " << totalTrades << std::endl;
     return 1;
 }
 
@@ -131,7 +139,7 @@ SimulatedBroker::placeOrder(Order order)
     currentCondition = marketData.getCurrentData();
     simulationTime = currentCondition.DateTime;
     
-    std::cout << "Order placed for order " 
+    Log::out() << "Order placed for order " 
               << order.getId() << " for " 
               << order.getTypeAsString() << " with " 
               << order.getQuantity() << " shares of " 
@@ -184,19 +192,19 @@ SimulatedBroker::executeOrder(Order& order)
     double actualSlippagePercent = 0.0;
     
     if (slippagePercentage > 0.0) {
-        std::mt19937 gen;
-        
-        if (useFixedSeed) {
-            // Use fixed seed for tests
-            gen.seed(randomSeed);
+        if (slippageMode == SlippageMode::Adverse) {
+            actualSlippagePercent = order.isBuy() ? slippagePercentage : -slippagePercentage;
         } else {
-            // Use random seed for real trading
-            std::random_device rd;
-            gen.seed(rd());
+            std::mt19937 gen;
+            if (useFixedSeed) {
+                gen.seed(randomSeed);       // fixed seed for tests
+            } else {
+                std::random_device rd;      // random seed otherwise
+                gen.seed(rd());
+            }
+            std::uniform_real_distribution<> slippageDist(-slippagePercentage, slippagePercentage);
+            actualSlippagePercent = slippageDist(gen);
         }
-        
-        std::uniform_real_distribution<> slippageDist(-slippagePercentage, slippagePercentage);
-        actualSlippagePercent = slippageDist(gen);
         slippageMultiplier = 1.0 + actualSlippagePercent;
     }
     
@@ -205,12 +213,12 @@ SimulatedBroker::executeOrder(Order& order)
     // For limit orders, check price constraints
     if (order.getType() == OrderType::LIMIT_BUY && executionPrice > order.getPrice()) {
         // Cannot execute buy limit order above limit price
-        std::cout << "Limit Buy order not executed: Market price $" << executionPrice 
+        Log::out() << "Limit Buy order not executed: Market price $" << executionPrice 
                   << " above limit price $" << order.getPrice() << std::endl;
         return false;
     } else if (order.getType() == OrderType::LIMIT_SELL && executionPrice < order.getPrice()) {
         // Cannot execute sell limit order below limit price
-        std::cout << "Limit Sell order not executed: Market price $" << executionPrice 
+        Log::out() << "Limit Sell order not executed: Market price $" << executionPrice 
                   << " below limit price $" << order.getPrice() << std::endl;
         return false;
     }
@@ -220,24 +228,25 @@ SimulatedBroker::executeOrder(Order& order)
     
     // Update positions based on order
     updatePositions(order, executionPrice);
+    updateExitLevels(order);
     
     // Add to filled orders
     order.setPrice(executionPrice); // Update with actual execution price
     filledOrders.push_back(order);
     totalTrades++;
     
-    std::cout << "Order executed: " << (order.isBuy() ? "BUY" : "SELL")
+    Log::out() << "Order executed: " << (order.isBuy() ? "BUY" : "SELL")
               << " " << order.getQuantity() << " shares of " << order.getTicker()
               << " at $" << std::fixed << std::setprecision(2) << executionPrice;
     
     // Display slippage information
     if (slippagePercentage > 0.0) {
-        std::cout << " (Order price: $" << std::fixed << std::setprecision(2) << originalOrderPrice
+        Log::out() << " (Order price: $" << std::fixed << std::setprecision(2) << originalOrderPrice
                   << ", Slippage: " << (actualSlippagePercent >= 0 ? "+" : "")
                   << std::fixed << std::setprecision(3) << (actualSlippagePercent * 100.0) << "%)";
     }
     
-    std::cout << std::endl;
+    Log::out() << std::endl;
     return true;
 }
 
@@ -272,19 +281,19 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                         // Long position after covering short
                         existingPos.setQuantity(newTotalShares);
                         existingPos.setAvgPrice(executionPrice); // Reset average price as we're now long
-                        std::cout << "Covered short position for " << ticker << " and established long position of " 
+                        Log::out() << "Covered short position for " << ticker << " and established long position of " 
                                   << newTotalShares << " shares" << std::endl;
                     } else {
                         // Exactly covered the short position, close position
                         positionHistory.push_back(existingPos);
                         positionsByTicker.erase(ticker);
-                        std::cout << "Completely covered short position for " << ticker << std::endl;
+                        Log::out() << "Completely covered short position for " << ticker << std::endl;
                     }
                 } else {
                     // Partially covering short position
                     existingPos.setQuantity(newTotalShares);
                     // We don't update avg price for partial short covers
-                    std::cout << "Partially covered short position for " << ticker 
+                    Log::out() << "Partially covered short position for " << ticker 
                               << ", remaining short: " << -newTotalShares << " shares" << std::endl;
                 }
             } else {
@@ -296,7 +305,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                 // Update position
                 existingPos.setQuantity(newTotalShares);
                 existingPos.setAvgPrice(newAvgPrice);
-                std::cout << "Increased long position for " << ticker << " to " 
+                Log::out() << "Increased long position for " << ticker << " to " 
                           << newTotalShares << " shares at avg price $" 
                           << std::fixed << std::setprecision(2) << newAvgPrice << std::endl;
             }
@@ -304,7 +313,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
             // New position
             Position newPosition(ticker, quantity, executionPrice);
             positionsByTicker[ticker] = newPosition;
-            std::cout << "Established new long position for " << ticker << " with " 
+            Log::out() << "Established new long position for " << ticker << " with " 
                       << quantity << " shares at $" << executionPrice << std::endl;
         }
     } else {
@@ -326,20 +335,20 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                         // Going short after closing long
                         existingPos.setQuantity(newTotalShares);
                         existingPos.setAvgPrice(executionPrice); // Reset average price as we're now short
-                        std::cout << "Closed long position for " << ticker 
+                        Log::out() << "Closed long position for " << ticker 
                                   << " and established short position of " 
                                   << -newTotalShares << " shares" << std::endl;
                     } else {
                         // Exactly closed the long position
                         positionHistory.push_back(existingPos);
                         positionsByTicker.erase(ticker);
-                        std::cout << "Completely closed long position for " << ticker << std::endl;
+                        Log::out() << "Completely closed long position for " << ticker << std::endl;
                     }
                 } else {
                     // Partially reducing long position
                     existingPos.setQuantity(newTotalShares);
                     // Average price remains unchanged when reducing a long position
-                    std::cout << "Partially closed long position for " << ticker 
+                    Log::out() << "Partially closed long position for " << ticker 
                               << ", remaining: " << newTotalShares << " shares" << std::endl;
                 }
             } else {
@@ -350,7 +359,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                 
                 existingPos.setQuantity(newTotalShares);
                 existingPos.setAvgPrice(newAvgPrice);
-                std::cout << "Increased short position for " << ticker << " to " 
+                Log::out() << "Increased short position for " << ticker << " to " 
                           << -newTotalShares << " shares at avg price $" 
                           << std::fixed << std::setprecision(2) << newAvgPrice << std::endl;
             }
@@ -358,7 +367,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
             // No existing position, establishing a new short position
             Position newPosition(ticker, -quantity, executionPrice);
             positionsByTicker[ticker] = newPosition;
-            std::cout << "Established new short position for " << ticker << " with " 
+            Log::out() << "Established new short position for " << ticker << " with " 
                       << quantity << " shares at $" << executionPrice << std::endl;
         }
     }
@@ -374,8 +383,8 @@ SimulatedBroker::updatePortfolioValue()
     double portfolioValue = currentCash;
     
     if (detailedLogging) {
-        std::cout << "\n--- Portfolio Value Calculation ---" << std::endl;
-        std::cout << "Cash: $" << std::fixed << std::setprecision(2) << currentCash << std::endl;
+        Log::out() << "\n--- Portfolio Value Calculation ---" << std::endl;
+        Log::out() << "Cash: $" << std::fixed << std::setprecision(2) << currentCash << std::endl;
     }
     
     // Track total long and short values separately for reporting
@@ -410,7 +419,7 @@ SimulatedBroker::updatePortfolioValue()
                 unrealizedPnLPercent = -unrealizedPnLPercent;
             }
             
-            std::cout << ticker << ": " 
+            Log::out() << ticker << ": " 
                       << (quantity > 0 ? "LONG " : "SHORT ")
                       << std::abs(quantity) << " shares @ $" << avgPrice
                       << ", current price: $" << currentPrice
@@ -425,10 +434,10 @@ SimulatedBroker::updatePortfolioValue()
     currentEquity = portfolioValue;
     
     if (detailedLogging) {
-        std::cout << "Total Long Value: $" << std::fixed << std::setprecision(2) << totalLongValue << std::endl;
-        std::cout << "Total Short Value: $" << std::fixed << std::setprecision(2) << totalShortValue << std::endl;
-        std::cout << "Total Portfolio Value: $" << std::fixed << std::setprecision(2) << portfolioValue << std::endl;
-        std::cout << "--------------------------------\n" << std::endl;
+        Log::out() << "Total Long Value: $" << std::fixed << std::setprecision(2) << totalLongValue << std::endl;
+        Log::out() << "Total Short Value: $" << std::fixed << std::setprecision(2) << totalShortValue << std::endl;
+        Log::out() << "Total Portfolio Value: $" << std::fixed << std::setprecision(2) << portfolioValue << std::endl;
+        Log::out() << "--------------------------------\n" << std::endl;
     }
     
     // Update highest equity for drawdown calculation
@@ -447,109 +456,69 @@ SimulatedBroker::getLatestPosition(std::string ticker)
     }
 }
 
+void
+SimulatedBroker::updateExitLevels(const Order& order)
+{
+    const std::string& ticker = order.getTicker();
+    auto position = positionsByTicker.find(ticker);
+    if (position == positionsByTicker.end() || position->second.getQuantity() == 0) {
+        exitLevels.erase(ticker);    // flat: nothing left to protect
+        return;
+    }
+
+    // An order in the same direction as the position (opening it or adding to it) sets its exits
+    bool sameDirection = (position->second.getQuantity() > 0) == order.isBuy();
+    if (sameDirection && (order.getStopLossPrice() > 0 || order.getTakeProfitPrice() > 0))
+        exitLevels[ticker] = ExitLevels{order.getStopLossPrice(), order.getTakeProfitPrice()};
+}
+
+void
+SimulatedBroker::exitPosition(const std::string& ticker, double quantity, const char* reason, double level)
+{
+    double currentPrice = getLatestPrice(ticker);
+    Log::out() << (quantity > 0 ? "LONG" : "SHORT") << " position " << reason << " triggered for " << ticker
+               << " at $" << currentPrice << " (level " << level << ")" << std::endl;
+
+    // Close the whole position: sell a long, buy back a short
+    Order exitOrder(quantity > 0 ? OrderType::SELL : OrderType::BUY, ticker, std::fabs(quantity), currentPrice);
+    executeOrder(exitOrder);
+}
+
 void 
 SimulatedBroker::checkStopLosses()
 {
-    // Create a copy of positionsByTicker to iterate, as we might modify during iteration
-    std::map<std::string, Position> positionsCopy = positionsByTicker;
-    
-    // Iterate through positions and check if current price hits stop loss
-    for (const auto& pair : positionsCopy) {
-        const Position& position = pair.second;
-        std::string ticker = position.getTicker();
+    std::map<std::string, Position> positionsCopy = positionsByTicker;   // we may modify positions below
+    for (const auto& [ticker, position] : positionsCopy) {
+        auto levels = exitLevels.find(ticker);
         double quantity = position.getQuantity();
-        
-        // Skip positions with zero quantity
-        if (quantity == 0) {
+        if (quantity == 0 || levels == exitLevels.end() || levels->second.stopLoss <= 0)
             continue;
-        }
-        
-        // Find associated order with stop loss
-        for (const auto& order : filledOrders) {
-            if (order.getTicker() == ticker && order.getStopLossPrice() > 0) {
-                double currentPrice = getLatestPrice(ticker);
-                
-                // Handle stop loss differently for long and short positions
-                if (quantity > 0) {
-                    // For LONG positions: Stop loss triggers when price falls below stop level
-                    if (currentPrice <= order.getStopLossPrice()) {
-                        std::cout << "LONG position stop loss triggered for " << ticker 
-                                  << " at $" << currentPrice 
-                                  << ", stop price: " << order.getStopLossPrice() << std::endl;
-                        
-                        // For long positions, we SELL to exit
-                        Order stopOrder(OrderType::SELL, ticker, std::abs(order.getQuantity()), currentPrice);
-                        executeOrder(stopOrder);
-                        break;
-                    }
-                } else {
-                    // For SHORT positions: Stop loss triggers when price rises above stop level
-                    if (currentPrice >= order.getStopLossPrice()) {
-                        std::cout << "SHORT position stop loss triggered for " << ticker 
-                                  << " at $" << currentPrice 
-                                  << ", stop price: " << order.getStopLossPrice() << std::endl;
-                        
-                        // For short positions, we BUY to cover and exit
-                        Order stopOrder(OrderType::BUY, ticker, std::abs(order.getQuantity()), currentPrice);
-                        executeOrder(stopOrder);
-                        break;
-                    }
-                }
-            }
-        }
+
+        double price = getLatestPrice(ticker);
+        double stop = levels->second.stopLoss;
+        bool hit = quantity > 0 ? price <= stop    // long: price fell to the stop
+                                : price >= stop;   // short: price rose to the stop
+        if (hit)
+            exitPosition(ticker, quantity, "stop loss", stop);
     }
 }
 
 void 
 SimulatedBroker::checkTakeProfits()
 {
-    // Create a copy of positionsByTicker to iterate, as we might modify during iteration
-    std::map<std::string, Position> positionsCopy = positionsByTicker;
-    
-    // Iterate through positions and check if current price hits take profit
-    for (const auto& pair : positionsCopy) {
-        const Position& position = pair.second;
-        std::string ticker = position.getTicker();
+    std::map<std::string, Position> positionsCopy = positionsByTicker;   // we may modify positions below
+    for (const auto& [ticker, position] : positionsCopy) {
+        auto levels = exitLevels.find(ticker);
         double quantity = position.getQuantity();
-        
-        // Skip positions with zero quantity
-        if (quantity == 0) {
+        if (quantity == 0 || levels == exitLevels.end() || levels->second.takeProfit <= 0)
             continue;
-        }
-        
-        // Find associated order with take profit
-        for (const auto& order : filledOrders) {
-            if (order.getTicker() == ticker && order.getTakeProfitPrice() > 0) {
-                double currentPrice = getLatestPrice(ticker);
-                
-                // Handle take profit differently for long and short positions
-                if (quantity > 0) {
-                    // For LONG positions: Take profit triggers when price rises above target level
-                    if (currentPrice >= order.getTakeProfitPrice()) {
-                        std::cout << "LONG position take profit triggered for " << ticker 
-                                  << " at $" << currentPrice 
-                                  << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
-                        
-                        // For long positions, we SELL to exit with profit
-                        Order tpOrder(OrderType::SELL, ticker, std::abs(quantity), currentPrice);
-                        executeOrder(tpOrder);
-                        break;
-                    }
-                } else {
-                    // For SHORT positions: Take profit triggers when price falls below target level
-                    if (currentPrice <= order.getTakeProfitPrice()) {
-                        std::cout << "SHORT position take profit triggered for " << ticker 
-                                  << " at $" << currentPrice 
-                                  << ", take profit price: " << order.getTakeProfitPrice() << std::endl;
-                        
-                        // For short positions, we BUY to cover and exit with profit
-                        Order tpOrder(OrderType::BUY, ticker, std::abs(quantity), currentPrice);
-                        executeOrder(tpOrder);
-                        break;
-                    }
-                }
-            }
-        }
+
+        double price = getLatestPrice(ticker);
+        double target = levels->second.takeProfit;
+        bool hit = quantity > 0 ? price >= target    // long: price rose to the target
+                                : price <= target;   // short: price fell to the target
+        if (hit)
+            exitPosition(ticker, quantity, "take profit", target);
     }
 }
 
@@ -610,7 +579,7 @@ SimulatedBroker::setSlippage(double slippagePerc)
     double oldSlippage = slippagePercentage;
     slippagePercentage = slippagePerc;
     
-    std::cout << "SimulatedBroker: Slippage changed from ±" 
+    Log::out() << "SimulatedBroker: Slippage changed from ±" 
               << std::fixed << std::setprecision(3) << (oldSlippage * 100.0) 
               << "% to ±" << (slippagePercentage * 100.0) << "%" << std::endl;
 }

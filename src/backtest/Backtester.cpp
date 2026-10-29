@@ -1,4 +1,5 @@
 #include "Backtester.hpp"
+#include "../util/Log.hpp"
 #include <cmath>
 #include <numeric>
 #include <iomanip>
@@ -24,6 +25,7 @@ Backtester::Backtester(const json& algoConfig)
     broker.setStartingCapital(100000.0);
     broker.setCommission(1.0);
     broker.setSlippage(0.0005);
+    broker.followLatestBar(true);   // the broker trades on the newest bar of the rolling window
 
     // Default date range (last 7 days)
     auto now = std::chrono::system_clock::now();
@@ -37,7 +39,7 @@ Backtester::Backtester(const json& algoConfig)
     endDate = ssEnd.str();
     startDate = ssStart.str();
     
-    std::cout << "Default date range: " << startDate << " to " << endDate << std::endl;
+    Log::out() << "Default date range: " << startDate << " to " << endDate << std::endl;
 }
 
 void Backtester::setStartingCapital(double capital) {
@@ -50,7 +52,7 @@ void Backtester::setCommissionPerTrade(double commission) {
 
 void Backtester::setSlippagePercentage(double slippage) {
     broker.setSlippage(slippage);
-    std::cout << "Backtester: Setting slippage to " << std::fixed << std::setprecision(3) 
+    Log::out() << "Backtester: Setting slippage to " << std::fixed << std::setprecision(3) 
               << (slippage * 100.0) << "% (random variation within +/- this range)" << std::endl;
 }
 
@@ -65,7 +67,7 @@ void Backtester::saveResultsToFile(const std::string& filename) {
 void Backtester::setDateRange(const std::string& start, const std::string& end) {
     startDate = start;
     endDate = end;
-    std::cout << "Set backtest date range: " << startDate << " to " << endDate << std::endl;
+    Log::out() << "Set backtest date range: " << startDate << " to " << endDate << std::endl;
 }
 
 void Backtester::setNumThreads(int threads) {
@@ -73,7 +75,7 @@ void Backtester::setNumThreads(int threads) {
 }
 
 void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
-    std::cout << "Setting mock market data with " << mockData.size() << " data points" << std::endl;
+    Log::out() << "Setting mock market data with " << mockData.size() << " data points" << std::endl;
     
     // Verify the mock data is not empty
     if (mockData.empty()) {
@@ -87,12 +89,12 @@ void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
     // Auto-enable direct data mode when mock data is provided
     useDirectData = true;
     
-    std::cout << "Verified market data size: " << marketDataAdapter.getDataSize() << " data points" << std::endl;
+    Log::out() << "Verified market data size: " << marketDataAdapter.getDataSize() << " data points" << std::endl;
     if (marketDataAdapter.getDataSize() > 0) {
         MarketCondition firstPoint = marketDataAdapter.getCurrentData();
-        std::cout << "First data point: " << firstPoint.DateTime << std::endl;
+        Log::out() << "First data point: " << firstPoint.DateTime << std::endl;
     }
-    std::cout << "Current index: " << marketDataAdapter.getCurrentIndex() << std::endl;
+    Log::out() << "Current index: " << marketDataAdapter.getCurrentIndex() << std::endl;
 }
 
 void Backtester::useDirectMarketData(bool useDirect) {
@@ -103,9 +105,6 @@ void
 Backtester::run() 
 {
     std::cout << "Starting backtest from " << startDate << " to " << endDate << "..." << std::endl;
-    
-    // Record start time
-    auto startTime = std::chrono::high_resolution_clock::now();
     
     // Only process market data if not using direct data mode
     if (!useDirectData) {
@@ -127,74 +126,47 @@ Backtester::run()
         return;
     }
     
-    // Ensure we're at the beginning of the data
-    marketDataAdapter.rewind();
-    
-    // Set up strategy engine
-    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
-    
-    // Initialize backtest
-    initializeBacktest();
-    
-    // Log initial state - ensure we have data before trying to access it
-    if (marketDataAdapter.getDataSize() > 0) {
-        MarketCondition firstPoint = marketDataAdapter.getCurrentData();
-        equityCurve.push_back({firstPoint.DateTime, broker.getCurrentEquity()});
-    } else {
-        std::cerr << "ERROR: Market data is empty after initialization. Exiting run()." << std::endl;
+    runOn(marketDataAdapter.getFullDataset());
+}
+
+void
+Backtester::runOn(const std::vector<MarketCondition>& bars)
+{
+    auto startTime = std::chrono::high_resolution_clock::now();
+    if (bars.empty()) {
+        std::cerr << "ERROR: No market data available for backtesting." << std::endl;
         return;
     }
-    
-    // Count how many data points we'll process
-    size_t totalDataPoints = marketDataAdapter.getDataSize();
-    std::cout << "Processing " << totalDataPoints << " market data points" << std::endl;
-    
-    // Progress tracking
-    size_t lastProgress = 0;
-    size_t progressStep = totalDataPoints / 20; // Show progress in 5% increments
-    if (progressStep == 0) progressStep = 1;
-        
-    // Add explicit counter to detect infinite loops
-    int loopCount = 0;
-    const int MAX_LOOPS = totalDataPoints * 2; // Safety limit
-        
-    while (marketDataAdapter.hasNext() && loopCount < MAX_LOOPS) {         
-        executeTimeStep();
-        loopCount++;
-        
-        // Show progress
-        size_t currentIndex = marketDataAdapter.getCurrentIndex();
-        if (currentIndex - lastProgress >= progressStep) {
-            int progressPercent = static_cast<int>((static_cast<double>(currentIndex) / totalDataPoints) * 100);
-            std::cout << "Progress: " << progressPercent << "% ("
-                      << currentIndex << "/" << totalDataPoints << " data points)"
-                      << std::endl;
-            lastProgress = currentIndex;
-        }
+
+    // Start from an empty window; bars are added one at a time below
+    std::vector<MarketCondition> none;
+    marketData.update(none);
+
+    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
+    initializeBacktest();
+    equityCurve.push_back({bars.front().DateTime, broker.getCurrentEquity()});
+
+    Log::out() << "Processing " << bars.size() << " market data points" << std::endl;
+    size_t progressStep = std::max<size_t>(1, bars.size() / 20);   // progress every 5%
+
+    for (size_t i = 0; i < bars.size(); i++) {
+        executeTimeStep(bars[i]);
+
+        if ((i + 1) % progressStep == 0)
+            Log::out() << "Progress: " << (100 * (i + 1) / bars.size()) << "% ("
+                       << (i + 1) << "/" << bars.size() << " data points)" << std::endl;
     }
-    
-    // Check if we exited due to the safety limit
-    if (loopCount >= MAX_LOOPS) {
-        std::cerr << "WARNING: Loop safety limit reached. Possible infinite loop detected." << std::endl;
-    }
-        
-    // Record end time and calculate duration
-    auto endTime = std::chrono::high_resolution_clock::now();
-    metrics.executionTime = endTime - startTime;
-    
-    // Calculate final metrics
+
+    metrics.executionTime = std::chrono::high_resolution_clock::now() - startTime;
     calculateMetrics();
-    
-    // Print report
-    printReport();
-    
-    // Save results to file if requested
-    if (!resultsFilename.empty()) {
+
+    if (Log::verbose)
+        printReport();
+
+    if (!resultsFilename.empty())
         saveResults();
-    }
-    
-    std::cout << "Backtest completed in " 
-              << metrics.executionTime.count() << " seconds" << std::endl;
+
+    Log::out() << "Backtest completed in " << metrics.executionTime.count() << " seconds" << std::endl;
 }
 
 void
@@ -211,36 +183,25 @@ Backtester::initializeBacktest()
 }
 
 void
-Backtester::executeTimeStep() 
+Backtester::executeTimeStep(const MarketCondition& bar)
 {
-    // 1. Process next data point using the adapter
-    // This updates the underlying MarketData with the next time point
-    marketDataAdapter.next();
-    
-    // Get the current data point for logging and synchronization
-    MarketCondition currentData = marketDataAdapter.getCurrentData();
-    std::string timestamp = currentData.DateTime;
-    
-    // Log the timestamp we're about to process
-    std::cout << "Backtester time step: " << timestamp << std::endl;
-    
-    // 2. Execute strategy - this will use the updated marketData
-    // The strategy will generate signals based on this data point
-    stratEngine.run();
-    
-    // 3. Simulate broker operations - this includes processing orders from strategies
-    // The broker will use the same current data point for execution
-    broker.nextStep();
-    
-    // 4. Log performance and update metrics
-    logPerformance();
-    
-    // Add to equity curve using current timestamp
-    equityCurve.push_back({timestamp, broker.getCurrentEquity()});
+    // 1. The new bar arrives (strategies see the newest windowBars bars, like live trading)
+    marketData.addBar(bar, windowBars);
+    Log::out() << "Backtester time step: " << bar.DateTime << std::endl;
 
-    // Feed this bar's fills and closing price to the performance tracker
+    // 2. Strategies decide; any order goes to the simulated broker
+    stratEngine.run();
+
+    // 3. The broker fills orders and checks stop losses / take profits on this bar,
+    //    then the OMS catches up with the filled position (the live app does the same after each bar)
+    broker.nextStep();
+    stratEngine.getOms()->syncPosition(bar.Ticker);
+    logPerformance();
+
+    // 4. Book-keeping
+    equityCurve.push_back({bar.DateTime, broker.getCurrentEquity()});
     recordNewFills();
-    tracker.markPrice(currentData.Ticker, currentData.Close);
+    tracker.markPrice(bar.Ticker, bar.Close);
     tracker.recordEquity();
 }
 

@@ -170,9 +170,29 @@ TEST_F(OrderValidatorTests, GivenWeHaveValidPositionSize_WeValidateCorrectly)
 TEST_F(OrderValidatorTests, GivenWeHaveInvalidPositionSize_WeValidateCorrectly)
 {
     GivenWeHaveMarketData();
-    GivenWeHaveAnInvalidOrder();
-    
-    EXPECT_EQ(cut.checkMaxPositionSize(order, 0), true);
+    GivenWeHaveAnInvalidOrder();   // quantity 20, above the limit of 10
+
+    EXPECT_EQ(cut.checkMaxPositionSize(order, 0), false);
+}
+
+TEST_F(OrderValidatorTests, OrdersThatShrinkThePositionAreAlwaysAllowed)
+{
+    GivenWeHaveMarketData();
+    Order sell(OrderType::SELL, "AAPL", 1, 109.0);
+    Order buy(OrderType::BUY, "AAPL", 1, 109.0);
+
+    EXPECT_TRUE(cut.checkMaxPositionSize(sell, 11));    // over the limit long: selling reduces it
+    EXPECT_FALSE(cut.checkMaxPositionSize(buy, 11));    // buying would make it worse
+    EXPECT_TRUE(cut.checkMaxPositionSize(buy, -11));    // over the limit short: buying reduces it
+    EXPECT_FALSE(cut.checkMaxPositionSize(sell, -11));
+}
+
+TEST_F(OrderValidatorTests, ShortsAreLimitedToo)
+{
+    GivenWeHaveMarketData();
+    Order sell(OrderType::SELL, "AAPL", 1, 109.0);
+    EXPECT_TRUE(cut.checkMaxPositionSize(sell, -9));    // to -10: at the limit
+    EXPECT_FALSE(cut.checkMaxPositionSize(sell, -10));  // to -11: beyond it
 }
 
 TEST_F(OrderValidatorTests, GivenWeHaveAValidOrder_WeValidateCorrectly)
