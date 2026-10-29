@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <memory>
 #include "StrategyBase.hpp"
 #include "../oms/OrderManagement.hpp"
 #include "../data_access/MarketData.hpp"
@@ -21,7 +22,7 @@ class StrategyEngine
         void setUp(json configData, StrategyFactory &stratFactory, MarketData &marketdata, BrokerBase* broker);
 
         // Get the order management system
-        OrderManagement* getOms() { return oms;};
+        OrderManagement* getOms() { return oms.get(); }
 
         // Given the orders every strategy proposed this bar, decide which (if any) to send.
         // All proposals must agree on ticker and direction (all buys or all sells); if they disagree,
@@ -37,6 +38,6 @@ class StrategyEngine
 
         json configData;
         MarketData* marketData; // Use a pointer to the MarketData object
-        static OrderManagement* oms;
+        std::unique_ptr<OrderManagement> oms = std::make_unique<OrderManagement>(); // one per engine, so backtests don't share orders/positions
         std::vector<std::unique_ptr<StrategyBase>> strategyList;
 };  

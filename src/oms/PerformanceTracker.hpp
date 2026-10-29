@@ -28,8 +28,8 @@ struct PerformanceSummary
     int fills = 0;
     int closedTrades = 0;           // fills that closed or reduced a position
     int winningTrades = 0;
-    int losingTrades = 0;
-    double winRatePercent = 0;
+    int losingTrades = 0;           // break-even trades count as neither
+    double winRatePercent = 0;      // winning / closed trades
     double avgWin = 0;
     double avgLoss = 0;
     double profitFactor = 0;        // gross profit / gross loss

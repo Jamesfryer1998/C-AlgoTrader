@@ -1,7 +1,6 @@
 #include "StrategyEngine.hpp"
 #include "StrategyFactory.hpp"
 
-OrderManagement* StrategyEngine::oms = new OrderManagement();
 
 StrategyEngine::StrategyEngine()
 : marketData(nullptr)

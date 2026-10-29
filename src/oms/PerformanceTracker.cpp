@@ -109,8 +109,9 @@ PerformanceTracker::summary() const
     double grossProfit = 0, grossLoss = 0;
     for (double pnl : closedTradePnL)
     {
-        if (pnl > 0) { s.winningTrades++; grossProfit += pnl; }
-        else         { s.losingTrades++;  grossLoss -= pnl; }
+        if (pnl > 0)      { s.winningTrades++; grossProfit += pnl; }
+        else if (pnl < 0) { s.losingTrades++;  grossLoss -= pnl; }
+        // exactly break-even counts as neither a win nor a loss
     }
     s.closedTrades = static_cast<int>(closedTradePnL.size());
     s.winRatePercent = s.closedTrades ? 100.0 * s.winningTrades / s.closedTrades : 0.0;

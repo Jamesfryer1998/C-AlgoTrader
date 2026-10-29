@@ -98,7 +98,12 @@ Individual test executables are located in subdirectories:
 ./build/tests/backtest_tests/backtest_tests
 ./build/tests/util_tests/util_tests
 ./build/tests/alpaca_tests/alpaca_tests
+./build/tests/regression_tests/regression_tests
 ```
+
+`regression_tests` runs the whole backtest and the live decision path on a fixed price series and checks the
+results haven't changed. If you change behaviour on purpose (e.g. tune a strategy), it prints the new values
+on a `REGRESSION VALUES` line; copy them into `tests/regression_tests/Tests_Regression.cpp`.
 
 ### To Debug Crash
 ```sh
