@@ -8,6 +8,7 @@
 #include "../src/data_access/MarketData.hpp"
 #include "../src/strategy_engine/StrategyEngine.hpp"
 #include "../src/strategy_engine/StrategyFactory.hpp"
+#include "../src/util/DotEnv.hpp"
 
 /*
  * Live trading, all in one process:
@@ -19,9 +20,7 @@
  * Nothing runs on a timer: each new bar triggers one decision as soon as it arrives.
  * No Python, no CSV files and no desktop app needed.
  *
- * Before running, set your Alpaca keys:
- *   export APCA_API_KEY_ID=...
- *   export APCA_API_SECRET_KEY=...
+ * Alpaca keys are read from .env in the project root (copy .env.example to .env and fill it in).
  */
 
 static std::atomic<bool> running{true};
@@ -37,6 +36,7 @@ int main()
     std::signal(SIGTERM, onStopSignal);  // systemctl stop / kill
 
     Config config;
+    DotEnv::load(config.getProjectRoot() + "/.env"); // API keys, kept out of git
     json algoConfig = config.loadConfig();
     json alpacaConfig = algoConfig.value("alpaca", json::object());
     int warmupBars = alpacaConfig.value("warmup_bars", 100);

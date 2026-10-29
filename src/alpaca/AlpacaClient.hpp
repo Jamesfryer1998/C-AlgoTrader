@@ -12,9 +12,8 @@ using json = nlohmann::json;
  * Tiny HTTPS helper shared by AlpacaStream and AlpacaBroker.
  * It adds the Alpaca API key headers to every request and turns the reply into JSON.
  *
- * Keys are read from environment variables so they never end up in git:
- *   export APCA_API_KEY_ID=...
- *   export APCA_API_SECRET_KEY=...
+ * Keys are read from the environment variables APCA_API_KEY_ID and APCA_API_SECRET_KEY.
+ * main() loads these from the git-ignored .env file (see .env.example).
  */
 struct HttpResult
 {

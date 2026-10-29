@@ -28,11 +28,12 @@ The trading app now streams real-time 1-minute bars from Alpaca and sends orders
 No Python, CSV files or broker desktop app are needed.
 
 1. Create a free account at [alpaca.markets](https://alpaca.markets) and generate **paper trading** API keys.
-2. Put the keys in your shell (e.g. in `~/.zshrc`), never in the repo:
+2. Put the keys in a `.env` file in the project root (git ignores it, so they never get committed):
    ```sh
-   export APCA_API_KEY_ID=your_key_id
-   export APCA_API_SECRET_KEY=your_secret_key
+   cp .env.example .env
+   # then edit .env and paste in your key id and secret
    ```
+   A variable already exported in your shell takes priority over `.env`.
 3. Build and run from the project root:
    ```sh
    ./build_run.sh

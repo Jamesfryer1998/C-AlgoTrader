@@ -36,9 +36,10 @@ AlpacaBroker::connect()
 {
     if (!client.hasKeys())
     {
-        std::cerr << "ERROR - Alpaca keys missing. Set them in your shell first:\n"
-                  << "  export APCA_API_KEY_ID=your_key_id\n"
-                  << "  export APCA_API_SECRET_KEY=your_secret_key" << std::endl;
+        std::cerr << "ERROR - Alpaca keys missing. In the project root run:\n"
+                  << "  cp .env.example .env\n"
+                  << "then put your paper trading keys from alpaca.markets into .env\n"
+                  << "(run the app from the project root so it can find .env)" << std::endl;
         return 0;
     }
 
