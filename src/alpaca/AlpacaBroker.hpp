@@ -32,6 +32,7 @@ class AlpacaBroker : public BrokerBase
         Position getLatestPosition(std::string ticker) override;
 
         bool isDryRun() const { return dryRun; }
+        bool reportsRealPositions() const override { return !dryRun; }
 
         // The JSON body we POST to /v2/orders (public so it can be unit tested)
         static json buildOrderJson(const Order& order);

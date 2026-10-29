@@ -51,6 +51,20 @@ Settings live in the `"alpaca"` block of `src/config/config.json`:
 | `max_bars` | How many recent bars to keep in memory |
 
 Outside US market hours, set `"data_feed": "test"` to see bars flowing.
+
+#### Saved state and P&L
+While running, the app saves its state to `data/live/` (`data/live_dry_run/` for dry runs). The files are only written while running and only read once at start-up, so they never slow down a decision:
+
+| File | Contents |
+|---|---|
+| `trades.csv` | Every order sent, one line each (bar time, type, quantity, price, stop loss, take profit) |
+| `positions.csv` | Current positions, rewritten when they change |
+| `performance.json` | Latest P&L snapshot: realised / unrealised P&L, ROI, drawdown, Sharpe, win rate |
+
+On the next start the trades are replayed, so P&L and order numbering carry on. Each bar the app also checks
+its position with Alpaca; if Alpaca filled a stop loss or take profit by itself, the difference is recorded as a
+trade at that bar's close. Live P&L uses the bar close as the fill price, so it's a close estimate rather than
+Alpaca's exact fills. ROI is measured against `"starting_capital"` in the config.
 See [doc/realtime_data_and_brokers.md](doc/realtime_data_and_brokers.md) for why Alpaca, prices and speeds.
 
 On macOS the WebSocket library uses Apple's built-in TLS, so there is nothing extra to install.

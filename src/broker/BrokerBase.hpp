@@ -17,5 +17,9 @@ class BrokerBase
         virtual int placeOrder(Order order) = 0;
         virtual Position getLatestPosition(std::string ticker) = 0;
 
+        // False when the broker only pretends to trade (e.g. a dry run), so its positions
+        // can't be compared with the orders we sent
+        virtual bool reportsRealPositions() const { return true; }
+
         std::string brokerName;
 };
