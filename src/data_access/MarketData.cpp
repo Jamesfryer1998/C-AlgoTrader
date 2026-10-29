@@ -181,8 +181,11 @@ MarketData::addBar(const MarketCondition& bar, size_t maxBars)
 {
     data.push_back(bar);
 
-    // Drop the oldest bars so memory (and the copies strategies take) stay small
-    if (maxBars > 0 && data.size() > maxBars)
+    // Drop the oldest bars once we have twice as many as needed, back down to maxBars.
+    // Trimming in batches keeps this O(1) per bar on average (removing one bar from the front of a
+    // vector every time would shift the whole window on every bar). Strategies only ever look at
+    // the newest bars, so how many older ones are still held doesn't change any result.
+    if (maxBars > 0 && data.size() > 2 * maxBars)
         data.erase(data.begin(), data.begin() + (data.size() - maxBars));
 }
 

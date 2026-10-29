@@ -1,0 +1,38 @@
+{
+    "_comment": "Settings for optimise_app. Each strategy lists the values to try for each parameter; every combination is backtested. Strategy parameters not listed here keep the values from config.json.",
+
+    "starting_capital": 100000.0,
+    "commission_per_trade": 0.0,
+    "slippage_percent": 0.01,
+    "objective": "sharpe",
+    "min_closed_trades": 30,
+    "test_months": 12,
+    "top_n_to_test": 10,
+    "max_combinations": 0,
+
+    "strategies": {
+        "RSI": {
+            "period": [7, 14, 21, 30, 45],
+            "oversold_threshold": [20, 25, 30, 35],
+            "overbought_threshold": [65, 70, 75, 80],
+            "stop_loss": [1, 2, 5],
+            "take_profit": [1, 2, 5]
+        },
+        "MACD": {
+            "short_period": [6, 9, 12, 16],
+            "long_period": [20, 26, 35, 50],
+            "signal_period": [5, 9, 12],
+            "signal_type": ["crossover", "zero_cross"],
+            "stop_loss": [1, 2, 5],
+            "take_profit": [1, 2, 5]
+        },
+        "MEANREV": {
+            "lookback_period": [20, 30, 60, 120],
+            "moving_average_period": [20, 30, 60, 120],
+            "entry_threshold": [1.5, 2.0, 2.5, 3.0],
+            "exit_threshold": [0.0, 0.5, 1.0],
+            "stop_loss": [1, 2, 5],
+            "take_profit": [1, 2, 5]
+        }
+    }
+}

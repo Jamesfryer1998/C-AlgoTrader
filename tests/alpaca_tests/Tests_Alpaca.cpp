@@ -105,10 +105,15 @@ TEST(MarketDataLiveTests, AddBarKeepsOnlyNewestBars)
     for (int i = 0; i < 10; i++)
         marketData.addBar(MarketCondition("t" + std::to_string(i), "NVDA", i, i, 1, "1m"), 3);
 
-    auto data = marketData.getData();
-    ASSERT_EQ(data.size(), 3u);
-    EXPECT_EQ(data.front().DateTime, "t7");
-    EXPECT_EQ(data.back().DateTime, "t9");
+    // Trimmed in batches: never fewer than 3 bars, never more than 6, newest always kept
+    for (int i = 10; i < 100; i++) {
+        marketData.addBar(MarketCondition("t" + std::to_string(i), "NVDA", i, i, 1, "1m"), 3);
+        const auto& data = marketData.getData();
+        ASSERT_GE(data.size(), 3u);
+        ASSERT_LE(data.size(), 6u);
+        ASSERT_EQ(data.back().DateTime, "t" + std::to_string(i));
+        ASSERT_EQ(data[data.size() - 3].DateTime, "t" + std::to_string(i - 2));   // last 3 in order
+    }
 }
 
 TEST(AlpacaBrokerTests, ClientOrderIdIsSentWhenSet)

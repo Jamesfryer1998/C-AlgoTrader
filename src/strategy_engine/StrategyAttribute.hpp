@@ -56,6 +56,6 @@ class StrategyAttribute
         string name;
         string price_type = "close";
         double trade_size = 1.0;  // Default to 100% of capital
-        int stop_loss = 10; // Default to 10% stop loss
-        int take_profit = 5; // Default to 5% take profit
+        double stop_loss = 10;  // % below (long) / above (short) the entry price; default 10%
+        double take_profit = 5; // % above (long) / below (short) the entry price; default 5%
 };

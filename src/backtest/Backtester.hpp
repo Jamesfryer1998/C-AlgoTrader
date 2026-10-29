@@ -69,6 +69,12 @@ public:
 
     // Bars kept in memory for strategies (default 1000; strategies only look back a fixed amount)
     void setWindowBars(size_t bars) { windowBars = bars; }
+
+    // Keep a timestamped equity point per bar (only needed for --output files). Off saves memory.
+    void keepEquityCurve(bool keep) { keepCurve = keep; }
+
+    // P&L, Sharpe, drawdown etc. from the last run
+    PerformanceSummary getSummary() const { return tracker.summary(); }
     SimulatedBroker& getBroker() { return broker; }
     
     // Configuration methods
@@ -105,6 +111,7 @@ private:
     int numThreads;
     bool useDirectData;
     size_t windowBars = 1000;
+    bool keepCurve = true;
     
     // Performance tracking
     PerformanceMetrics metrics;

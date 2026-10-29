@@ -1,4 +1,5 @@
 #include "CSVParser.hpp"
+#include "../util/Log.hpp"
 
 #include <fstream>
 #include <filesystem>
@@ -35,7 +36,7 @@ CSVParser::Read(const std::string& filePath)
             data.push_back(recentLine);
         }
 
-        std::cout << data.size() << " lines read from file" << std::endl;
+        Log::out() << data.size() << " lines read from file" << std::endl;
     }
 
     csvFile.close();

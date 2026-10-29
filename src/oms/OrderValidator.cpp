@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdio>
 #include "OrderValidator.hpp"
+#include "../util/Log.hpp"
 
 void 
 OrderValidator::setParams(json configData)
@@ -14,7 +15,7 @@ OrderValidator::setParams(json configData)
         throw std::runtime_error("Error: Invalid config data - " + std::string(e.what()));
     }
 
-    std::cout << "  --> Params set: " 
+    Log::out() << "  --> Params set: " 
                 << "maxPositionSize=" << maxPositionSize << ", "
                 << "maxExposure=" << maxExposure << ", "
                 << "slippageTolerance=" << slippageTolerance << std::endl;

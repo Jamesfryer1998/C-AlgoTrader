@@ -1,4 +1,5 @@
 #include "BacktestMarketDataAdapter.hpp"
+#include "../util/Log.hpp"
 #include <stdexcept>
 #include <iostream>
 
@@ -104,7 +105,7 @@ BacktestMarketDataAdapter::next()
     }
     
     // Advance the index
-    std::cout << "DEBUG: Processing timepoint [" << currentCondition.DateTime 
+    Log::out() << "DEBUG: Processing timepoint [" << currentCondition.DateTime 
               << "] at index " << currentIndex << " (data size: " << marketData->getData().size() << ")" << std::endl;
     currentIndex++;
 }
@@ -112,7 +113,7 @@ BacktestMarketDataAdapter::next()
 void 
 BacktestMarketDataAdapter::rewind()
 {
-    std::cout << "Rewinding to the beginning of the data" << std::endl;
+    Log::out() << "Rewinding to the beginning of the data" << std::endl;
     currentIndex = 0;
     
     // If we have data, update the MarketData instance with the first point

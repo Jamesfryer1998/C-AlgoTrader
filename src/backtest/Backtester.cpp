@@ -1,5 +1,6 @@
 #include "Backtester.hpp"
 #include "../util/Log.hpp"
+#include "../util/MarketTime.hpp"
 #include <cmath>
 #include <numeric>
 #include <iomanip>
@@ -27,17 +28,10 @@ Backtester::Backtester(const json& algoConfig)
     broker.setSlippage(0.0005);
     broker.followLatestBar(true);   // the broker trades on the newest bar of the rolling window
 
-    // Default date range (last 7 days)
-    auto now = std::chrono::system_clock::now();
-    auto endTimeT = std::chrono::system_clock::to_time_t(now);
-    auto startTimeT = endTimeT - (7 * 24 * 60 * 60); // 7 days earlier
-    
-    std::stringstream ssEnd, ssStart;
-    ssEnd << std::put_time(std::localtime(&endTimeT), "%Y-%m-%d");
-    ssStart << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
-    
-    endDate = ssEnd.str();
-    startDate = ssStart.str();
+    // Default date range: the last 7 days (thread-safe; many Backtesters may be created at once)
+    std::time_t now = std::time(nullptr);
+    endDate = MarketTime::datePart(MarketTime::toNewYorkTime(now));
+    startDate = MarketTime::datePart(MarketTime::toNewYorkTime(now - 7 * 24 * 3600));
     
     Log::out() << "Default date range: " << startDate << " to " << endDate << std::endl;
 }
@@ -199,7 +193,8 @@ Backtester::executeTimeStep(const MarketCondition& bar)
     logPerformance();
 
     // 4. Book-keeping
-    equityCurve.push_back({bar.DateTime, broker.getCurrentEquity()});
+    if (keepCurve)
+        equityCurve.push_back({bar.DateTime, broker.getCurrentEquity()});
     recordNewFills();
     tracker.markPrice(bar.Ticker, bar.Close);
     tracker.recordEquity();

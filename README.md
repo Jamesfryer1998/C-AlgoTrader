@@ -102,6 +102,40 @@ On Linux install OpenSSL headers first (`sudo apt install libssl-dev`).
 By default history comes from Alpaca's `sip` feed (all US exchanges, free for data older than 15 minutes).
 Set `"history_feed": "iex"` in the `"alpaca"` config block to match the free live stream instead.
 
+### Optimising strategy settings
+`optimise_app` backtests every combination of strategy settings listed in `src/config/optimisation.json`
+over years of 1-minute data, in parallel, and ranks them.
+
+```sh
+# 1. Download the history once (about 10 years of NVDA, ~60 MB; re-running only fetches what's new)
+./build/app/optimise_app --download --strategy RSI --max-combinations 1
+
+# 2. Optimise all three strategies (RSI, MACD, MEANREV)
+./build/app/optimise_app
+
+# Or just one, or a quicker random sample of settings
+./build/app/optimise_app --strategy MACD --max-combinations 200
+```
+
+How it avoids fooling itself:
+- The last `test_months` (default 12) are **held back**. Every setting is ranked on the older data only;
+  the top 10 are then run on the held-back year as a check. Settings are never chosen using the test year.
+- If the best training setting has a negative Sharpe on the test year, it says so: that usually means it
+  fitted noise in the past rather than finding a real edge.
+- Costs match Alpaca: $0 commission plus 0.01% slippage against you on every fill (`optimisation.json`).
+- Settings need at least `min_closed_trades` (default 30) on the training data to be ranked.
+
+Output (in `data/optimisation/`):
+- `<STRATEGY>_<time>.csv` - every setting tried with training and test results, plus your current
+  `config.json` settings as `current_config` for comparison
+- `best_<time>.json` - the best training setting per strategy, ready to copy into `config.json`
+
+Edit the value lists in `src/config/optimisation.json` to search different ranges (no rebuild needed).
+`"objective"` can be `sharpe` (default), `total_return` or `return_over_drawdown`.
+
+Returns look tiny (fractions of a percent) because every order is 1 share against $100k of capital;
+compare settings by Sharpe ratio, which doesn't depend on trade size.
+
 ### Running Tests
 ```sh
 # From the build directory

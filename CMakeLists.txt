@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.14)
 project(algo_trader)
 set(CMAKE_CXX_STANDARD 23)
 
+# Optimised build that still has debug symbols (lldb works), unless you ask for something else,
+# e.g. cmake -B build -DCMAKE_BUILD_TYPE=Debug. Backtests run several times faster than unoptimised.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+endif()
+
 # Install gtest which now lives on head.
 cmake_policy(SET CMP0135 NEW)
 include(FetchContent)
@@ -20,6 +26,11 @@ FetchContent_Declare(
 
 # Make json available
 FetchContent_MakeAvailable(json)
+
+# Treat the json library's headers as system headers so our -Werror flags don't fail on warnings
+# inside third-party code (GCC reports false "maybe-uninitialized" ones in optimised builds)
+get_target_property(JSON_INCLUDES nlohmann_json INTERFACE_INCLUDE_DIRECTORIES)
+set_target_properties(nlohmann_json PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${JSON_INCLUDES}")
 
 # IXWebSocket: small C++ WebSocket + HTTP client, used to talk to Alpaca.
 # TLS: macOS uses Apple's built-in TLS (nothing to install). Linux uses OpenSSL (libssl-dev).
