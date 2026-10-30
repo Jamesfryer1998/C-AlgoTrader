@@ -20,7 +20,7 @@ class RSI : public StrategyBase {
 
         void execute() override
         {
-            std::vector<float> closes = recentCloses(_strategyAttribute.period);
+            std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
                 return;   // not enough bars yet
 
@@ -76,6 +76,8 @@ class RSI : public StrategyBase {
             float value = 100.0f - (100.0f / (1.0f + rs));
             return std::round(value * 100) / 100;
         }
+
+        int barsNeeded() const override { return _strategyAttribute.period; }
 
         // e.g. "RSI(21)   L: 35.00 | C: 48.21 | U: 80.00   BUY below L, SELL above U"
         std::string status() const override

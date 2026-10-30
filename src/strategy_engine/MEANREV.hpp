@@ -24,10 +24,14 @@ class MEANREV : public StrategyBase {
     public:
         MEANREV(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
+        int barsNeeded() const override
+        {
+            return std::max(_strategyAttribute.lookback_period, _strategyAttribute.moving_average_period);
+        }
+
         void execute() override
         {
-            int needed = std::max(_strategyAttribute.lookback_period, _strategyAttribute.moving_average_period);
-            std::vector<float> closes = recentCloses(needed);
+            std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
                 return;   // not enough bars yet
 

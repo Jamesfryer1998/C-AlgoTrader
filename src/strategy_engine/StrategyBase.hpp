@@ -27,6 +27,9 @@ class StrategyBase
         // e.g. "MEANREV  L: 205.10 | C: 206.52 | U: 209.80 ...". Empty until it has enough bars.
         virtual std::string status() const { return ""; }
 
+        // How many 1-minute bars the strategy needs before it can make a decision
+        virtual int barsNeeded() const = 0;
+
         virtual bool onNewOrder()
         {
             return (NewOrder == true);

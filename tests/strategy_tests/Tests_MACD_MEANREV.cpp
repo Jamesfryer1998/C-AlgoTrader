@@ -211,3 +211,12 @@ TEST(StrategyStatusTests, MacdShowsGapToSignalLine)
     run(zero, closes);
     EXPECT_NE(zero.status().find("| zero line   above: SELL if it crosses below 0"), std::string::npos) << zero.status();
 }
+
+TEST(StrategyStatusTests, BarsNeededMatchesTheSettings)
+{
+    EXPECT_EQ(MEANREV(meanrevAttributes()).barsNeeded(), 10);
+    EXPECT_EQ(MACD(macdAttributes()).barsNeeded(), 5 * (6 + 3));
+    StrategyAttribute longLookback(json{{"name", "MEANREV"}, {"lookback_period", 120}, {"moving_average_period", 20},
+                                        {"entry_threshold", 2.0}, {"exit_threshold", 0.0}});
+    EXPECT_EQ(MEANREV(longLookback).barsNeeded(), 120);
+}

@@ -21,6 +21,9 @@ class StrategyEngine
         // Set up the strategy engine
         void setUp(json configData, StrategyFactory &stratFactory, MarketData &marketdata, BrokerBase* broker);
 
+        // The most bars any active strategy needs before it can decide (size the warm-up with this)
+        int barsNeeded() const;
+
         // Get the order management system
         OrderManagement* getOms() { return oms.get(); }
 

@@ -27,10 +27,12 @@ class MACD : public StrategyBase {
 
         struct Values { double macd = 0, signal = 0, previousMacd = 0, previousSignal = 0; };
 
+        // A long window so the moving averages have settled
+        int barsNeeded() const override { return 5 * (_strategyAttribute.long_period + _strategyAttribute.signal_period); }
+
         void execute() override
         {
-            int window = 5 * (_strategyAttribute.long_period + _strategyAttribute.signal_period);
-            std::vector<float> closes = recentCloses(window);
+            std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
                 return;   // not enough bars yet
 

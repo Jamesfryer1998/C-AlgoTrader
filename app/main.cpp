@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <csignal>
@@ -121,16 +122,21 @@ int main()
     if (!broker.connect())
         return 1;
 
-    // 2. Market data: preload recent bars so strategies (e.g. RSI period 30) can decide from the first live bar
+    // 2. Strategies + OMS
     AlpacaStream stream(algoConfig);
     MarketData marketData;
-    std::vector<MarketCondition> history = stream.fetchRecentBars(warmupBars);
-    marketData.update(history);
-
-    // 3. Strategies + OMS
     StrategyFactory stratFactory(algoConfig);
     StrategyEngine stratEngine;
     stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
+
+    // 3. Market data: preload enough recent bars for every strategy to decide from the first live bar
+    //    (e.g. MEANREV lookback 120 needs 120 bars), and keep at least that many in memory
+    int needed = stratEngine.barsNeeded();
+    warmupBars = std::max(warmupBars, needed);
+    maxBars = std::max(maxBars, static_cast<size_t>(needed) + 50);
+    std::vector<MarketCondition> history = stream.fetchRecentBars(warmupBars);
+    marketData.update(history);
+    std::cout << "Loaded " << history.size() << " recent bars (strategies need " << needed << ")" << std::endl;
 
     // 4. Saved state: reload trades/positions from the last run, then check against what Alpaca holds
     std::string stateDir = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/")

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "StrategyEngine.hpp"
 #include "StrategyFactory.hpp"
 #include "../util/Log.hpp"
@@ -68,8 +69,10 @@ StrategyEngine::executeStrategies()
         if (Log::verbose)
         {
             std::string line = strat->status();
-            if (!line.empty())
-                Log::out() << line << std::endl;
+            if (line.empty())
+                line = strat->_strategyAttribute.name + "   warming up: " + std::to_string(marketData->getData().size())
+                     + " of " + std::to_string(strat->barsNeeded()) + " bars needed";
+            Log::out() << line << std::endl;
         }
 
         if(strat->onNewOrder())
@@ -127,4 +130,13 @@ StrategyEngine::printStategies()
     {
         Log::out() << "  -> "  << strat->_strategyAttribute.name << std::endl;
     }
+}
+
+int
+StrategyEngine::barsNeeded() const
+{
+    int most = 0;
+    for (const auto& strat : strategyList)
+        most = std::max(most, strat->barsNeeded());
+    return most;
 }
