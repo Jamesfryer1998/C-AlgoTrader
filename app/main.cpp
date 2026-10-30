@@ -68,12 +68,12 @@ static json printAlpaca(AlpacaBroker& broker, const std::string& ticker)
     AlpacaBroker::AccountSnapshot account = broker.getAccount();
     const json& position = broker.lastPositionDetails();
     json snapshot = json::object();
-    std::cout << std::fixed << std::setprecision(2) << "P&L: ";
+    std::cout << std::fixed << std::setprecision(2);
 
     if (account.ok)
     {
         double today = account.equity - account.lastEquity;
-        std::cout << "equity $" << account.equity << " | today " << money(today);
+        std::cout << "equity $" << account.equity;
         snapshot["equity"] = account.equity;
         snapshot["today_pnl"] = std::round(today * 100) / 100;
         snapshot["cash"] = account.cash;
