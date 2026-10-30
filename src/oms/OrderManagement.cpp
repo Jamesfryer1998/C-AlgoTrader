@@ -111,13 +111,15 @@ void OrderManagement::onNewOrder(Order& order)
 void OrderManagement::syncPosition(const string& ticker)
 {
     Position latest = broker->getLatestPosition(ticker);
+    if (!broker->lastPositionReliable)
+        return;   // the broker couldn't be asked; keep what we have and try again next bar
 
     std::erase_if(positions, [&ticker](Position& position) { return position.getTicker() == ticker; });
 
     if (latest.getQuantity() != 0)
         addPosition(latest);
 
-    reconcileWithBroker(ticker, latest.getQuantity());
+    reconcileWithBroker(ticker, latest);
 
     if (store)
         store->savePositions(positions);
@@ -185,8 +187,9 @@ void OrderManagement::saveTrade(const TradeRecord& trade)
 // Alpaca fills stop losses and take profits on its own servers, so our book can fall behind.
 // If the broker holds a different amount than we think, record the difference as a trade at the
 // latest price so P&L and the saved history stay in step with reality.
-void OrderManagement::reconcileWithBroker(const string& ticker, float brokerQuantity)
+void OrderManagement::reconcileWithBroker(const string& ticker, const Position& brokerPosition)
 {
+    float brokerQuantity = brokerPosition.getQuantity();
     if (!tracker || !broker->reportsRealPositions() || !marketData || marketData->getData().empty())
         return;
 
@@ -195,7 +198,11 @@ void OrderManagement::reconcileWithBroker(const string& ticker, float brokerQuan
     if (std::fabs(difference) < 1e-6)
         return;
 
-    float price = marketData->getLastClosePrice();
+    // If we're taking over a whole position we never traded ourselves (e.g. bought before records
+    // were kept), use the broker's real average cost so our P&L matches the broker's. Otherwise the
+    // difference was filled just now (e.g. a stop loss), so the latest close is the best estimate.
+    bool adoptingWholePosition = std::fabs(ours) < 1e-6 && brokerPosition.getAvgPrice() > 0;
+    float price = adoptingWholePosition ? brokerPosition.getAvgPrice() : marketData->getLastClosePrice();
     Order adjustment(difference > 0 ? OrderType::BUY : OrderType::SELL, ticker, std::fabs(difference), price);
     adjustment.setStrategy("broker");
 

@@ -164,6 +164,9 @@ AlpacaBroker::placeOrder(Order order)
 Position
 AlpacaBroker::getLatestPosition(std::string ticker)
 {
+    lastPositionReliable = true;
+    lastPosition = json::object();
+
     if (dryRun)
         return Position(ticker, 0, 0);
 
@@ -175,8 +178,10 @@ AlpacaBroker::getLatestPosition(std::string ticker)
     if (!result.ok())
     {
         std::cerr << "WARNING - Could not get position for " << ticker << ": " << result.error << std::endl;
+        lastPositionReliable = false;   // don't mistake a failed request for "we hold nothing"
         return Position(ticker, 0, 0);
     }
+    lastPosition = result.body;
 
     // Alpaca sends numbers as text, e.g. {"qty":"5","avg_entry_price":"181.20","side":"long"}
     float quantity = std::fabs(std::stof(result.body.value("qty", "0")));
@@ -185,4 +190,29 @@ AlpacaBroker::getLatestPosition(std::string ticker)
 
     float avgPrice = std::stof(result.body.value("avg_entry_price", "0"));
     return Position(ticker, quantity, avgPrice);
+}
+
+static double numberField(const json& body, const char* key)
+{
+    // Alpaca sends numbers as text, e.g. "100123.45"
+    try { return body.contains(key) && body[key].is_string() ? std::stod(body[key].get<std::string>()) : 0.0; }
+    catch (const std::exception&) { return 0.0; }
+}
+
+AlpacaBroker::AccountSnapshot
+AlpacaBroker::getAccount()
+{
+    AccountSnapshot snapshot;
+    if (dryRun)
+        return snapshot;
+
+    HttpResult result = client.get(tradingUrl + "/v2/account");
+    if (!result.ok())
+        return snapshot;
+
+    snapshot.ok = true;
+    snapshot.equity = numberField(result.body, "equity");
+    snapshot.lastEquity = numberField(result.body, "last_equity");
+    snapshot.cash = numberField(result.body, "cash");
+    return snapshot;
 }

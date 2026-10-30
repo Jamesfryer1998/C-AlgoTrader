@@ -1,8 +1,10 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <thread>
 #include "../src/alpaca/AlpacaBroker.hpp"
 #include "../src/alpaca/AlpacaStream.hpp"
@@ -29,12 +31,70 @@
  * and reloaded on the next start, so a restart carries on where it left off.
  */
 
+// Our own running estimate (fills assumed at bar closes)
 static void printPerformance(const PerformanceSummary& s)
 {
     std::cout << std::fixed << std::setprecision(2)
-              << "P&L: realised $" << s.realisedPnL << " | unrealised $" << s.unrealisedPnL
+              << "Estimated P&L (our records): realised $" << s.realisedPnL << " | unrealised $" << s.unrealisedPnL
               << " | total $" << s.totalPnL << " (" << s.roiPercent << "%)"
               << " | trades " << s.fills << std::endl;
+}
+
+// e.g. +$12.30 / -$50.67
+static std::string money(double value)
+{
+    std::ostringstream out;
+    out << (value < 0 ? "-$" : "+$") << std::fixed << std::setprecision(2) << std::fabs(value);
+    return out.str();
+}
+
+static double field(const json& j, const char* key)
+{
+    try { return j.contains(key) && j[key].is_string() ? std::stod(j[key].get<std::string>()) : 0.0; }
+    catch (const std::exception&) { return 0.0; }
+}
+
+// Alpaca's real numbers (real fills, Alpaca's latest price). Returns them for saving.
+static json printAlpaca(AlpacaBroker& broker, const std::string& ticker)
+{
+    AlpacaBroker::AccountSnapshot account = broker.getAccount();
+    const json& position = broker.lastPositionDetails();
+    json snapshot = json::object();
+    std::cout << std::fixed << std::setprecision(2) << "Alpaca: ";
+
+    if (account.ok)
+    {
+        double today = account.equity - account.lastEquity;
+        std::cout << "equity $" << account.equity << " (today " << money(today) << ")";
+        snapshot["equity"] = account.equity;
+        snapshot["today_pnl"] = std::round(today * 100) / 100;
+        snapshot["cash"] = account.cash;
+    }
+    else
+    {
+        std::cout << "account unavailable";
+    }
+
+    if (!position.empty())
+    {
+        double unrealised = field(position, "unrealized_pl");
+        std::cout << " | " << ticker << " " << position.value("qty", "0") << " @ $" << field(position, "avg_entry_price")
+                  << ", now $" << field(position, "current_price")
+                  << " | unrealised " << money(unrealised)
+                  << " (" << field(position, "unrealized_plpc") * 100.0 << "%)";
+        snapshot["position"] = {{"ticker", ticker}, {"qty", field(position, "qty")},
+                                {"avg_entry_price", field(position, "avg_entry_price")},
+                                {"current_price", field(position, "current_price")},
+                                {"market_value", field(position, "market_value")},
+                                {"unrealized_pl", unrealised},
+                                {"unrealized_intraday_pl", field(position, "unrealized_intraday_pl")}};
+    }
+    else
+    {
+        std::cout << " | no " << ticker << " position";
+    }
+    std::cout << std::endl;
+    return snapshot;
 }
 
 static std::atomic<bool> running{true};
@@ -99,8 +159,13 @@ int main()
         tracker.markPrice(bar.Ticker, bar.Close);
         tracker.recordEquity();
         PerformanceSummary summary = tracker.summary();
-        store.savePerformance(PerformanceTracker::toJson(summary));
         printPerformance(summary);
+
+        // Alpaca's real figures (skipped in dry runs, where Alpaca isn't holding our trades)
+        json performance = {{"estimate", PerformanceTracker::toJson(summary)}};
+        if (!broker.isDryRun())
+            performance["alpaca"] = printAlpaca(broker, bar.Ticker);
+        store.savePerformance(performance);
     });
 
     // 6. Bars arrive on the stream's own thread; this thread just waits for Ctrl+C

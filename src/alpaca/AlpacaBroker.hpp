@@ -32,6 +32,22 @@ class AlpacaBroker : public BrokerBase
         Position getLatestPosition(std::string ticker) override;
 
         bool isDryRun() const { return dryRun; }
+
+        // Alpaca's own figures, for display. These come from Alpaca's real fills and latest prices,
+        // so they are the true numbers (our PerformanceTracker is an estimate from bar closes).
+        struct AccountSnapshot
+        {
+            bool ok = false;
+            double equity = 0;          // cash + market value of everything held
+            double lastEquity = 0;      // equity at the previous close
+            double cash = 0;
+        };
+        AccountSnapshot getAccount();
+
+        // Alpaca's position details from the last getLatestPosition() call
+        // (qty, avg_entry_price, current_price, market_value, unrealized_pl, unrealized_plpc, ...);
+        // empty object when flat
+        const json& lastPositionDetails() const { return lastPosition; }
         bool reportsRealPositions() const override { return !dryRun; }
 
         // The JSON body we POST to /v2/orders (public so it can be unit tested)
@@ -43,4 +59,5 @@ class AlpacaBroker : public BrokerBase
         std::string dataUrl;
         std::string feed;
         bool dryRun;
+        json lastPosition = json::object();
 };

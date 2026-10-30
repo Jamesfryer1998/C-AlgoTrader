@@ -258,3 +258,64 @@ TEST_F(TradeStoreTests, BrokerSideExitIsRecordedAsAnAdjustment)
     EXPECT_EQ(trades[1].ourId, 2);
     EXPECT_TRUE(oms.getPositions().empty());
 }
+
+TEST_F(TradeStoreTests, AdoptingAPositionUsesTheBrokersAverageCost)
+{
+    // Broker already holds 11 shares bought at $100 (FakeBroker's average) before we kept records;
+    // the latest bar closed at $110. Our book should take them on at $100, not $110.
+    MarketData data = barsAt(110);
+    FakeBroker broker;
+    broker.heldQuantity = 11;
+    TradeStore store(dir);
+    PerformanceTracker tracker(10000);
+    OrderManagement oms;
+    oms.setUp(omsConfig(20), &broker);
+    oms.setMarketData(data);
+    oms.enablePersistence(&store, &tracker);
+
+    oms.syncPosition("NVDA");
+    store.flush();
+
+    tracker.markPrice("NVDA", 110);
+    EXPECT_DOUBLE_EQ(tracker.getPositionQuantity("NVDA"), 11);
+    EXPECT_NEAR(tracker.summary().unrealisedPnL, 110.0, 1e-6);   // 11 x (110 - 100), same as the broker
+    std::vector<TradeRecord> trades = store.loadTrades();
+    ASSERT_EQ(trades.size(), 1u);
+    EXPECT_EQ(trades[0].status, "adjustment");
+    EXPECT_NEAR(trades[0].price, 100.0, 1e-6);
+}
+
+TEST_F(TradeStoreTests, FailedPositionRequestIsNotMistakenForFlat)
+{
+    MarketData data = barsAt(100);
+    FakeBroker broker;
+    TradeStore store(dir);
+    PerformanceTracker tracker(10000);
+    OrderManagement oms;
+    oms.setUp(omsConfig(), &broker);
+    oms.setMarketData(data);
+    oms.enablePersistence(&store, &tracker);
+
+    Order o = order(OrderType::BUY, 2, 100);
+    oms.onNewOrder(o);
+    store.flush();
+    size_t tradesBefore = store.loadTrades().size();
+
+    // A network blip: the broker answers "0" but flags it as unreliable
+    class FailingBroker : public FakeBroker
+    {
+        public:
+            Position getLatestPosition(std::string ticker) override
+            {
+                lastPositionReliable = false;
+                return Position(ticker, 0, 0);
+            }
+    } failing;
+    oms.setUp(omsConfig(), &failing);
+    oms.syncPosition("NVDA");
+    store.flush();
+
+    EXPECT_DOUBLE_EQ(tracker.getPositionQuantity("NVDA"), 2);   // unchanged
+    EXPECT_EQ(store.loadTrades().size(), tradesBefore);           // no fake "sell" recorded
+    ASSERT_EQ(oms.getPositions().size(), 1u);
+}

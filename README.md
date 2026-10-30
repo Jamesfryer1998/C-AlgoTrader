@@ -59,7 +59,7 @@ While running, the app saves its state to `data/live/` (`data/live_dry_run/` for
 |---|---|
 | `trades.csv` | Every order the strategies produced, one line each, whatever happened to it (see below) |
 | `positions.csv` | Current positions, rewritten when they change |
-| `performance.json` | Latest P&L snapshot: realised / unrealised P&L, ROI, drawdown, Sharpe, win rate |
+| `performance.json` | Latest snapshot: `alpaca` = Alpaca's real equity, today's P&L and position (unrealised P&L from real fills and Alpaca's latest price); `estimate` = our own book (realised / unrealised P&L, ROI, drawdown, Sharpe, win rate) |
 
 `trades.csv` columns:
 
@@ -83,8 +83,9 @@ Lines are written by a background thread after the order has gone out, so saving
 
 On the next start the trades are replayed, so P&L and order numbering carry on. Each bar the app also checks
 its position with Alpaca; if Alpaca filled a stop loss or take profit by itself, the difference is recorded as a
-trade at that bar's close. Live P&L uses the bar close as the fill price, so it's a close estimate rather than
-Alpaca's exact fills. ROI is measured against `"starting_capital"` in the config.
+trade at that bar's close. After every bar the app prints two lines: `Alpaca:` with Alpaca's real equity, today's P&L and
+unrealised P&L (trust this one), and `Estimated P&L (our records)`, our own book, which assumes fills at
+bar closes. The estimate is what feeds drawdown / Sharpe / win rate, so small differences are expected. ROI is measured against `"starting_capital"` in the config.
 See [doc/realtime_data_and_brokers.md](doc/realtime_data_and_brokers.md) for why Alpaca, prices and speeds.
 
 On macOS the WebSocket library uses Apple's built-in TLS, so there is nothing extra to install.

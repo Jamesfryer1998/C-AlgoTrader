@@ -33,5 +33,9 @@ class BrokerBase
         };
         OrderReceipt lastReceipt;
 
+        // false if the last getLatestPosition() call failed (e.g. a network blip), so its answer
+        // must not be trusted as "we hold nothing"
+        bool lastPositionReliable = true;
+
         std::string brokerName;
 };

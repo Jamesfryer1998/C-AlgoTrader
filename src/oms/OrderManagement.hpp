@@ -50,7 +50,7 @@ class OrderManagement
     private:
         TradeRecord makeRecord(const Order& order, int ourId) const;
         void saveTrade(const TradeRecord& trade);
-        void reconcileWithBroker(const string& ticker, float brokerQuantity);
+        void reconcileWithBroker(const string& ticker, const Position& brokerPosition);
 
         TradeStore* store = nullptr;
         PerformanceTracker* tracker = nullptr;
