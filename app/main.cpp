@@ -32,6 +32,13 @@
  * and reloaded on the next start, so a restart carries on where it left off.
  */
 
+// The start of each bar's summary line, e.g. "[2026-10-30 12:24:00 New York] NVDA 204.67 vol 12969"
+static void printBar(const MarketCondition& bar)
+{
+    std::cout << "[" << bar.DateTime << " New York] " << bar.Ticker << " " << std::fixed << std::setprecision(2)
+              << bar.Close << " vol " << bar.Volume << " | ";
+}
+
 // Dry runs only: Alpaca isn't holding the printed orders, so show our own estimate (fills at bar closes)
 static void printEstimate(const PerformanceSummary& s)
 {
@@ -79,8 +86,7 @@ static json printAlpaca(AlpacaBroker& broker, const std::string& ticker)
     if (!position.empty())
     {
         double unrealised = field(position, "unrealized_pl");
-        std::cout << " | " << ticker << " " << position.value("qty", "0") << " @ $" << field(position, "avg_entry_price")
-                  << ", now $" << field(position, "current_price")
+        std::cout << " | holding " << position.value("qty", "0") << " @ $" << field(position, "avg_entry_price")
                   << " | unrealised " << money(unrealised)
                   << " (" << field(position, "unrealized_plpc") * 100.0 << "%)";
         snapshot["position"] = {{"ticker", ticker}, {"qty", field(position, "qty")},
@@ -92,7 +98,7 @@ static json printAlpaca(AlpacaBroker& broker, const std::string& ticker)
     }
     else
     {
-        std::cout << " | no " << ticker << " position";
+        std::cout << " | no position";
     }
     std::cout << std::endl;
     return snapshot;
@@ -146,6 +152,7 @@ int main()
     // 5. On every new bar: store it, run the strategies (which may send an order), report the timing
     stream.start([&](const MarketCondition& bar)
     {
+        std::cout << "\n";   // blank line between bars
         auto started = std::chrono::steady_clock::now();
 
         marketData.addBar(bar, maxBars);
@@ -161,8 +168,10 @@ int main()
         tracker.recordEquity();
         PerformanceSummary summary = tracker.summary();
 
-        // Shown: Alpaca's real P&L (our estimate in dry runs). Saved: both, in performance.json
+        // One line per bar: the bar, then Alpaca's real P&L (our estimate in dry runs).
+        // Saved: both, in performance.json
         json performance = {{"estimate", PerformanceTracker::toJson(summary)}};
+        printBar(bar);
         if (broker.isDryRun())
             printEstimate(summary);
         else

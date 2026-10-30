@@ -49,7 +49,6 @@ class AlpacaStream
     private:
         void onMessage(const ix::WebSocketMessagePtr& msg);
         void handleAlpacaMessage(const json& message);
-        static double secondsSinceBarClose(const std::string& barStartUtc);
 
         std::string feed;
         std::string symbol;

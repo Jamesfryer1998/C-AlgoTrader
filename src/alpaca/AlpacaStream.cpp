@@ -131,13 +131,7 @@ AlpacaStream::handleAlpacaMessage(const json& message)
 
     if (type == "b") // A new 1-minute bar
     {
-        MarketCondition bar = parseBar(message, symbol);
-        std::cout << "\n[" << bar.DateTime << " New York] " << bar.Ticker
-                  << " close " << std::fixed << std::setprecision(2) << bar.Close
-                  << " vol " << bar.Volume
-                  << " | arrived " << std::setprecision(2)
-                  << secondsSinceBarClose(message.value("t", "")) << "s after the minute closed"
-                  << std::endl;
+        MarketCondition bar = parseBar(message, symbol);   // printed by the app with the P&L
 
         if (barCallback)
             barCallback(bar);
@@ -182,16 +176,4 @@ AlpacaStream::parseBar(const json& bar, const std::string& symbol)
         bar.value("c", 0.0f),
         bar.value("v", 0),
         "1m");
-}
-
-double
-AlpacaStream::secondsSinceBarClose(const std::string& barStartUtc)
-{
-    std::time_t barStart = MarketTime::parseUtc(barStartUtc);
-    if (barStart < 0)
-        return 0.0;
-
-    auto barClose = std::chrono::system_clock::from_time_t(barStart) + std::chrono::minutes(1);
-    auto delay = std::chrono::system_clock::now() - barClose;
-    return std::chrono::duration<double>(delay).count();
 }
