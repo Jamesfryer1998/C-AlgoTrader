@@ -31,11 +31,11 @@
  * and reloaded on the next start, so a restart carries on where it left off.
  */
 
-// Our own running estimate (fills assumed at bar closes)
-static void printPerformance(const PerformanceSummary& s)
+// Dry runs only: Alpaca isn't holding the printed orders, so show our own estimate (fills at bar closes)
+static void printEstimate(const PerformanceSummary& s)
 {
     std::cout << std::fixed << std::setprecision(2)
-              << "Estimated P&L (our records): realised $" << s.realisedPnL << " | unrealised $" << s.unrealisedPnL
+              << "P&L (dry run estimate): realised $" << s.realisedPnL << " | unrealised $" << s.unrealisedPnL
               << " | total $" << s.totalPnL << " (" << s.roiPercent << "%)"
               << " | trades " << s.fills << std::endl;
 }
@@ -54,18 +54,18 @@ static double field(const json& j, const char* key)
     catch (const std::exception&) { return 0.0; }
 }
 
-// Alpaca's real numbers (real fills, Alpaca's latest price). Returns them for saving.
+// P&L straight from Alpaca (real fills, Alpaca's latest price). Returns it for saving.
 static json printAlpaca(AlpacaBroker& broker, const std::string& ticker)
 {
     AlpacaBroker::AccountSnapshot account = broker.getAccount();
     const json& position = broker.lastPositionDetails();
     json snapshot = json::object();
-    std::cout << std::fixed << std::setprecision(2) << "Alpaca: ";
+    std::cout << std::fixed << std::setprecision(2) << "P&L: ";
 
     if (account.ok)
     {
         double today = account.equity - account.lastEquity;
-        std::cout << "equity $" << account.equity << " (today " << money(today) << ")";
+        std::cout << "equity $" << account.equity << " | today " << money(today);
         snapshot["equity"] = account.equity;
         snapshot["today_pnl"] = std::round(today * 100) / 100;
         snapshot["cash"] = account.cash;
@@ -154,16 +154,17 @@ int main()
         std::cout << "Decision took " << std::chrono::duration<double, std::milli>(took).count() << "ms" << std::endl;
 
         // After the decision (not timed): catch up with fills Alpaca made itself (stop loss / take profit),
-        // mark P&L at this bar's close and save a snapshot
+        // update our records and show P&L
         oms->syncPosition(bar.Ticker);
         tracker.markPrice(bar.Ticker, bar.Close);
         tracker.recordEquity();
         PerformanceSummary summary = tracker.summary();
-        printPerformance(summary);
 
-        // Alpaca's real figures (skipped in dry runs, where Alpaca isn't holding our trades)
+        // Shown: Alpaca's real P&L (our estimate in dry runs). Saved: both, in performance.json
         json performance = {{"estimate", PerformanceTracker::toJson(summary)}};
-        if (!broker.isDryRun())
+        if (broker.isDryRun())
+            printEstimate(summary);
+        else
             performance["alpaca"] = printAlpaca(broker, bar.Ticker);
         store.savePerformance(performance);
     });
@@ -174,7 +175,13 @@ int main()
 
     std::cout << "\nStopping..." << std::endl;
     stream.stop();
-    printPerformance(tracker.summary());
+    if (broker.isDryRun())
+        printEstimate(tracker.summary());
+    else
+    {
+        broker.getLatestPosition(stream.getSymbol());   // refresh Alpaca's position for the final line
+        printAlpaca(broker, stream.getSymbol());
+    }
     std::cout << "State saved in " << stateDir << std::endl;
     return 0;
 }
