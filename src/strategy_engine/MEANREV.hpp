@@ -4,6 +4,7 @@
 #include "../util/Log.hpp"
 #include <cmath>
 #include <iomanip>
+#include <sstream>
 
 /**
  * MEANREV - mean reversion
@@ -30,7 +31,11 @@ class MEANREV : public StrategyBase {
             if (closes.empty())
                 return;   // not enough bars yet
 
-            double z = zScore(closes, _strategyAttribute.moving_average_period, _strategyAttribute.lookback_period);
+            double z = zScore(closes, _strategyAttribute.moving_average_period, _strategyAttribute.lookback_period,
+                              &lastMean, &lastSd);
+            lastClose = closes.back();
+            lastZ = z;
+            ready = true;
             double entry = _strategyAttribute.entry_threshold;
             double exit = _strategyAttribute.exit_threshold;
 
@@ -46,7 +51,8 @@ class MEANREV : public StrategyBase {
         }
 
         // z-score of the newest close. closes must hold at least max(maPeriod, sdPeriod) values.
-        static double zScore(const std::vector<float>& closes, int maPeriod, int sdPeriod)
+        static double zScore(const std::vector<float>& closes, int maPeriod, int sdPeriod,
+                             double* meanOut = nullptr, double* sdOut = nullptr)
         {
             size_t n = closes.size();
             double mean = 0;
@@ -62,6 +68,8 @@ class MEANREV : public StrategyBase {
             for (size_t i = n - sdPeriod; i < n; i++)
                 variance += (closes[i] - sdMean) * (closes[i] - sdMean);
             double sd = std::sqrt(variance / sdPeriod);
+            if (meanOut) *meanOut = mean;
+            if (sdOut) *sdOut = sd;
 
             return sd > 0 ? (closes.back() - mean) / sd : 0.0;
         }
@@ -80,6 +88,33 @@ class MEANREV : public StrategyBase {
 
         int getState() const { return state; }
 
+        // Price levels that would trigger the next trade:
+        //   flat:  "MEANREV(20/120)   L: 205.10 | C: 206.52 | U: 209.80   (z -0.42, BUY below L, SELL above U)"
+        //   long:  "MEANREV(20/120)   long, C: 204.00 | exit at >= 207.45   (z -1.80)"
+        //   short: "MEANREV(20/120)   short, C: 211.00 | exit at <= 207.45   (z +2.10)"
+        std::string status() const override
+        {
+            if (!ready)
+                return "";
+            double entry = _strategyAttribute.entry_threshold;
+            double exit = _strategyAttribute.exit_threshold;
+            std::ostringstream out;
+            out << std::fixed << std::setprecision(2) << "MEANREV(" << _strategyAttribute.moving_average_period
+                << "/" << _strategyAttribute.lookback_period << ")   ";
+            if (state == 0)
+                out << "L: " << lastMean - entry * lastSd << " | C: " << lastClose << " | U: " << lastMean + entry * lastSd
+                    << "   (z " << (lastZ >= 0 ? "+" : "") << lastZ << ", BUY below L, SELL above U)";
+            else if (state > 0)
+                out << "long, C: " << lastClose << " | exit at >= " << lastMean - exit * lastSd
+                    << "   (z " << (lastZ >= 0 ? "+" : "") << lastZ << ")";
+            else
+                out << "short, C: " << lastClose << " | exit at <= " << lastMean + exit * lastSd
+                    << "   (z " << (lastZ >= 0 ? "+" : "") << lastZ << ")";
+            return out.str();
+        }
+
     private:
         int state = 0;   // +1 long, -1 short, 0 flat (the position this strategy asked for)
+        double lastMean = 0, lastSd = 0, lastClose = 0, lastZ = 0;
+        bool ready = false;
 };

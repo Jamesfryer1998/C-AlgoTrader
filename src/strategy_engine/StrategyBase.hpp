@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <string>
 #include <vector>
 #include "../oms/Order.hpp"
 #include "StrategyAttribute.hpp"
@@ -21,6 +22,10 @@ class StrategyBase
 
         // Throws if a required setting is missing. Called once, when the factory creates the strategy.
         virtual void validate() = 0;
+
+        // One line showing where the strategy stands against the levels that would make it trade,
+        // e.g. "MEANREV  L: 205.10 | C: 206.52 | U: 209.80 ...". Empty until it has enough bars.
+        virtual std::string status() const { return ""; }
 
         virtual bool onNewOrder()
         {

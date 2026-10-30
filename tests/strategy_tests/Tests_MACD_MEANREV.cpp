@@ -169,3 +169,45 @@ TEST(MEANREVTests, ValidationRejectsBadSettings)
     EXPECT_THROW(MEANREV(bad).validate(), std::runtime_error);
     EXPECT_NO_THROW(MEANREV(meanrevAttributes()).validate());
 }
+
+// ---------- status lines (shown in the live decisions output) ----------
+
+TEST(StrategyStatusTests, EmptyBeforeEnoughBars)
+{
+    MEANREV meanrev(meanrevAttributes());
+    MACD macd(macdAttributes());
+    EXPECT_EQ(meanrev.status(), "");
+    EXPECT_EQ(macd.status(), "");
+}
+
+TEST(StrategyStatusTests, MeanRevShowsEntryLevelsWhenFlatAndExitLevelWhenIn)
+{
+    std::vector<float> closes;
+    for (int i = 0; i < 30; i++) closes.push_back(100.0f + (i % 2 ? 0.5f : -0.5f));   // mean 100, sd 0.5
+    MEANREV meanrev(meanrevAttributes());
+    run(meanrev, closes);
+    // entry 1.5 sd either side of 100
+    EXPECT_EQ(meanrev.status(), "MEANREV(10/10)   L: 99.25 | C: 100.50 | U: 100.75   (z +1.00, BUY below L, SELL above U)");
+
+    closes.push_back(96.0f);   // dip -> long
+    MEANREV dipped(meanrevAttributes());
+    run(dipped, closes);
+    ASSERT_EQ(dipped.getState(), 1);
+    EXPECT_NE(dipped.status().find("long, C: 96.00 | exit at >= "), std::string::npos) << dipped.status();
+}
+
+TEST(StrategyStatusTests, MacdShowsGapToSignalLine)
+{
+    std::vector<float> closes;
+    for (int i = 0; i < 60; i++) closes.push_back(100.0f + i);   // rising: MACD above its signal line
+    MACD macd(macdAttributes());
+    run(macd, closes);
+    std::string line = macd.status();
+    EXPECT_EQ(line.rfind("MACD(3/6/3)   MACD ", 0), 0u) << line;
+    EXPECT_NE(line.find("| signal "), std::string::npos) << line;
+    EXPECT_NE(line.find("above: SELL if it crosses below the signal line"), std::string::npos) << line;
+
+    MACD zero(macdAttributes("zero_cross"));
+    run(zero, closes);
+    EXPECT_NE(zero.status().find("| zero line   above: SELL if it crosses below 0"), std::string::npos) << zero.status();
+}

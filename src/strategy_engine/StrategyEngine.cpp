@@ -65,6 +65,13 @@ StrategyEngine::executeStrategies()
         strat->supplyData(*marketData);
         strat->execute();
 
+        if (Log::verbose)
+        {
+            std::string line = strat->status();
+            if (!line.empty())
+                Log::out() << line << std::endl;
+        }
+
         if(strat->onNewOrder())
         {
             Order proposal = strat->getOrder();

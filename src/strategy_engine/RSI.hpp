@@ -4,6 +4,7 @@
 #include "../util/Log.hpp"
 #include <cmath>
 #include <iomanip>
+#include <sstream>
 
 /**
  * RSI - Relative Strength Index
@@ -24,6 +25,7 @@ class RSI : public StrategyBase {
                 return;   // not enough bars yet
 
             rsi = calculateRSI(closes);
+            ready = true;
 
             if (rsi > _strategyAttribute.overbought_threshold)
                 signal(OrderType::SELL);
@@ -72,11 +74,22 @@ class RSI : public StrategyBase {
 
             float rs = avgGain / avgLoss;
             float value = 100.0f - (100.0f / (1.0f + rs));
-
-            Log::out() << "INFO - calculateRSI: Calculated RSI(" << _strategyAttribute.period << "): " << std::fixed
-                       << std::setprecision(2) << value << " using " << closes.size() << " data points" << std::endl;
-
             return std::round(value * 100) / 100;
+        }
+
+        // e.g. "RSI(21)   L: 35.00 | C: 48.21 | U: 80.00   BUY below L, SELL above U"
+        std::string status() const override
+        {
+            if (!ready)
+                return "";
+            std::ostringstream out;
+            out << std::fixed << std::setprecision(2)
+                << "RSI(" << _strategyAttribute.period << ")   L: " << _strategyAttribute.oversold_threshold
+                << " | C: " << rsi << " | U: " << _strategyAttribute.overbought_threshold
+                << "   BUY below L, SELL above U";
+            if (rsi < _strategyAttribute.oversold_threshold) out << "  <- BUY zone";
+            if (rsi > _strategyAttribute.overbought_threshold) out << "  <- SELL zone";
+            return out.str();
         }
 
     private:
@@ -94,4 +107,5 @@ class RSI : public StrategyBase {
         }
 
         float rsi = 50.0f;
+        bool ready = false;
 };
