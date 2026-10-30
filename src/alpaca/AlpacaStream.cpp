@@ -28,8 +28,18 @@ AlpacaStream::fetchRecentBars(int count)
     if (feed == "test" || count <= 0)
         return bars; // The test stream has no history
 
-    // Look back a few days so this still works on a Monday morning or after a holiday.
-    std::time_t start = std::time(nullptr) - 4 * 24 * 60 * 60;
+    // One request returns at most 10,000 bars
+    const int maxPerRequest = 10000;
+    if (count > maxPerRequest)
+    {
+        std::cerr << "WARNING - Strategies want " << count << " bars; loading the newest " << maxPerRequest << std::endl;
+        count = maxPerRequest;
+    }
+
+    // Search far enough back to find that many bars: a few days covers a Monday morning or a holiday,
+    // plus a day for every ~300 bars (IEX skips minutes with no trades, so a day has under 390)
+    int days = 4 + count / 300;
+    std::time_t start = std::time(nullptr) - static_cast<std::time_t>(days) * 24 * 60 * 60;
     char startText[32];
     std::strftime(startText, sizeof(startText), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&start));
 
@@ -50,7 +60,10 @@ AlpacaStream::fetchRecentBars(int count)
         bars.push_back(parseBar(bar, symbol));
 
     std::reverse(bars.begin(), bars.end()); // We asked for newest first, strategies want oldest first
-    std::cout << "Loaded " << bars.size() << " recent " << symbol << " bars from Alpaca" << std::endl;
+    std::cout << "Back-filled " << bars.size() << " of " << count << " recent " << symbol << " bars from Alpaca" << std::endl;
+    if (static_cast<int>(bars.size()) < count)
+        std::cerr << "WARNING - Only " << bars.size() << " bars available; strategies needing more will "
+                  << "start deciding once enough live bars arrive" << std::endl;
     return bars;
 }
 

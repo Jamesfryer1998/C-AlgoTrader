@@ -113,9 +113,6 @@ int main()
     Config config;
     DotEnv::load(config.getProjectRoot() + "/.env"); // API keys, kept out of git
     json algoConfig = config.loadConfig();
-    json alpacaConfig = algoConfig.value("alpaca", json::object());
-    int warmupBars = alpacaConfig.value("warmup_bars", 100);
-    size_t maxBars = alpacaConfig.value("max_bars", 500);
 
     // 1. Broker: check our keys work and the account is reachable
     AlpacaBroker broker(algoConfig);
@@ -129,14 +126,12 @@ int main()
     StrategyEngine stratEngine;
     stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
 
-    // 3. Market data: preload enough recent bars for every strategy to decide from the first live bar
-    //    (e.g. MEANREV lookback 120 needs 120 bars), and keep at least that many in memory
+    // 3. Market data: back-fill exactly the bars the active strategies need (e.g. MEANREV lookback 120
+    //    needs 120, MACD 16/50/5 needs 275) so they decide from the first live bar, and keep that many in memory
     int needed = stratEngine.barsNeeded();
-    warmupBars = std::max(warmupBars, needed);
-    maxBars = std::max(maxBars, static_cast<size_t>(needed) + 50);
-    std::vector<MarketCondition> history = stream.fetchRecentBars(warmupBars);
+    size_t maxBars = static_cast<size_t>(std::max(needed, 1));
+    std::vector<MarketCondition> history = stream.fetchRecentBars(needed);
     marketData.update(history);
-    std::cout << "Loaded " << history.size() << " recent bars (strategies need " << needed << ")" << std::endl;
 
     // 4. Saved state: reload trades/positions from the last run, then check against what Alpaca holds
     std::string stateDir = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/")

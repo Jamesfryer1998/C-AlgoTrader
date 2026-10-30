@@ -11,9 +11,7 @@
         "trading_url": "https://paper-api.alpaca.markets",
         "dry_run": false,
         "history_feed": "sip",
-        "history_adjustment": "split",
-        "warmup_bars": 100,
-        "max_bars": 500
+        "history_adjustment": "split"
     },
     "strategies": [
         {

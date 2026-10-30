@@ -32,7 +32,8 @@ class AlpacaStream
 
         AlpacaStream(const json& config);
 
-        // Download the most recent 1-minute bars over REST so strategies have history straight away.
+        // Download the most recent `count` 1-minute bars over REST so strategies have history straight away
+        // (oldest first). The live app asks for exactly what the active strategies need.
         std::vector<MarketCondition> fetchRecentBars(int count);
 
         // Connect and start streaming. Returns immediately; bars arrive on onBar.

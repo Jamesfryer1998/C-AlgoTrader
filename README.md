@@ -47,8 +47,8 @@ Settings live in the `"alpaca"` block of `src/config/config.json`:
 | `data_feed` | `"iex"` free real-time feed, `"sip"` all exchanges (paid plan), `"test"` fake symbol FAKEPACA that streams 24/7 for checking the wiring (orders are only printed) |
 | `trading_url` | `https://paper-api.alpaca.markets` (paper) or `https://api.alpaca.markets` (real money) |
 | `dry_run` | `true` prints orders instead of sending them |
-| `warmup_bars` | Minimum recent bars loaded at start-up (raised automatically to what the active strategies need, e.g. 120 for MEANREV lookback 120) |
-| `max_bars` | How many recent bars to keep in memory |
+
+At start-up the app back-fills exactly the bars the active strategies need (the largest of: RSI `period`, MEANREV `lookback_period`/`moving_average_period`, MACD `5 × (long_period + signal_period)`) and keeps that many in memory, so every strategy decides from the first live bar.
 
 Outside US market hours, set `"data_feed": "test"` to see bars flowing.
 
