@@ -104,6 +104,17 @@ static json printAlpaca(AlpacaBroker& broker, const std::string& ticker)
     return snapshot;
 }
 
+// While alive, everything written to std::cout goes into a buffer instead, so a bar's decision
+// output can be shown under its summary line (which needs the post-decision P&L). Restores on exit.
+struct CaptureStdout
+{
+    std::ostringstream buffer;
+    std::streambuf* original;
+    CaptureStdout() : original(std::cout.rdbuf(buffer.rdbuf())) {}
+    ~CaptureStdout() { std::cout.rdbuf(original); }
+    std::string release() { std::cout.rdbuf(original); return buffer.str(); }
+};
+
 static std::atomic<bool> running{true};
 
 static void onStopSignal(int)
@@ -152,14 +163,16 @@ int main()
     // 5. On every new bar: store it, run the strategies (which may send an order), report the timing
     stream.start([&](const MarketCondition& bar)
     {
-        std::cout << "\n";   // blank line between bars
+        // Hold back the strategies' output so the bar's summary line can be printed first
+        CaptureStdout decisionOutput;
         auto started = std::chrono::steady_clock::now();
 
         marketData.addBar(bar, maxBars);
         stratEngine.run();
 
         auto took = std::chrono::steady_clock::now() - started;
-        std::cout << "Decision took " << std::chrono::duration<double, std::milli>(took).count() << "ms" << std::endl;
+        std::cout << "Decision took " << std::fixed << std::setprecision(2)
+                  << std::chrono::duration<double, std::milli>(took).count() << "ms" << std::endl;
 
         // After the decision (not timed): catch up with fills Alpaca made itself (stop loss / take profit),
         // update our records and show P&L
@@ -171,11 +184,14 @@ int main()
         // One line per bar: the bar, then Alpaca's real P&L (our estimate in dry runs).
         // Saved: both, in performance.json
         json performance = {{"estimate", PerformanceTracker::toJson(summary)}};
+        std::string decisionLines = decisionOutput.release();
+        std::cout << "\n";   // blank line between bars
         printBar(bar);
         if (broker.isDryRun())
             printEstimate(summary);
         else
             performance["alpaca"] = printAlpaca(broker, bar.Ticker);
+        std::cout << decisionLines << std::flush;
         store.savePerformance(performance);
     });
 
