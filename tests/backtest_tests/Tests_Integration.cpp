@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <cmath>
+#include <functional>
 #include <memory>
 #include "../../src/backtest/Backtester.hpp"
 #include "../../src/broker/SimulatedBroker.hpp"
@@ -161,6 +163,18 @@ public:
         mockAdapter->setMockData(mockData);
     }
     
+    // Advance one bar the same way Backtester::executeTimeStep does:
+    // reveal the next bar to MarketData, then let the broker process it.
+    // Returns false when there is no more data.
+    bool step() {
+        BacktestMarketDataAdapter& adapter = mockAdapter->getAdapter();
+        if (!adapter.hasNext())
+            return false;
+        adapter.next();
+        broker->nextStep();
+        return true;
+    }
+
     void createBroker() {
         broker = std::make_unique<SimulatedBroker>(mockAdapter->getMarketData());
         broker->setStartingCapital(100000.0);
@@ -374,79 +388,79 @@ TEST_F(BacktestIntegrationTests, DISABLED_ResilienceToExtremeMarketConditions) {
     EXPECT_GT(metrics.maxDrawdownPercent, 20.0);
 }
 
-TEST_F(BacktestIntegrationTests, StopLossAndTakeProfitBacktesting) {
-    setupVolatileMarket();
-    createBroker();
-    
-    // We'll manually place orders with stop losses and take profits
-    // and then simulate market steps to see how they behave
-    
-    // Buy order with stop loss at 5% and take profit at 10%
-    float initialPrice = broker->getLatestPrice("AAPL");
-    Order buyOrder("buy", "AAPL", 100.0f, initialPrice);
+// Buys at the first bar with a 5% stop loss and 10% take profit, then steps through the data.
+// Returns the % move from entry at which the position closed, or NAN if it never closed.
+static float runBracketTrade(std::function<bool()> step, SimulatedBroker& broker)
+{
+    if (!step())
+        return NAN;
+
+    float entryPrice = broker.getLatestPrice("AAPL");
+    Order buyOrder("buy", "AAPL", 100.0f, entryPrice);
     buyOrder.setStopLoss(5.0f);
     buyOrder.setTakeProfit(10.0f);
-    broker->placeOrder(buyOrder);
-    
-    // Simulate market steps and check if stop loss or take profit triggered
-    int stepsRun = 0;
-    bool orderClosed = false;
-    float finalPrice = 0.0f;
-    
-    for (int i = 0; i < 20; i++) {
-        broker->nextStep();
-        stepsRun++;
-        
-        Position position = broker->getLatestPosition("AAPL");
-        if (position.getQuantity() == 0.0f) {
-            orderClosed = true;
-            finalPrice = broker->getLatestPrice("AAPL");
-            break;
-        }
+    broker.placeOrder(buyOrder);
+
+    bool opened = false;
+    while (step()) {
+        float quantity = broker.getLatestPosition("AAPL").getQuantity();
+        if (quantity != 0.0f)
+            opened = true;
+        if (opened && quantity == 0.0f)
+            return (broker.getLatestPrice("AAPL") - entryPrice) / entryPrice * 100.0f;
     }
-    
-    // Check results - either the position should be closed by stop loss/take profit
-    // or we should have run all steps
-    EXPECT_TRUE(orderClosed || stepsRun == 20);
-    
-    if (orderClosed) {
-        // If closed, check if it was due to stop loss or take profit
-        float priceChange = (finalPrice - initialPrice) / initialPrice * 100.0f;
-        
-        // It should be near either the stop loss or take profit level
-        bool nearStopLoss = std::abs(priceChange + 5.0f) < 2.0f;
-        bool nearTakeProfit = std::abs(priceChange - 10.0f) < 2.0f;
-        
-        EXPECT_TRUE(nearStopLoss || nearTakeProfit);
-    }
+    return NAN;
+}
+
+TEST_F(BacktestIntegrationTests, StopLossAndTakeProfitBacktesting) {
+    // Rising 1% a bar: the 10% take profit must close the position
+    auto rising = TestMarketDataProvider::createTrendingMarketData(30, "AAPL", 100.0f, 0.01f);
+    mockAdapter->setMockData(rising);
+    createBroker();
+
+    float closedAt = runBracketTrade([this] { return step(); }, *broker);
+
+    ASSERT_FALSE(std::isnan(closedAt)) << "Take profit never triggered";
+    EXPECT_GE(closedAt, 10.0f);
+    EXPECT_LT(closedAt, 12.0f); // closed on the first bar past the target, not much later
+}
+
+TEST_F(BacktestIntegrationTests, StopLossTriggersInFallingMarket) {
+    // Falling 1% a bar: the 5% stop loss must close the position
+    auto falling = TestMarketDataProvider::createTrendingMarketData(30, "AAPL", 100.0f, -0.01f);
+    mockAdapter->setMockData(falling);
+    createBroker();
+
+    float closedAt = runBracketTrade([this] { return step(); }, *broker);
+
+    ASSERT_FALSE(std::isnan(closedAt)) << "Stop loss never triggered";
+    EXPECT_LE(closedAt, -5.0f);
+    EXPECT_GT(closedAt, -7.0f); // closed on the first bar past the stop, not much later
 }
 
 TEST_F(BacktestIntegrationTests, DifferentOrderTypesBacktesting) {
     setupTrendingMarket();
     createBroker();
-    
-    // Place different types of orders
+
+    // Process the first bar so the broker has a real current price
+    ASSERT_TRUE(step());
     float currentPrice = broker->getLatestPrice("AAPL");
-    
-    // Market order - should execute immediately
+    ASSERT_GT(currentPrice, 0.0f);
+
+    // Market order - should execute on the next bar
     Order marketOrder(OrderType::BUY, "AAPL", 100.0f, currentPrice);
     broker->placeOrder(marketOrder);
-    
-    // Limit buy below market - should not execute until price drops
+
+    // Limit buy below market - should not execute in a rising market
     Order limitBuyOrder(OrderType::LIMIT_BUY, "AAPL", 50.0f, currentPrice * 0.95f);
     broker->placeOrder(limitBuyOrder);
-    
-    // Limit sell above market - should execute when price rises
+
+    // Limit sell above market - should execute once the price has risen 5%
     Order limitSellOrder(OrderType::LIMIT_SELL, "AAPL", 100.0f, currentPrice * 1.05f);
     broker->placeOrder(limitSellOrder);
-    
-    // Run some market steps
-    for (int i = 0; i < 30; i++) {
-        broker->nextStep();
-    }
 
-    currentPrice = broker->getLatestPrice("AAPL");
-    
-    // Check results - market order should have executed
+    while (step()) {}
+
+    // Market buy + limit sell executed, limit buy did not
     EXPECT_EQ(broker->getNumTrades(), 2);
 }

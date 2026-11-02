@@ -52,6 +52,8 @@ class Order {
         float getStopLossPrice() const {return stopLossPrice;}
         float getTakeProfitPrice() const {return takeProfitPrice;}
         string getTypeAsString() const {return orderTypeToString(type);}
+        string getStrategy() const { return strategy; }
+        string getClientOrderId() const { return clientOrderId; }
 
         void setId(int _id) {id = _id;};
         void setStopLoss(float stopLossPercentage);
@@ -61,6 +63,8 @@ class Order {
         void setTicker(string  _ticker) {ticker = _ticker;}
         void setQuantity(float _quantity) {quantity = _quantity;}
         void setType(string _typeStr){type = stringToOrderType(_typeStr);}
+        void setStrategy(const string& name) { strategy = name; }
+        void setClientOrderId(const string& id) { clientOrderId = id; } // our id as the broker sees it
         
         // Helper methods
         bool isMarket() const { return type == OrderType::BUY || type == OrderType::SELL; }
@@ -77,4 +81,6 @@ class Order {
         float price;
         float stopLossPrice;
         float takeProfitPrice;
+        string strategy;       // e.g. "RSI", or "RSI+MACD" when several agreed
+        string clientOrderId;  // sent to the broker so its order can be matched to ours
 };

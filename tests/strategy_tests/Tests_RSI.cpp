@@ -282,3 +282,20 @@ TEST_F(RSITests, Calculation_10)
 
     EXPECT_EQ(76.87f, rsi.calculateRSI(closes));
 }
+TEST_F(RSITests, StatusShowsRsiBetweenItsThresholds)
+{
+    auto strats = strategyFactory.generateStrategies();
+    RSI rsi{strats[0].get()->_strategyAttribute};
+    EXPECT_EQ(rsi.status(), "");   // nothing computed yet
+
+    GenerateMarketDataForBuy();
+    rsi.supplyData(marketData);
+    rsi.execute();
+
+    std::string line = rsi.status();
+    EXPECT_EQ(line.rfind("RSI(", 0), 0u) << line;
+    EXPECT_NE(line.find("L: "), std::string::npos) << line;
+    EXPECT_NE(line.find(" | C: "), std::string::npos) << line;
+    EXPECT_NE(line.find(" | U: "), std::string::npos) << line;
+    EXPECT_NE(line.find("<- BUY zone"), std::string::npos) << line;
+}

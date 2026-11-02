@@ -1,80 +1,41 @@
-#include "StrategyBase.hpp"
-#include <cassert>
-#include <iomanip> // For std::setprecision
+#pragma once
 
+#include "StrategyBase.hpp"
+#include "../util/Log.hpp"
+#include <cmath>
+#include <iomanip>
+#include <sstream>
+
+/**
+ * RSI - Relative Strength Index
+ *
+ * RSI = 100 - 100 / (1 + average gain / average loss) over the last `period` closes.
+ *   RSI above overbought_threshold -> SELL (price has risen a lot, expect a fall)
+ *   RSI below oversold_threshold   -> BUY  (price has fallen a lot, expect a bounce)
+ * A signal is raised on every bar the RSI stays in either zone.
+ */
 class RSI : public StrategyBase {
     public:
-        RSI(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) 
-        {
-            
-        }
-        
-        void execute() override 
-        {
-            validate();
-            run();
-        }
+        RSI(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
-        void supplyData(MarketData& marketdata) override
+        void execute() override
         {
-            marketData = marketdata;
+            std::vector<float> closes = recentCloses(barsNeeded());
+            if (closes.empty())
+                return;   // not enough bars yet
+
+            rsi = calculateRSI(closes);
+            ready = true;
+
+            if (rsi > _strategyAttribute.overbought_threshold)
+                signal(OrderType::SELL);
+            else if (rsi < _strategyAttribute.oversold_threshold)
+                signal(OrderType::BUY);
+            else
+                return;
+
+            logDecision();
         }
-
-        MarketData getData()
-        {
-            return marketData;
-        }
-
-        float calculateRSI(const std::vector<float>& closes)
-        {
-            // Verify we have enough data to calculate RSI properly
-            if (closes.size() <= 1) {
-                // Since getRecentCloses() now strictly enforces the period requirement,
-                // we should never get here unless there's an error
-                std::cout << "ERROR - calculateRSI: Called with insufficient data (" 
-                          << closes.size() << " points)" << std::endl;
-                return 50.0f; // Return neutral value as a fallback
-            }
-
-            float gainSum = 0.0f;
-            float lossSum = 0.0f;
-            int period = _strategyAttribute.period;
-            
-            assert(static_cast<int>(closes.size()) >= period);
-            
-            // Calculate gains and losses for all available price changes
-            for (size_t i = 1; i < closes.size(); i++) {
-                float change = closes[i] - closes[i-1];
-                if (change > 0) {
-                    gainSum += change;
-                } else if (change < 0) {
-                    lossSum -= change;
-                }
-            }
-            
-            // Use the configured period for the average
-            float avgGain = gainSum / (closes.size() - 1);
-            float avgLoss = lossSum / (closes.size() - 1);
-            
-            // Handle edge cases
-            if (avgLoss == 0.0f && avgGain == 0.0f) {
-                std::cout << "INFO - calculateRSI: No price movement, returning neutral RSI 50" << std::endl;
-                return 50.0f;
-            } else if (avgLoss == 0.0f) {
-                std::cout << "INFO - calculateRSI: No losses, returning maximum RSI 100" << std::endl;
-                return 100.0f;
-            }
-            
-            float rs = avgGain / avgLoss;
-            float rsi = 100.0f - (100.0f / (1.0f + rs));
-            
-            std::cout << "INFO - calculateRSI: Calculated RSI(" << period << "): " << std::fixed 
-                      << std::setprecision(2) << rsi << " using " << closes.size() << " data points" << std::endl;
-            
-            return std::round(rsi * 100) / 100;
-        }
-
-    private:
 
         void validate() override
         {
@@ -86,142 +47,67 @@ class RSI : public StrategyBase {
                 throw std::runtime_error("RSI oversold threshold not set");
         }
 
-        void run()
+        const MarketData& getData() const { return *marketData; }
+
+        float calculateRSI(const std::vector<float>& closes)
         {
-            std::vector<float> recentCloses = getRecentCloses(_strategyAttribute.period);
-            if(recentCloses.size() == 0) {
-                std::cout << "DEBUG - RSI::run - No recent closes, skipping RSI calculation" << std::endl;
-                return;
-            }
-            
-            std::cout << "DEBUG - RSI::run - Got " << recentCloses.size() << " recent closes" << std::endl;
-            MarketCondition currentCondition = getCurrentMarketCondition();
-            float quantity = 1;
+            if (closes.size() <= 1)
+                return 50.0f;   // neutral
 
-            rsi = calculateRSI(recentCloses);
-
-            if (isOverbought())
-            {
-                order = createSellOrder(currentCondition.Ticker, currentCondition.Close, quantity);
-            }
-            else if (isOversold())
-            {
-                order = createBuyOrder(currentCondition.Ticker, currentCondition.Close, quantity);
-            }
-            else if (isNeutral())
-            {
-                holdOrder();
+            float gainSum = 0.0f;
+            float lossSum = 0.0f;
+            for (size_t i = 1; i < closes.size(); i++) {
+                float change = closes[i] - closes[i-1];
+                if (change > 0)
+                    gainSum += change;
+                else if (change < 0)
+                    lossSum -= change;
             }
 
-            if (decision != orderTypeToString(OrderType::HOLD))
-                logDecision(currentCondition, rsi, quantity);
+            float avgGain = gainSum / (closes.size() - 1);
+            float avgLoss = lossSum / (closes.size() - 1);
+
+            if (avgLoss == 0.0f && avgGain == 0.0f)
+                return 50.0f;    // no movement
+            if (avgLoss == 0.0f)
+                return 100.0f;   // only gains
+
+            float rs = avgGain / avgLoss;
+            float value = 100.0f - (100.0f / (1.0f + rs));
+            return std::round(value * 100) / 100;
         }
 
-        std::vector<float> getRecentCloses(int period)
+        int barsNeeded() const override { return _strategyAttribute.period; }
+
+        // e.g. "RSI(21)   L: 35.00 | C: 48.21 | U: 80.00   BUY below L, SELL above U"
+        std::string status() const override
         {
-            std::vector<float> closes;
-            const auto& data = marketData.getData();
-            int dataSize = static_cast<int>(data.size());
-            
-            if (data.empty() || period <= 0) 
-            {
-                std::cout << "Data is empty, or invalid period set, period:" << period << std::endl;
-                return closes;
-            }
-            
-            if (dataSize < period)
-            {
-                std::cout << "Skipping RSI calculation: Insufficient data (" << dataSize 
-                          << " points available, " << period << " required)" << std::endl;
-                return closes; // Return empty vector
-            }
-
-            int start = std::max(0, dataSize - period);
-            // std::cout << "DEBUG: Recent closes for RSI calculation:" << std::endl;
-            for (int i = start; i < dataSize; ++i) {
-                closes.push_back(data[i].Close);
-                // std::cout << "  [" << i - start << "] " << data[i].DateTime << ": $" 
-                //           << std::fixed << std::setprecision(2) << data[i].Close << std::endl;
-            }
-            return closes;
+            if (!ready)
+                return "";
+            std::ostringstream out;
+            out << std::fixed << std::setprecision(2)
+                << "RSI(" << _strategyAttribute.period << ")   L: " << _strategyAttribute.oversold_threshold
+                << " | C: " << rsi << " | U: " << _strategyAttribute.overbought_threshold
+                << "   BUY below L, SELL above U";
+            if (rsi < _strategyAttribute.oversold_threshold) out << "  <- BUY zone";
+            if (rsi > _strategyAttribute.overbought_threshold) out << "  <- SELL zone";
+            return out.str();
         }
 
-
-        bool isOverbought()
-        {
-            return (rsi > _strategyAttribute.overbought_threshold);
-        }
-
-        bool isOversold()
-        {
-            return (rsi < _strategyAttribute.oversold_threshold);
-        }
-
-        bool isNeutral()
-        {
-            return (rsi < _strategyAttribute.overbought_threshold && rsi > _strategyAttribute.oversold_threshold);
-        }
-
-        Order createBuyOrder(string ticker, float price, float quantity)
-        {
-            Order order{
-                OrderType::BUY,
-                ticker,
-                quantity,
-                price
-            };
-
-            order.setStopLoss(_strategyAttribute.stop_loss);
-            order.setTakeProfit(_strategyAttribute.take_profit);
-
-            decision = orderTypeToString(OrderType::BUY);
-            NewOrder = true;
-            return order;
-        }
-
-        Order createSellOrder(string ticker, float price, float quantity)
-        {
-            Order order{
-                OrderType::SELL,
-                ticker,
-                quantity,
-                price
-            };
-
-            order.setStopLoss(_strategyAttribute.stop_loss);
-            order.setTakeProfit(_strategyAttribute.take_profit);
-
-            decision = orderTypeToString(OrderType::SELL);
-            NewOrder = true;
-            return order;
-        }
-
-        void holdOrder()
-        {
-            decision = orderTypeToString(OrderType::HOLD);
-        }
-
-        MarketCondition getCurrentMarketCondition()
-        {
-            return marketData.getCurrentData();
-        }
-
-        void logDecision(MarketCondition currentCondition, float rsi, float quantity)
-        {
-            std::cout << "\n==== RSI SIGNAL ====" << std::endl;
-            std::cout << "Date: " << currentCondition.DateTime << std::endl;
-            std::cout << "Ticker: " << currentCondition.Ticker << std::endl;
-            std::cout << "Price:  $" << std::fixed << std::setprecision(2) << currentCondition.Close << std::endl;
-            std::cout << "Quantity:  " << std::fixed << std::setprecision(2) << quantity << std::endl;
-            std::cout << "RSI:    " << std::fixed << std::setprecision(2) << rsi << std::endl;
-            std::cout << "Action: " << decision << std::endl;
-            std::cout << "===================\n" << std::endl;
-        }
-
-        StrategyAttribute getAttributes() { return _strategyAttribute; }
-        
     private:
-        float rsi;
-        string decision;
-        MarketData marketData;
+        void logDecision()
+        {
+            const MarketCondition& bar = currentBar();
+            Log::out() << "\n==== RSI SIGNAL ====" << std::endl
+                       << "Date: " << bar.DateTime << std::endl
+                       << "Ticker: " << bar.Ticker << std::endl
+                       << "Price:  $" << std::fixed << std::setprecision(2) << bar.Close << std::endl
+                       << "Quantity:  " << std::fixed << std::setprecision(2) << order.getQuantity() << std::endl
+                       << "RSI:    " << std::fixed << std::setprecision(2) << rsi << std::endl
+                       << "Action: " << order.getTypeAsString() << std::endl
+                       << "===================\n" << std::endl;
+        }
+
+        float rsi = 50.0f;
+        bool ready = false;
 };

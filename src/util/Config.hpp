@@ -30,10 +30,6 @@ class Config
         // Form the path to the default config file
         string formConfigPath();
         
-        // Convert a path relative to the project root into an absolute path
-        // Example: "tests/data/file.json" -> "/full/path/to/projectroot/tests/data/file.json"
-        string getAbsolutePath(const std::string& relativePath);
-        
         // Get a path relative to the tests directory
         // Example: "test_data/config.json" -> "/full/path/to/projectroot/tests/test_data/config.json"
         string getTestPath(const std::string& relativeTestPath);

@@ -7,6 +7,8 @@
 #include "../data_access/MarketData.hpp"
 #include "OrderValidator.hpp"
 #include "../broker/BrokerBase.hpp"
+#include "PerformanceTracker.hpp"
+#include "TradeStore.hpp"
 
 using namespace std;
 
@@ -21,7 +23,7 @@ class OrderManagement
         void addOrder(Order &order);
         void removePosition(int id);
         void onNewOrder(Order& order);
-        void onOrderExecuted(Order& order);
+        void syncPosition(const string& ticker);
         void addPosition(Position &position);
         vector<Order> getOrders(){ return orders; };
         void reset() { orders.clear(); positions.clear(); };
@@ -31,13 +33,25 @@ class OrderManagement
             validator.setParams(configdata);
             broker = Broker;
         };
-        void setMarketData(MarketData marketdata) { marketData = marketdata;};
+        void setMarketData(const MarketData& marketdata) { marketData = &marketdata; };
+
+        // Live trading only: save trades/positions to disk and feed the performance tracker.
+        // Loads anything saved by a previous run straight away. Backtests don't call this.
+        void enablePersistence(TradeStore* tradeStore, PerformanceTracker* performanceTracker);
 
         BrokerBase* broker;
         vector<Order> orders;
         int latestOrderId = 1;
-        MarketData marketData;
+        const MarketData* marketData = nullptr; // owned by the caller, not copied
         int latestPositionId = 1;
         OrderValidator validator;
         vector<Position> positions;
+
+    private:
+        TradeRecord makeRecord(const Order& order, int ourId) const;
+        void saveTrade(const TradeRecord& trade);
+        void reconcileWithBroker(const string& ticker, const Position& brokerPosition);
+
+        TradeStore* store = nullptr;
+        PerformanceTracker* tracker = nullptr;
 };

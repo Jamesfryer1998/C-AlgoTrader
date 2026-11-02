@@ -10,14 +10,6 @@
 // Strat factory will form out json into strategies
 
 
-// Default constructor - uses the Config class to load the consolidated config
-StrategyFactory::StrategyFactory()
-{
-    Config configLoader;
-    json fullConfig = configLoader.loadConfig();
-    loadJsonData(fullConfig);
-}
-
 // Constructor for testing - accepts a custom file path
 StrategyFactory::StrategyFactory(string filePath)
 {
@@ -38,14 +30,6 @@ StrategyFactory::loadJson(string filePath)
     strategyData = config.getJson();
 }
 
-string
-StrategyFactory::formatStrategyPath()
-{
-    string projectRoot = config.getProjectRoot();
-    string configPath = projectRoot + JSON_CONFIG_NAME;
-    return configPath;
-}
-
 void
 StrategyFactory::loadJsonData(const json& configData)
 {
@@ -58,27 +42,6 @@ StrategyFactory::loadJsonData(const json& configData)
         strategyData["strategies"] = json::array();
     }
 }
-
-// Strat factory
-// std::vector<std::unique_ptr<StrategyBase>> 
-// StrategyFactory::generateStrategies() 
-// {
-    
-//     std::vector<std::unique_ptr<StrategyBase>> strategies;
-//     int numStrats = strategyData["strategies"].size();
-
-//     for (int i = 0; i < numStrats; ++i) {
-//         std::string name = strategyData["strategies"][i]["name"];
-//         auto strategy = StrategyBase::create(name);
-//         if (strategy) {
-//             strategies.push_back(std::move(strategy));
-//         } else {
-//             std::cerr << "Failed to create strategy: " << name << std::endl;
-//         }
-//     }
-//     return strategies;
-// }
-
 
 std::vector<std::unique_ptr<StrategyBase>> 
 StrategyFactory::generateStrategies() 
@@ -95,12 +58,19 @@ StrategyFactory::generateStrategies()
         if(!active)
             continue;
 
+        std::unique_ptr<StrategyBase> strategy;
         if(name == "RSI")
-            strategies.push_back(std::make_unique<RSI>(attributes));
+            strategy = std::make_unique<RSI>(attributes);
         else if (name == "MACD")
-            strategies.push_back(std::make_unique<MACD>(attributes));
+            strategy = std::make_unique<MACD>(attributes);
         else if (name == "MEANREV")
-            strategies.push_back(std::make_unique<MEANREV>(attributes));
+            strategy = std::make_unique<MEANREV>(attributes);
+        else
+            throw std::runtime_error("Unknown strategy in config: " + name);
+
+        // Check the settings once here, so a bad config fails at start-up rather than on every bar
+        strategy->validate();
+        strategies.push_back(std::move(strategy));
     }
     return strategies;
 }

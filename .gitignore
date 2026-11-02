@@ -2,5 +2,7 @@
 /.vscode
 /data
 .DS_Store
-src/pyhton/__pycache__/
 TODO.txt
+
+# Secrets (API keys). Copy .env.example to .env
+.env

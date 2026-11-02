@@ -18,14 +18,6 @@ MarketData::~MarketData()
 }
 
 void
-MarketData::process(json configData)
-{
-    std::cout << "Processing Market Data" << std::endl;
-    string filePath = generateFilePath(configData);
-    loadData(filePath);
-}
-
-void
 MarketData::processForDateRange(json configData, const std::string& startDate, const std::string& endDate)
 {
     std::cout << "Processing Market Data for date range from " << startDate << " to " << endDate << std::endl;
@@ -62,7 +54,7 @@ MarketData::processForDateRange(json configData, const std::string& startDate, c
 }
 
 void
-MarketData::processParallel(json configData, int numThreads)
+MarketData::processParallel(json configData, int numThreads, const std::string& requestedStart, const std::string& requestedEnd)
 {
     // If numThreads is 0, use the number of hardware threads available
     if (numThreads <= 0) {
@@ -89,6 +81,12 @@ MarketData::processParallel(json configData, int numThreads)
     if (configData.contains("backtest_start_date") && configData.contains("backtest_end_date")) {
         startDate = configData["backtest_start_date"];
         endDate = configData["backtest_end_date"];
+    }
+
+    // A range passed in (e.g. from backtest_app --start-date/--end-date) wins
+    if (!requestedStart.empty() && !requestedEnd.empty()) {
+        startDate = requestedStart;
+        endDate = requestedEnd;
     }
     
     // Get data directory
@@ -178,7 +176,20 @@ MarketData::update(std::vector<MarketCondition>& marketData)
     data = marketData;
 }
 
-vector<MarketCondition>
+void
+MarketData::addBar(const MarketCondition& bar, size_t maxBars)
+{
+    data.push_back(bar);
+
+    // Drop the oldest bars once we have twice as many as needed, back down to maxBars.
+    // Trimming in batches keeps this O(1) per bar on average (removing one bar from the front of a
+    // vector every time would shift the whole window on every bar). Strategies only ever look at
+    // the newest bars, so how many older ones are still held doesn't change any result.
+    if (maxBars > 0 && data.size() > 2 * maxBars)
+        data.erase(data.begin(), data.begin() + (data.size() - maxBars));
+}
+
+const vector<MarketCondition>&
 MarketData::getData() const
 {
     return data;
@@ -210,7 +221,7 @@ MarketData::getDataDirectory()
 }
 
 float
-MarketData::getLastClosePrice()
+MarketData::getLastClosePrice() const
 {
     if (data.empty()) {
         throw std::runtime_error("No market data available");
@@ -221,7 +232,7 @@ MarketData::getLastClosePrice()
 }
 
 MarketCondition
-MarketData::getCurrentData()
+MarketData::getCurrentData() const
 {
     if (data.empty()) {
         throw std::runtime_error("No market data available");

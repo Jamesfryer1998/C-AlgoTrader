@@ -1,4 +1,6 @@
 #include "Backtester.hpp"
+#include "../util/Log.hpp"
+#include "../util/MarketTime.hpp"
 #include <cmath>
 #include <numeric>
 #include <iomanip>
@@ -24,20 +26,14 @@ Backtester::Backtester(const json& algoConfig)
     broker.setStartingCapital(100000.0);
     broker.setCommission(1.0);
     broker.setSlippage(0.0005);
+    broker.followLatestBar(true);   // the broker trades on the newest bar of the rolling window
 
-    // Default date range (last 7 days)
-    auto now = std::chrono::system_clock::now();
-    auto endTimeT = std::chrono::system_clock::to_time_t(now);
-    auto startTimeT = endTimeT - (7 * 24 * 60 * 60); // 7 days earlier
+    // Default date range: the last 7 days (thread-safe; many Backtesters may be created at once)
+    std::time_t now = std::time(nullptr);
+    endDate = MarketTime::datePart(MarketTime::toNewYorkTime(now));
+    startDate = MarketTime::datePart(MarketTime::toNewYorkTime(now - 7 * 24 * 3600));
     
-    std::stringstream ssEnd, ssStart;
-    ssEnd << std::put_time(std::localtime(&endTimeT), "%Y-%m-%d");
-    ssStart << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
-    
-    endDate = ssEnd.str();
-    startDate = ssStart.str();
-    
-    std::cout << "Default date range: " << startDate << " to " << endDate << std::endl;
+    Log::out() << "Default date range: " << startDate << " to " << endDate << std::endl;
 }
 
 void Backtester::setStartingCapital(double capital) {
@@ -50,7 +46,7 @@ void Backtester::setCommissionPerTrade(double commission) {
 
 void Backtester::setSlippagePercentage(double slippage) {
     broker.setSlippage(slippage);
-    std::cout << "Backtester: Setting slippage to " << std::fixed << std::setprecision(3) 
+    Log::out() << "Backtester: Setting slippage to " << std::fixed << std::setprecision(3) 
               << (slippage * 100.0) << "% (random variation within +/- this range)" << std::endl;
 }
 
@@ -65,7 +61,7 @@ void Backtester::saveResultsToFile(const std::string& filename) {
 void Backtester::setDateRange(const std::string& start, const std::string& end) {
     startDate = start;
     endDate = end;
-    std::cout << "Set backtest date range: " << startDate << " to " << endDate << std::endl;
+    Log::out() << "Set backtest date range: " << startDate << " to " << endDate << std::endl;
 }
 
 void Backtester::setNumThreads(int threads) {
@@ -73,7 +69,7 @@ void Backtester::setNumThreads(int threads) {
 }
 
 void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
-    std::cout << "Setting mock market data with " << mockData.size() << " data points" << std::endl;
+    Log::out() << "Setting mock market data with " << mockData.size() << " data points" << std::endl;
     
     // Verify the mock data is not empty
     if (mockData.empty()) {
@@ -87,12 +83,12 @@ void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
     // Auto-enable direct data mode when mock data is provided
     useDirectData = true;
     
-    std::cout << "Verified market data size: " << marketDataAdapter.getDataSize() << " data points" << std::endl;
+    Log::out() << "Verified market data size: " << marketDataAdapter.getDataSize() << " data points" << std::endl;
     if (marketDataAdapter.getDataSize() > 0) {
         MarketCondition firstPoint = marketDataAdapter.getCurrentData();
-        std::cout << "First data point: " << firstPoint.DateTime << std::endl;
+        Log::out() << "First data point: " << firstPoint.DateTime << std::endl;
     }
-    std::cout << "Current index: " << marketDataAdapter.getCurrentIndex() << std::endl;
+    Log::out() << "Current index: " << marketDataAdapter.getCurrentIndex() << std::endl;
 }
 
 void Backtester::useDirectMarketData(bool useDirect) {
@@ -104,15 +100,12 @@ Backtester::run()
 {
     std::cout << "Starting backtest from " << startDate << " to " << endDate << "..." << std::endl;
     
-    // Record start time
-    auto startTime = std::chrono::high_resolution_clock::now();
-    
     // Only process market data if not using direct data mode
     if (!useDirectData) {
         // Process market data with date range and parallel processing
         if (numThreads > 0) {
             std::cout << "Using " << numThreads << " threads for processing" << std::endl;
-            marketDataAdapter.loadHistoricalDataParallel(algoConfig, numThreads);
+            marketDataAdapter.loadHistoricalDataParallel(algoConfig, numThreads, startDate, endDate);
         } else {
             std::cout << "Using all available cores for processing" << std::endl;
             marketDataAdapter.loadHistoricalData(algoConfig, startDate, endDate);
@@ -127,74 +120,47 @@ Backtester::run()
         return;
     }
     
-    // Ensure we're at the beginning of the data
-    marketDataAdapter.rewind();
-    
-    // Set up strategy engine
-    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
-    
-    // Initialize backtest
-    initializeBacktest();
-    
-    // Log initial state - ensure we have data before trying to access it
-    if (marketDataAdapter.getDataSize() > 0) {
-        MarketCondition firstPoint = marketDataAdapter.getCurrentData();
-        equityCurve.push_back({firstPoint.DateTime, broker.getCurrentEquity()});
-    } else {
-        std::cerr << "ERROR: Market data is empty after initialization. Exiting run()." << std::endl;
+    runOn(marketDataAdapter.getFullDataset());
+}
+
+void
+Backtester::runOn(const std::vector<MarketCondition>& bars)
+{
+    auto startTime = std::chrono::high_resolution_clock::now();
+    if (bars.empty()) {
+        std::cerr << "ERROR: No market data available for backtesting." << std::endl;
         return;
     }
-    
-    // Count how many data points we'll process
-    size_t totalDataPoints = marketDataAdapter.getDataSize();
-    std::cout << "Processing " << totalDataPoints << " market data points" << std::endl;
-    
-    // Progress tracking
-    size_t lastProgress = 0;
-    size_t progressStep = totalDataPoints / 20; // Show progress in 5% increments
-    if (progressStep == 0) progressStep = 1;
-        
-    // Add explicit counter to detect infinite loops
-    int loopCount = 0;
-    const int MAX_LOOPS = totalDataPoints * 2; // Safety limit
-        
-    while (marketDataAdapter.hasNext() && loopCount < MAX_LOOPS) {         
-        executeTimeStep();
-        loopCount++;
-        
-        // Show progress
-        size_t currentIndex = marketDataAdapter.getCurrentIndex();
-        if (currentIndex - lastProgress >= progressStep) {
-            int progressPercent = static_cast<int>((static_cast<double>(currentIndex) / totalDataPoints) * 100);
-            std::cout << "Progress: " << progressPercent << "% ("
-                      << currentIndex << "/" << totalDataPoints << " data points)"
-                      << std::endl;
-            lastProgress = currentIndex;
-        }
+
+    // Start from an empty window; bars are added one at a time below
+    std::vector<MarketCondition> none;
+    marketData.update(none);
+
+    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
+    initializeBacktest();
+    equityCurve.push_back({bars.front().DateTime, broker.getCurrentEquity()});
+
+    Log::out() << "Processing " << bars.size() << " market data points" << std::endl;
+    size_t progressStep = std::max<size_t>(1, bars.size() / 20);   // progress every 5%
+
+    for (size_t i = 0; i < bars.size(); i++) {
+        executeTimeStep(bars[i]);
+
+        if ((i + 1) % progressStep == 0)
+            Log::out() << "Progress: " << (100 * (i + 1) / bars.size()) << "% ("
+                       << (i + 1) << "/" << bars.size() << " data points)" << std::endl;
     }
-    
-    // Check if we exited due to the safety limit
-    if (loopCount >= MAX_LOOPS) {
-        std::cerr << "WARNING: Loop safety limit reached. Possible infinite loop detected." << std::endl;
-    }
-        
-    // Record end time and calculate duration
-    auto endTime = std::chrono::high_resolution_clock::now();
-    metrics.executionTime = endTime - startTime;
-    
-    // Calculate final metrics
+
+    metrics.executionTime = std::chrono::high_resolution_clock::now() - startTime;
     calculateMetrics();
-    
-    // Print report
-    printReport();
-    
-    // Save results to file if requested
-    if (!resultsFilename.empty()) {
+
+    if (Log::verbose)
+        printReport();
+
+    if (!resultsFilename.empty())
         saveResults();
-    }
-    
-    std::cout << "Backtest completed in " 
-              << metrics.executionTime.count() << " seconds" << std::endl;
+
+    Log::out() << "Backtest completed in " << metrics.executionTime.count() << " seconds" << std::endl;
 }
 
 void
@@ -202,50 +168,46 @@ Backtester::initializeBacktest()
 {
     // Reset performance tracking
     equityCurve.clear();
-    dailyReturns.clear();
     customMetrics.clear();
+    tracker = PerformanceTracker(broker.getStartingCapital(), PerformanceTracker::MINUTE_BARS_PER_YEAR);
+    fillsRecorded = 0;
     
     // Log initial state
     metrics.startingCapital = broker.getStartingCapital();
 }
 
 void
-Backtester::executeTimeStep() 
+Backtester::executeTimeStep(const MarketCondition& bar)
 {
-    // 1. Process next data point using the adapter
-    // This updates the underlying MarketData with the next time point
-    marketDataAdapter.next();
-    
-    // Get the current data point for logging and synchronization
-    MarketCondition currentData = marketDataAdapter.getCurrentData();
-    std::string timestamp = currentData.DateTime;
-    
-    // Log the timestamp we're about to process
-    std::cout << "Backtester time step: " << timestamp << std::endl;
-    
-    // 2. Execute strategy - this will use the updated marketData
-    // The strategy will generate signals based on this data point
+    // 1. The new bar arrives (strategies see the newest windowBars bars, like live trading)
+    marketData.addBar(bar, windowBars);
+    Log::out() << "Backtester time step: " << bar.DateTime << std::endl;
+
+    // 2. Strategies decide; any order goes to the simulated broker
     stratEngine.run();
-    
-    // 3. Simulate broker operations - this includes processing orders from strategies
-    // The broker will use the same current data point for execution
+
+    // 3. The broker fills orders and checks stop losses / take profits on this bar,
+    //    then the OMS catches up with the filled position (the live app does the same after each bar)
     broker.nextStep();
-    
-    // 4. Log performance and update metrics
+    stratEngine.getOms()->syncPosition(bar.Ticker);
     logPerformance();
-    
-    // Add to equity curve using current timestamp
-    equityCurve.push_back({timestamp, broker.getCurrentEquity()});
-    
-    // Calculate daily return and add to returns vector (if equity has changed)
-    if (equityCurve.size() >= 2) {
-        double prevEquity = equityCurve[equityCurve.size() - 2].second;
-        double currentEquity = equityCurve[equityCurve.size() - 1].second;
-        
-        if (prevEquity != 0) {
-            double dailyReturn = (currentEquity - prevEquity) / prevEquity;
-            dailyReturns.push_back(dailyReturn);
-        }
+
+    // 4. Book-keeping
+    if (keepCurve)
+        equityCurve.push_back({bar.DateTime, broker.getCurrentEquity()});
+    recordNewFills();
+    tracker.markPrice(bar.Ticker, bar.Close);
+    tracker.recordEquity();
+}
+
+void
+Backtester::recordNewFills()
+{
+    const std::vector<Order>& fills = broker.getFilledOrders();
+    for (; fillsRecorded < fills.size(); fillsRecorded++) {
+        const Order& fill = fills[fillsRecorded];
+        tracker.recordFill(fill.getTicker(), fill.isBuy(), fill.getQuantity(), fill.getPrice(),
+                           broker.getCommissionPerTrade());
     }
 }
 
@@ -263,184 +225,30 @@ Backtester::logPerformance()
 void
 Backtester::calculateMetrics() 
 {
-    // Basic metrics
+    PerformanceSummary summary = tracker.summary();
+
     metrics.finalEquity = broker.getCurrentEquity();
     metrics.totalPnL = broker.getPnL();
     metrics.totalPnLPercent = (metrics.finalEquity - metrics.startingCapital) / metrics.startingCapital * 100.0;
     metrics.numTrades = broker.getNumTrades();
-    
-    // Calculate trade statistics from filled orders
-    const std::vector<Order>& filledOrders = broker.getFilledOrders();
-    
-    // Separate buy and sell orders
-    std::vector<Order> buyOrders;
-    std::vector<Order> sellOrders;
-    
-    for (const auto& order : filledOrders) {
-        if (order.getType() == OrderType::BUY || order.getType() == OrderType::LIMIT_BUY) {
-            buyOrders.push_back(order);
-        } else {
-            sellOrders.push_back(order);
-        }
-    }
-    
-    // Match buys and sells to determine profitable trades
-    // This is a simplified approach - in a real system, you'd need to match
-    // buy and sell orders properly considering partial fills, multiple sells
-    // for a single position, etc.
-    
-    std::vector<double> tradeProfits;
-    
-    for (const auto& buyOrder : buyOrders) {
-        for (const auto& sellOrder : sellOrders) {
-            if (buyOrder.getTicker() == sellOrder.getTicker()) {
-                // Calculate profit for this pair
-                double buyValue = buyOrder.getQuantity() * buyOrder.getPrice();
-                double sellValue = sellOrder.getQuantity() * sellOrder.getPrice();
-                double profit = sellValue - buyValue;
-                
-                tradeProfits.push_back(profit);
-                break; // Move to next buy order
-            }
-        }
-    }
-    
-    // Calculate trade statistics
-    metrics.winningTrades = std::count_if(tradeProfits.begin(), tradeProfits.end(),
-                                         [](double profit) { return profit > 0; });
-    metrics.losingTrades = std::count_if(tradeProfits.begin(), tradeProfits.end(),
-                                        [](double profit) { return profit <= 0; });
-    
-    // Calculate win rate
-    if (tradeProfits.size() > 0) {
-        metrics.winRate = static_cast<double>(metrics.winningTrades) / tradeProfits.size() * 100.0;
-    } else {
-        metrics.winRate = 0;
-    }
-    
-    // Calculate average win and loss
-    std::vector<double> winningTrades;
-    std::vector<double> losingTrades;
-    
-    for (double profit : tradeProfits) {
-        if (profit > 0) {
-            winningTrades.push_back(profit);
-        } else if (profit < 0) {
-            losingTrades.push_back(profit);
-        }
-    }
-    
-    if (!winningTrades.empty()) {
-        metrics.avgWin = std::accumulate(winningTrades.begin(), winningTrades.end(), 0.0) / winningTrades.size();
-    } else {
-        metrics.avgWin = 0;
-    }
-    
-    if (!losingTrades.empty()) {
-        metrics.avgLoss = std::accumulate(losingTrades.begin(), losingTrades.end(), 0.0) / losingTrades.size();
-    } else {
-        metrics.avgLoss = 0;
-    }
-    
-    // Calculate profit factor
-    double grossProfit = std::accumulate(winningTrades.begin(), winningTrades.end(), 0.0);
-    double grossLoss = std::fabs(std::accumulate(losingTrades.begin(), losingTrades.end(), 0.0));
-    
-    if (grossLoss > 0) {
-        metrics.profitFactor = grossProfit / grossLoss;
-    } else {
-        metrics.profitFactor = grossProfit > 0 ? std::numeric_limits<double>::infinity() : 0;
-    }
-    
-    // Calculate Sharpe ratio, max drawdown, and annualized return
-    metrics.sharpeRatio = calculateSharpeRatio();
-    metrics.maxDrawdownPercent = calculateMaxDrawdown();
-    metrics.annualizedReturn = calculateAnnualizedReturn();
-}
 
-double
-Backtester::calculateSharpeRatio() 
-{
-    if (dailyReturns.empty()) {
-        return 0.0;
-    }
-    
-    // Calculate mean return
-    double meanReturn = std::accumulate(dailyReturns.begin(), dailyReturns.end(), 0.0) / dailyReturns.size();
-    
-    // Calculate standard deviation
-    double sq_sum = std::inner_product(dailyReturns.begin(), dailyReturns.end(), dailyReturns.begin(), 0.0,
-                                     std::plus<>(), [meanReturn](double x, double y) {
-                                         return (x - meanReturn) * (y - meanReturn);
-                                     });
-    
-    double stddev = std::sqrt(sq_sum / dailyReturns.size());
-    
-    // Risk-free rate (simplified - in real system you'd use actual risk-free rate)
-    double riskFreeRate = 0.0;
-    
-    // Calculate daily Sharpe ratio
-    double dailySharpe;
-    if (stddev == 0.0) {
-        dailySharpe = 0.0;
-    } else {
-        dailySharpe = (meanReturn - riskFreeRate) / stddev;
-    }
-    
-    // Annualize the Sharpe ratio (assuming 252 trading days per year)
-    return dailySharpe * std::sqrt(252);
-}
+    metrics.realisedPnL = summary.realisedPnL;
+    metrics.unrealisedPnL = summary.unrealisedPnL;
+    metrics.commissionPaid = summary.commissionPaid;
+    metrics.winningTrades = summary.winningTrades;
+    metrics.losingTrades = summary.losingTrades;
+    metrics.winRate = summary.winRatePercent;
+    metrics.avgWin = summary.avgWin;
+    metrics.avgLoss = summary.avgLoss;
+    metrics.profitFactor = summary.profitFactor;
+    metrics.sharpeRatio = summary.sharpeRatio;
+    metrics.maxDrawdownPercent = summary.maxDrawdownPercent;
+    metrics.annualizedReturn = summary.annualisedReturnPercent;
 
-double
-Backtester::calculateMaxDrawdown() 
-{
-    if (equityCurve.empty()) {
-        return 0.0;
-    }
-    
-    double maxDrawdown = 0.0;
-    double peak = equityCurve[0].second;
-    
-    for (const auto& point : equityCurve) {
-        double equity = point.second;
-        
-        if (equity > peak) {
-            peak = equity;
-        }
-        
-        double drawdown = (peak - equity) / peak * 100.0;
-        maxDrawdown = std::max(maxDrawdown, drawdown);
-    }
-    
-    return maxDrawdown;
-}
-
-double
-Backtester::calculateAnnualizedReturn() 
-{
-    if (equityCurve.size() < 2) {
-        return 0.0;
-    }
-    
-    // Get first and last equity values
-    double startEquity = equityCurve.front().second;
-    double endEquity = equityCurve.back().second;
-    
-    // Calculate total return
-    double totalReturn = (endEquity - startEquity) / startEquity;
-    
-    // Estimate the number of trading days in the simulation
-    int tradingDays = equityCurve.size();
-    
-    // Calculate annualized return (assuming 252 trading days per year)
-    double yearsElapsed = static_cast<double>(tradingDays) / 252.0;
-    
-    if (yearsElapsed <= 0) {
-        return totalReturn * 100.0; // Just return total return as percentage if period is too short
-    }
-    
-    // Calculate annualized return
-    return (std::pow(1.0 + totalReturn, 1.0 / yearsElapsed) - 1.0) * 100.0;
+    // The tracker and the broker keep separate books; they should always agree on equity
+    if (std::fabs(summary.equity - metrics.finalEquity) > 0.01)
+        std::cerr << "WARNING: performance tracker equity " << summary.equity
+                  << " differs from broker equity " << metrics.finalEquity << std::endl;
 }
 
 void 
@@ -453,6 +261,9 @@ Backtester::printReport()
     std::cout << "Final equity: " << formatCurrency(metrics.finalEquity) << std::endl;
     std::cout << "Total P&L: " << formatCurrency(metrics.totalPnL) 
               << " (" << formatPercent(metrics.totalPnLPercent) << "%)" << std::endl;
+    std::cout << "  - Realised: " << formatCurrency(metrics.realisedPnL)
+              << " | Unrealised: " << formatCurrency(metrics.unrealisedPnL)
+              << " | Commission: " << formatCurrency(-metrics.commissionPaid) << std::endl;
     std::cout << "Execution time: " << metrics.executionTime.count() << " seconds" << std::endl;
     
     // Performance metrics
@@ -463,7 +274,8 @@ Backtester::printReport()
     
     // Trade statistics
     std::cout << "\nTrade statistics:" << std::endl;
-    std::cout << "- Total trades: " << metrics.numTrades << std::endl;
+    std::cout << "- Total fills: " << metrics.numTrades << std::endl;
+    std::cout << "- Closed trades (fills that closed or reduced a position):" << std::endl;
     std::cout << "- Winning trades: " << metrics.winningTrades 
               << " (" << formatPercent(metrics.winRate) << "%)" << std::endl;
     std::cout << "- Losing trades: " << metrics.losingTrades << std::endl;
@@ -492,6 +304,9 @@ Backtester::saveResults()
     outFile << "Final equity: " << formatCurrency(metrics.finalEquity) << "\n";
     outFile << "Total P&L: " << formatCurrency(metrics.totalPnL) 
             << " (" << formatPercent(metrics.totalPnLPercent) << "%)\n";
+    outFile << "Realised P&L: " << formatCurrency(metrics.realisedPnL) << "\n";
+    outFile << "Unrealised P&L: " << formatCurrency(metrics.unrealisedPnL) << "\n";
+    outFile << "Commission: " << formatCurrency(metrics.commissionPaid) << "\n";
     outFile << "Execution time: " << metrics.executionTime.count() << " seconds\n\n";
     
     // Performance metrics

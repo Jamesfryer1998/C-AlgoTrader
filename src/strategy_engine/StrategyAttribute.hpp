@@ -26,6 +26,8 @@ class StrategyAttribute
             exit_threshold = stratJson.contains("exit_threshold") ? stratJson["exit_threshold"].get<double>() : 0;
             moving_average_period = stratJson.contains("moving_average_period") ? stratJson["moving_average_period"].get<int>() : 0;
 
+            if (stratJson.contains("signal_type")) signal_type = stratJson["signal_type"];
+
             if (stratJson.contains("name")) name = stratJson["name"];
             if (stratJson.contains("price_type")) price_type = stratJson["price_type"];
             if (stratJson.contains("trade_size")) trade_size = stratJson["trade_size"];
@@ -34,25 +36,26 @@ class StrategyAttribute
         }
 
         // RSI
-        int period;
-        double oversold_threshold;
-        double overbought_threshold;
+        int period = 0;
+        double oversold_threshold = 0;
+        double overbought_threshold = 0;
 
         // MACD
-        int short_period;
-        int long_period;
-        int signal_period;
+        int short_period = 0;
+        int long_period = 0;
+        int signal_period = 0;
+        string signal_type = "crossover";   // "crossover" (MACD vs signal line) or "zero_cross" (MACD vs 0)
 
         // MEANREV
-        int lookback_period;
-        double exit_threshold;
-        double entry_threshold;
-        int moving_average_period;
+        int lookback_period = 0;
+        double exit_threshold = 0;
+        double entry_threshold = 0;
+        int moving_average_period = 0;
 
         // Common
         string name;
         string price_type = "close";
         double trade_size = 1.0;  // Default to 100% of capital
-        int stop_loss = 10; // Default to 10% stop loss
-        int take_profit = 5; // Default to 5% take profit
+        double stop_loss = 10;  // % below (long) / above (short) the entry price; default 10%
+        double take_profit = 5; // % above (long) / below (short) the entry price; default 5%
 };

@@ -35,7 +35,8 @@ public:
      * @param configData Configuration for data loading
      * @param numThreads Number of threads to use for processing
      */
-    void loadHistoricalDataParallel(const json& configData, int numThreads);
+    void loadHistoricalDataParallel(const json& configData, int numThreads,
+                                    const std::string& startDate = "", const std::string& endDate = "");
     
     /**
      * Load mock data for backtesting (primarily for testing)
@@ -71,6 +72,9 @@ public:
      * @return Total number of data points
      */
     size_t getDataSize() const;
+
+    // Every bar loaded, oldest first
+    const std::vector<MarketCondition>& getFullDataset() const { return fullDataset; }
     
     /**
      * Get the current data point without advancing

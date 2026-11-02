@@ -2,7 +2,7 @@
 #include "../../src/broker/SimulatedBroker.hpp"
 
 
-class SimulatedBrokerTests : public ::testing::Test {
+class SimulatedBrokerSetupTests : public ::testing::Test {
     public:
         
         Config config;
@@ -25,7 +25,7 @@ class SimulatedBrokerTests : public ::testing::Test {
 
 };
 
-TEST_F(SimulatedBrokerTests, CanInstantiate)
+TEST_F(SimulatedBrokerSetupTests, CanInstantiate)
 {
     SimulatedBroker cut(marketData);
 }

@@ -1,6 +1,8 @@
 #include "CSVParser.hpp"
+#include "../util/Log.hpp"
 
 #include <fstream>
+#include <filesystem>
 
 
 CSVParser::CSVParser()
@@ -34,7 +36,7 @@ CSVParser::Read(const std::string& filePath)
             data.push_back(recentLine);
         }
 
-        std::cout << data.size() << " lines read from file" << std::endl;
+        Log::out() << data.size() << " lines read from file" << std::endl;
     }
 
     csvFile.close();
@@ -70,7 +72,7 @@ std::vector<std::string> CSVParser::tokenise(std::string csvLine, char separator
     do{
         end = csvLine.find_first_of(separator, start);
         if (start == csvLine.length() || start == end) break;
-        if (end >= 0 ) token = csvLine.substr(start, end - start);
+        if (end != std::string::npos) token = csvLine.substr(start, end - start);
         else token = csvLine.substr(start, csvLine.length() - start);
         tokens.push_back(token);
         start = end + 1;

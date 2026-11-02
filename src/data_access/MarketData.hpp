@@ -21,12 +21,6 @@ class MarketData
         ~MarketData();
         
         /**
-         * Process market data from default sources
-         * @param configData Configuration for data processing
-         */
-        void process(json configData);
-        
-        /**
          * Process market data for a specific date range
          * @param configData Configuration for data processing
          * @param startDate Start date for the data range
@@ -39,7 +33,8 @@ class MarketData
          * @param configData Configuration for data processing
          * @param numThreads Number of threads to use (0 = auto)
          */
-        void processParallel(json configData, int numThreads = 0);
+        void processParallel(json configData, int numThreads = 0,
+                             const std::string& startDate = "", const std::string& endDate = "");
         
         /**
          * Load data from a specific file
@@ -52,12 +47,19 @@ class MarketData
          * @param marketData New market data
          */
         void update(std::vector<MarketCondition>& marketData);
+
+        /**
+         * Append one new bar (used by live trading).
+         * @param bar The newest market condition
+         * @param maxBars Keep at least the newest maxBars bars, trimming in batches (0 = keep everything)
+         */
+        void addBar(const MarketCondition& bar, size_t maxBars = 0);
         
         /**
          * Get all market data
          * @return Vector of market conditions
          */
-        std::vector<MarketCondition> getData() const;
+        const std::vector<MarketCondition>& getData() const;
         
         /**
          * Generate file path for data based on configuration
@@ -76,13 +78,13 @@ class MarketData
          * Get the last (most recent) close price
          * @return Close price as float
          */
-        float getLastClosePrice();
+        float getLastClosePrice() const;
         
         /**
          * Get the most recent market condition
          * @return Most recent market condition
          */
-        MarketCondition getCurrentData();
+        MarketCondition getCurrentData() const;
 
     private:
         std::vector<MarketCondition> data;

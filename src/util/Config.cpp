@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "Log.hpp"
 #include <fstream>
 
 Config::Config() 
@@ -15,7 +16,7 @@ Config::loadConfig()
     if(!loaded)
     {
         loadJson(formConfigPath());
-        std::cout << "JSON Data: " << configData.dump(4) << std::endl;
+        Log::out() << "JSON Data: " << configData.dump(4) << std::endl;
         return configData;
     }
     else
@@ -33,7 +34,7 @@ Config::loadJson(const std::string& path)
         throw std::runtime_error("Failed to open JSON file: " + path);
     }
 
-    std::cout << "Loading JSON from: " << path << std::endl;
+    Log::out() << "Loading JSON from: " << path << std::endl;
 
     json j;
     file >> j;  
@@ -65,21 +66,6 @@ Config::getProjectRoot()
     }
     
     return exePath.string();
-}
-
-string
-Config::getAbsolutePath(const std::string& relativePath)
-{
-    // If the path is already absolute, return it as is
-    if (!relativePath.empty() && relativePath[0] == '/') {
-        return relativePath;
-    }
-    
-    // Otherwise, combine it with the project root
-    std::filesystem::path projectRoot = getProjectRoot();
-    std::filesystem::path fullPath = projectRoot / relativePath;
-    
-    return fullPath.string();
 }
 
 string

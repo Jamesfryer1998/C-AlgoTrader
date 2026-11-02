@@ -2,6 +2,8 @@
 #define CSVPARSER_HPP
 
 #include <iostream>
+#include <string>
+#include <vector>
 #include "MarketCondition.hpp"
 
 class CSVParser 

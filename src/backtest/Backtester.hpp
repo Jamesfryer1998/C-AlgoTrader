@@ -14,6 +14,7 @@
 #include "../strategy_engine/StrategyFactory.hpp"
 #include "../broker/SimulatedBroker.hpp"
 #include "BacktestMarketDataAdapter.hpp"
+#include "../oms/PerformanceTracker.hpp"
 
 /**
  * Performance metrics for backtesting results
@@ -23,6 +24,9 @@ struct PerformanceMetrics {
     double finalEquity;
     double totalPnL;
     double totalPnLPercent;
+    double realisedPnL;
+    double unrealisedPnL;
+    double commissionPaid;
     double maxDrawdownPercent;
     double sharpeRatio;
     int numTrades;
@@ -55,6 +59,23 @@ public:
      * Run the backtest simulation
      */
     void run();
+
+    /**
+     * Run the backtest over bars you already have in memory (oldest first). The bars are only read,
+     * never copied, so many backtests can share one dataset (the optimiser does this).
+     * Strategies see a rolling window of the newest bars, exactly like live trading.
+     */
+    void runOn(const std::vector<MarketCondition>& bars);
+
+    // Bars kept in memory for strategies (default 1000; strategies only look back a fixed amount)
+    void setWindowBars(size_t bars) { windowBars = bars; }
+
+    // Keep a timestamped equity point per bar (only needed for --output files). Off saves memory.
+    void keepEquityCurve(bool keep) { keepCurve = keep; }
+
+    // P&L, Sharpe, drawdown etc. from the last run
+    PerformanceSummary getSummary() const { return tracker.summary(); }
+    SimulatedBroker& getBroker() { return broker; }
     
     // Configuration methods
     void setStartingCapital(double capital);
@@ -89,25 +110,25 @@ private:
     std::string endDate;
     int numThreads;
     bool useDirectData;
+    size_t windowBars = 1000;
+    bool keepCurve = true;
     
     // Performance tracking
     PerformanceMetrics metrics;
-    std::vector<double> dailyReturns;
+    PerformanceTracker tracker;               // works out P&L, Sharpe, drawdown from the broker's fills
+    size_t fillsRecorded = 0;                 // how many of the broker's fills the tracker has seen
     std::vector<std::pair<std::string, double>> equityCurve;
     std::map<std::string, std::vector<double>> customMetrics;
     
     // Simulation methods
     void initializeBacktest();
-    void executeTimeStep();
+    void executeTimeStep(const MarketCondition& bar);
     void logPerformance();
     void calculateMetrics();
     void printReport();
     void saveResults();
     
-    // Calculation helpers
-    double calculateSharpeRatio();
-    double calculateMaxDrawdown();
-    double calculateAnnualizedReturn();
+    void recordNewFills();
     
     // Utility methods
     std::string getCurrentTimestamp() const;
