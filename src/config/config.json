@@ -16,7 +16,7 @@
     "strategies": [
         {
             "name": "RSI",
-            "active": 1,
+            "active": 0,
             "period": 21,
             "overbought_threshold": 80,
             "oversold_threshold": 35,
@@ -35,7 +35,7 @@
         },
         {
             "name": "MEANREV",
-            "active": 0,
+            "active": 1,
             "lookback_period": 120,
             "entry_threshold": 2.0,
             "exit_threshold": 0.0,
