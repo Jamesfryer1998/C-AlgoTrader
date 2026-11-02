@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "alpaca/AlpacaDailyBars.hpp"
 #include "alpaca/AlpacaBroker.hpp"
 #include "alpaca/AlpacaStream.hpp"
 #include "data_access/MarketData.hpp"
@@ -123,4 +124,24 @@ TEST(AlpacaBrokerTests, ClientOrderIdIsSentWhenSet)
 
     order.setClientOrderId("algo-12-1793300000");
     EXPECT_EQ(AlpacaBroker::buildOrderJson(order)["client_order_id"], "algo-12-1793300000");
+}
+
+TEST(AlpacaDailyBarsTests, ParsesDailyBarsAsNewYorkDates)
+{
+    // Alpaca stamps daily bars at midnight New York time (04:00Z in summer, 05:00Z in winter)
+    json body = json::parse(R"({"bars":[
+        {"t":"2026-10-29T04:00:00Z","o":70.1,"h":70.9,"l":69.5,"c":70.5,"v":1234567},
+        {"t":"2026-12-01T05:00:00Z","o":71.0,"h":72.0,"l":70.0,"c":71.5,"v":2000000},
+        {"t":"2026-12-02T05:00:00Z","o":71.5,"h":72.5,"l":71.0,"c":72.0,"v":10}
+    ],"next_page_token":null})");
+
+    std::vector<quant::DailyBar> bars = AlpacaDailyBars::parseBars(body, "2026-12-02");   // today: unfinished
+    ASSERT_EQ(bars.size(), 2u);
+    EXPECT_EQ(bars[0].date, "2026-10-29");
+    EXPECT_EQ(bars[1].date, "2026-12-01");
+    EXPECT_DOUBLE_EQ(bars[0].close, 70.5);
+    EXPECT_DOUBLE_EQ(bars[0].high, 70.9);
+    EXPECT_DOUBLE_EQ(bars[1].volume, 2000000);
+
+    EXPECT_TRUE(AlpacaDailyBars::parseBars(json::object()).empty());
 }

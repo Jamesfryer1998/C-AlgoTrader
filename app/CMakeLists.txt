@@ -1,6 +1,7 @@
 add_executable(algo_trader_app main.cpp)
 add_executable(backtest_app backtest.cpp)
 add_executable(optimise_app optimise.cpp)
+add_executable(quant_app quant.cpp)
 
 target_link_libraries(algo_trader_app 
     alpaca_lib
@@ -26,4 +27,10 @@ target_link_libraries(optimise_app
     oms_lib
     strategy_lib
     backtester_lib
+    nlohmann_json)
+
+target_link_libraries(quant_app
+    alpaca_lib
+    quant_lib
+    util_lib
     nlohmann_json)

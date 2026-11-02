@@ -138,6 +138,41 @@ Edit the value lists in `src/config/optimisation.json` to search different range
 Returns look tiny (fractions of a percent) because every order is 1 share against $100k of capital;
 compare settings by Sharpe ratio, which doesn't depend on trade size.
 
+### Quant learning projects (`quant_app`)
+Three classic projects on **daily** data, separate from the live NVDA trader. Prices come from Alpaca
+(same `.env` keys, adjusted for splits and dividends, history from 2016) and are cached in `data/daily/`.
+Results are printed and saved as CSVs in `data/quant/`. Code is in `src/quant/`.
+
+```sh
+# Run from the project root directory
+./build/app/quant_app risk                      # Monte Carlo VaR / expected shortfall
+./build/app/quant_app scan                      # which pairs of stocks are cointegrated?
+./build/app/quant_app pairs --pair KO,PEP       # pairs trading backtest
+./build/app/quant_app macross --symbol SPY      # 50/200-day crossover vs buy and hold
+./build/app/quant_app --help                    # all options (symbols, weights, z-score levels, costs...)
+```
+Add `--offline` to reuse the saved CSVs instead of downloading again.
+
+**1. Monte Carlo portfolio risk** (`risk`). Estimates each stock's return, volatility and the correlation
+matrix from daily log returns, then simulates 10,000 possible 21-day futures with correlated random returns
+(Cholesky factor of the covariance). From that distribution: **VaR 95%** (the loss a 1-in-20 month exceeds)
+and **expected shortfall** (the average loss in those worst 5%). The same simulation with every correlation set
+to zero shows that correlation, not the individual stocks, drives portfolio risk. A reality check counts how
+often real 21-day windows lost more than the VaR: usually more than the model's 5%, because real returns have
+fatter tails than a normal distribution.
+
+**2. Pairs trading** (`scan`, `pairs`). `scan` runs an Engle-Granger cointegration test on every pair in a list
+(regress log Y on log X, then an ADF test on the residual spread) and ranks them; it warns that testing many pairs
+finds a few by chance. `pairs` backtests one pair: the hedge ratio and z-score come from a rolling 252-day fit,
+enter when |z| > 2 (short the expensive stock, buy the cheap one), exit when |z| < 0.5, stop out at |z| > 4.
+The hedge ratio is frozen while a trade is open, signals earn returns from the next day, and each trade pays
+costs. A year-by-year cointegration table shows that relationships break.
+
+**3. Moving average crossover** (`macross`). Invested while the 50-day average is above the 200-day, in cash
+otherwise. The signal from one close only earns returns from the next day, every buy and sell pays costs, and
+the result is compared with buy and hold over exactly the same days. It also prints the same strategy without
+costs and with look-ahead (using the same close it trades on) to show how much those mistakes flatter a backtest.
+
 ### Running Tests
 ```sh
 # From the build directory
