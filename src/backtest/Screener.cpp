@@ -6,6 +6,8 @@
 #include <fstream>
 #include <iomanip>
 #include <map>
+#include <set>
+#include "Backtester.hpp"
 #include <sstream>
 #include "../quant/Stats.hpp"
 
@@ -184,6 +186,75 @@ Screener::heldUp(const std::vector<Row>& rows, double minTrainSharpe, double min
     std::stable_sort(out.begin(), out.end(),
                      [](const Row& a, const Row& b) { return a.test.sharpeRatio > b.test.sharpeRatio; });
     return out;
+}
+
+std::vector<Screener::Row>
+Screener::topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades)
+{
+    std::vector<Row> candidates = heldUp(rows, 0.5, 0.5, minTestTrades);
+    auto weaker = [](const Row& r) { return std::min(r.train.sharpeRatio, r.test.sharpeRatio); };
+    std::stable_sort(candidates.begin(), candidates.end(),
+                     [&](const Row& a, const Row& b) { return weaker(a) > weaker(b); });
+
+    std::vector<Row> picks;
+    std::set<std::string> stocks;
+    for (const auto& row : candidates)
+    {
+        if (picks.size() >= n)
+            break;
+        if (stocks.insert(row.symbol).second)   // one strategy per stock
+            picks.push_back(row);
+    }
+    return picks;
+}
+
+quant::PriceTable
+Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<quant::DailyBar>>& daily) const
+{
+    double maxPosition = baseConfig.value("max_position_size", 10.0);
+    std::vector<std::string> names;
+    std::map<std::string, std::vector<quant::DailyBar>> values;
+
+    for (const auto& pick : picks)
+    {
+        auto found = daily.find(pick.symbol);
+        if (found == daily.end() || found->second.empty())
+            continue;
+
+        // The chosen setting on top of the strategy's other settings
+        json strategySettings = optimiser.currentSettings(pick.strategy);
+        for (const auto& [key, value] : pick.parameters.items())
+            strategySettings[key] = value;
+        json config = baseConfig;
+        config["strategies"] = json::array({strategySettings});
+
+        Backtester backtester(config);
+        backtester.setStartingCapital(settings.value("starting_capital", 100000.0));
+        backtester.setCommissionPerTrade(settings.value("commission_per_trade", 0.0));
+        backtester.setSlippagePercentage(settings.value("slippage_percent", 0.01) / 100.0);
+        backtester.getBroker().setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
+        backtester.keepEquityCurve(true);
+        std::vector<MarketCondition> bars = toBars(pick.symbol, found->second);
+        backtester.runOn(bars);
+
+        const auto& curve = backtester.getEquityCurve();
+        if (curve.size() < 2)
+            continue;
+        double capital = maxPosition * bars.front().Close;
+        double start = curve.front().second;
+        std::string name = pick.symbol + " " + pick.strategy;
+        std::vector<quant::DailyBar> series;
+        for (size_t i = 1; i < curve.size(); i++)   // skip the starting point (it repeats the first date)
+        {
+            quant::DailyBar point;
+            point.date = curve[i].first.substr(0, 10);
+            point.close = std::max(capital * 0.01, capital + curve[i].second - start);
+            series.push_back(point);
+        }
+        names.push_back(name);
+        values[name] = series;
+    }
+    return quant::alignCloses(names, values);
 }
 
 std::string

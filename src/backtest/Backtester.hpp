@@ -79,6 +79,10 @@ public:
 
     // P&L, Sharpe, drawdown etc. from the last run
     PerformanceSummary getSummary() const { return tracker.summary(); }
+
+    // (bar time, account equity) after each bar of the last run, when keepEquityCurve is on.
+    // The first point is the starting equity, stamped with the first bar's time.
+    const std::vector<std::pair<std::string, double>>& getEquityCurve() const { return equityCurve; }
     SimulatedBroker& getBroker() { return broker; }
     
     // Configuration methods

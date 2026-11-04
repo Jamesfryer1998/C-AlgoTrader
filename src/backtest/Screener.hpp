@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
@@ -84,6 +85,18 @@ class Screener
         // Combinations that did well in both periods and beat buy and hold on the test years
         static std::vector<Row> heldUp(const std::vector<Row>& rows, double minTrainSharpe, double minTestSharpe,
                                        int minTestTrades);
+
+        // The n to take forward: held up in both periods (Sharpe >= 0.5 in each, beat buy and hold, at least
+        // minTestTrades test trades), ranked by the weaker of the two Sharpe ratios so both periods must be good,
+        // and at most one strategy per stock. May return fewer than n.
+        static std::vector<Row> topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades = 5);
+
+        // Each pick's daily value over its whole history (training and test years) with its chosen setting,
+        // as if max_position_size shares at the first price were the capital: value = that capital + P&L so far.
+        // These act like prices, so MonteCarloRisk can measure the risk of trading the picks together.
+        // Names are "STOCK STRATEGY". daily: the stocks' daily bars by symbol.
+        quant::PriceTable pickValues(const std::vector<Row>& picks,
+                                     const std::map<std::string, std::vector<quant::DailyBar>>& daily) const;
 
         // Save / load results (so a long screen can be resumed)
         static bool writeCsv(const std::string& path, const std::vector<Row>& rows);

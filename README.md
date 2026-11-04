@@ -196,6 +196,12 @@ years, and whether a better training Sharpe predicted a better test Sharpe. It t
 combinations by training Sharpe (what you'd pick knowing only the past) with how they did afterwards, and the
 combinations that held up in both periods. Every row is saved in `data/screen/screen_results.csv`.
 
+It finishes with the **top 5 to take forward** (`--top N` to change): combinations that held up in both periods,
+ranked by the weaker of their training and test Sharpe so both must be good, one strategy per stock (saved in
+`data/screen/top_picks.csv`). It then runs the **Monte Carlo risk** model on those picks traded together: each
+pick's daily P&L with its chosen setting becomes a return stream, and 10,000 simulated months give the
+combined volatility, the correlation between the picks, VaR and expected shortfall (`--value` sets the money, $100k by default).
+
 Read it with care: hundreds of combinations are tried, so some will look good by luck; today's S&P 100 is a
 list of past winners (survivorship bias); and "held up" is filtered using the test years. Treat what it finds
 as candidates to paper trade, not proof.

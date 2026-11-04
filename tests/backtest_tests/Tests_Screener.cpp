@@ -227,3 +227,66 @@ TEST(ScreenerTests, SummaryPicksAndCsv)
     EXPECT_FALSE(read[4].found);
     std::remove(path.c_str());
 }
+
+TEST(ScreenerTests, TopPicksNeedBothPeriodsAndOnePerStock)
+{
+    auto row = [](const std::string& symbol, const std::string& strategy, double train, double test, int trades) {
+        Screener::Row r;
+        r.symbol = symbol;
+        r.strategy = strategy;
+        r.found = true;
+        r.train.sharpeRatio = train;
+        r.test.sharpeRatio = test;
+        r.test.closedTrades = trades;
+        r.buyHoldSharpe = 0.4;
+        return r;
+    };
+    std::vector<Screener::Row> rows = {
+        row("A", "RSI", 3.0, 0.6, 10),       // great training, only just OK test: weaker side 0.6
+        row("B", "MACD", 1.0, 1.1, 10),      // good in both: weaker side 1.0 -> first
+        row("B", "RSI", 0.9, 0.9, 10),       // same stock as a better pick: skipped
+        row("C", "MEANREV", 0.8, 2.0, 10),   // weaker side 0.8
+        row("D", "RSI", 2.0, 2.0, 2),        // too few test trades
+        row("E", "RSI", 2.0, 0.3, 10)};      // test too weak
+
+    std::vector<Screener::Row> picks = Screener::topPicks(rows, 5);
+    ASSERT_EQ(picks.size(), 3u);
+    EXPECT_EQ(picks[0].symbol, "B");
+    EXPECT_EQ(picks[0].strategy, "MACD");
+    EXPECT_EQ(picks[1].symbol, "C");
+    EXPECT_EQ(picks[2].symbol, "A");
+    EXPECT_EQ(Screener::topPicks(rows, 1).size(), 1u);
+}
+
+TEST(ScreenerTests, PickValuesTrackEachPicksProfit)
+{
+    Quiet quiet;
+    Screener screener(baseConfig(), screenSettings());
+    std::vector<quant::DailyBar> daily = dailyBars(700);
+
+    Screener::Row rsi;
+    rsi.symbol = "TEST";
+    rsi.strategy = "RSI";
+    rsi.found = true;
+    rsi.parameters = {{"period", 7}, {"oversold_threshold", 30}, {"overbought_threshold", 70}};
+    Screener::Row meanrev = rsi;
+    meanrev.strategy = "MEANREV";
+    meanrev.parameters = {{"lookback_period", 20}, {"entry_threshold", 1.5}};
+
+    quant::PriceTable values = screener.pickValues({rsi, meanrev}, {{"TEST", daily}});
+    ASSERT_EQ(values.symbols.size(), 2u);
+    EXPECT_EQ(values.symbols[0], "TEST RSI");
+    EXPECT_EQ(values.days(), 700u);
+    EXPECT_EQ(values.dates.front(), daily.front().date);
+
+    // Starts at the full-position capital (10 shares at the first price) and moves with the strategy's P&L
+    double capital = 10 * daily.front().close;
+    EXPECT_NEAR(values[0][0], capital, capital * 0.05);
+    EXPECT_NE(values[0].back(), values[0].front());
+    EXPECT_NE(values[0], values[1]);
+
+    // Unknown stock: left out
+    Screener::Row missing = rsi;
+    missing.symbol = "NONE";
+    EXPECT_EQ(screener.pickValues({missing}, {{"TEST", daily}}).symbols.size(), 0u);
+}
