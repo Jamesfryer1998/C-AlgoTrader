@@ -297,7 +297,7 @@ namespace quant
         return result;
     }
 
-    Performance performance(const Vector& dailyReturns)
+    Performance performance(const Vector& dailyReturns, double periodsPerYear)
     {
         Performance p;
         p.days = static_cast<int>(dailyReturns.size());
@@ -312,11 +312,11 @@ namespace quant
             p.maxDrawdown = std::max(p.maxDrawdown, 1.0 - equity / peak);
         }
         p.totalReturn = equity - 1.0;
-        p.cagr = equity > 0 ? std::pow(equity, TRADING_DAYS / p.days) - 1.0 : -1.0;
+        p.cagr = equity > 0 ? std::pow(equity, periodsPerYear / p.days) - 1.0 : -1.0;
 
         double sd = stdev(dailyReturns);
-        p.annualVolatility = sd * std::sqrt(TRADING_DAYS);
-        p.sharpe = sd > 0 ? mean(dailyReturns) / sd * std::sqrt(TRADING_DAYS) : 0.0;
+        p.annualVolatility = sd * std::sqrt(periodsPerYear);
+        p.sharpe = sd > 0 ? mean(dailyReturns) / sd * std::sqrt(periodsPerYear) : 0.0;
         return p;
     }
 }

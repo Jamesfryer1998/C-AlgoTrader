@@ -290,3 +290,96 @@ TEST(ScreenerTests, PickValuesTrackEachPicksProfit)
     missing.symbol = "NONE";
     EXPECT_EQ(screener.pickValues({missing}, {{"TEST", daily}}).symbols.size(), 0u);
 }
+
+namespace
+{
+    // Regular-hours minute bars (09:30-15:59) for `days` weekdays from 2025-01-06, swinging over hours
+    std::vector<MarketCondition> minuteBars(int days, const std::string& ticker = "MIN")
+    {
+        std::vector<MarketCondition> bars;
+        std::time_t t = 1736121600;   // 2025-01-06 UTC (a Monday)
+        unsigned seed = 3;
+        double price = 100;
+        int made = 0, k = 0;
+        while (made < days)
+        {
+            std::tm day = *std::gmtime(&t);
+            t += 24 * 60 * 60;
+            if (day.tm_wday == 0 || day.tm_wday == 6)
+                continue;
+            char date[16];
+            std::strftime(date, sizeof(date), "%Y-%m-%d", &day);
+            for (int m = 0; m < 390; m++, k++)
+            {
+                seed = seed * 1103515245u + 12345u;
+                double noise = (((seed >> 16) % 1000) / 1000.0 - 0.5) * 0.004;
+                double previous = price;
+                price = 100.0 * (1.0 + 0.03 * std::sin(k / 120.0)) * (1.0 + noise);
+                char time[32];
+                std::snprintf(time, sizeof(time), "%s %02d:%02d:00", date, 9 + (30 + m) / 60, (30 + m) % 60);
+                bars.emplace_back(time, ticker, static_cast<float>(previous), static_cast<float>(price), 1000, "1m");
+            }
+            made++;
+        }
+        return bars;
+    }
+
+    json minuteSettings()
+    {
+        json s = screenSettings();
+        s["bars_per_year"] = 252.0 * 390.0;
+        s["test_start"] = "2025-04-01";
+        s["min_train_days"] = 40;
+        s["min_test_days"] = 15;
+        s["test_warmup_bars"] = 100;
+        return s;
+    }
+}
+
+TEST(ScreenerTests, ScreensMinuteBars)
+{
+    Quiet quiet;
+    Screener screener(baseConfig(), minuteSettings());
+    std::vector<MarketCondition> bars = minuteBars(80);   // ~ 2025-01-06 to 2025-04-25
+    EXPECT_EQ(Screener::countDays(bars), 80);
+
+    std::vector<Screener::Row> rows = screener.screenStock("MIN", bars, {"RSI"}, 2);
+    ASSERT_EQ(rows.size(), 1u);
+    const auto& row = rows[0];
+    EXPECT_EQ(row.trainDays + row.testDays, 80);   // days, not bars
+    EXPECT_EQ(row.testStart, "2025-04-01");
+    ASSERT_TRUE(row.found);
+    EXPECT_GT(row.test.fills, 0);
+
+    // Buy and hold is measured bar by bar and annualised for minute bars, like the strategies
+    quant::Vector closes;
+    for (const auto& bar : bars)
+        if (bar.DateTime >= "2025-04-01")
+            closes.push_back(bar.Close);
+    quant::Performance expected = quant::performance(quant::simpleReturns(closes), 252.0 * 390.0);
+    EXPECT_NEAR(row.buyHoldSharpe, expected.sharpe, 1e-9);
+    EXPECT_NEAR(row.buyHoldReturn, closes.back() / closes.front() - 1.0, 1e-9);
+}
+
+TEST(ScreenerTests, MinutePickValuesAreOnePerDay)
+{
+    Quiet quiet;
+    Screener screener(baseConfig(), minuteSettings());
+    Screener::Row pick;
+    pick.symbol = "MIN";
+    pick.strategy = "RSI";
+    pick.found = true;
+    pick.parameters = {{"period", 14}, {"oversold_threshold", 30}, {"overbought_threshold", 70}};
+
+    std::vector<MarketCondition> bars = minuteBars(30);
+    quant::PriceTable values = screener.pickValues({pick}, std::map<std::string, std::vector<MarketCondition>>{{"MIN", bars}});
+    ASSERT_EQ(values.symbols.size(), 1u);
+    EXPECT_EQ(values.days(), 30u);   // the last value of each day
+    EXPECT_EQ(values.dates.front(), "2025-01-06");
+
+    json ready = screener.strategySettings(pick);   // full block for config.json
+    EXPECT_EQ(ready["name"], "RSI");
+    EXPECT_EQ(ready["period"], 14);
+    EXPECT_EQ(ready["stop_loss"], 10);   // not searched: kept from config.json
+    EXPECT_EQ(ready["active"], 1);
+}

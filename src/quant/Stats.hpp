@@ -92,5 +92,6 @@ namespace quant
         double maxDrawdown = 0;    // worst peak-to-trough fall, as a positive fraction
         int days = 0;
     };
-    Performance performance(const Vector& dailyReturns);
+    // periodsPerYear: how many returns make a year (252 for daily, 252 x 390 for regular-hours minute bars)
+    Performance performance(const Vector& dailyReturns, double periodsPerYear = TRADING_DAYS);
 }

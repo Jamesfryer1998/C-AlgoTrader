@@ -11,9 +11,10 @@
 #include <sstream>
 #include "../quant/Stats.hpp"
 
-static json withDailyBars(json config)
+// Sharpe ratios annualised for the bar size being screened (from the settings; daily if not given)
+static json withBarsPerYear(json config, const json& settings)
 {
-    config["bars_per_year"] = quant::TRADING_DAYS;   // Sharpe ratios annualised for daily bars
+    config["bars_per_year"] = settings.value("bars_per_year", quant::TRADING_DAYS);
     return config;
 }
 
@@ -24,9 +25,9 @@ static json pickOnlyTheBest(json settings)
 }
 
 Screener::Screener(const json& baseConfig, const json& settings)
-    : baseConfig(withDailyBars(baseConfig)),
+    : baseConfig(withBarsPerYear(baseConfig, settings)),
       settings(settings),
-      optimiser(withDailyBars(baseConfig), pickOnlyTheBest(settings))
+      optimiser(withBarsPerYear(baseConfig, settings), pickOnlyTheBest(settings))
 {
 }
 
@@ -45,20 +46,45 @@ Screener::toBars(const std::string& symbol, const std::vector<quant::DailyBar>& 
     return bars;
 }
 
+int
+Screener::countDays(const std::vector<MarketCondition>& bars)
+{
+    int days = 0;
+    std::string last;
+    for (const auto& bar : bars)
+    {
+        std::string day = bar.DateTime.substr(0, 10);
+        if (day != last)
+        {
+            days++;
+            last = day;
+        }
+    }
+    return days;
+}
+
 std::vector<Screener::Row>
 Screener::screenStock(const std::string& symbol, const std::vector<quant::DailyBar>& daily,
                       const std::vector<std::string>& strategies, int threads,
                       const std::function<void(const std::string&, size_t, size_t)>& onProgress) const
 {
+    return screenStock(symbol, toBars(symbol, daily), strategies, threads, onProgress);
+}
+
+std::vector<Screener::Row>
+Screener::screenStock(const std::string& symbol, const std::vector<MarketCondition>& all,
+                      const std::vector<std::string>& strategies, int threads,
+                      const std::function<void(const std::string&, size_t, size_t)>& onProgress) const
+{
     std::string testStart = settings.value("test_start", "2024-01-01");
-    size_t minTrainDays = settings.value("min_train_days", 500);
-    size_t minTestDays = settings.value("min_test_days", 120);
+    int minTrainDays = settings.value("min_train_days", 500);
+    int minTestDays = settings.value("min_test_days", 120);
+    double barsPerYear = baseConfig.value("bars_per_year", quant::TRADING_DAYS);
     size_t warmupWanted = settings.value("test_warmup_bars", 320);
     double maxPosition = baseConfig.value("max_position_size", 10.0);
 
     // 1. Split: training years before test_start, test years from it. The test run is given the last
     //    training bars first as history only, so strategies start the test years warmed up.
-    std::vector<MarketCondition> all = toBars(symbol, daily);
     std::vector<MarketCondition> train, test;
     for (const auto& bar : all)
         (bar.DateTime.substr(0, 10) < testStart ? train : test).push_back(bar);
@@ -69,8 +95,8 @@ Screener::screenStock(const std::string& symbol, const std::vector<quant::DailyB
         Row row;
         row.symbol = symbol;
         row.strategy = name;
-        row.trainDays = static_cast<int>(train.size());
-        row.testDays = static_cast<int>(test.size());
+        row.trainDays = countDays(train);
+        row.testDays = countDays(test);
         if (!test.empty())
         {
             row.testStart = test.front().DateTime.substr(0, 10);
@@ -78,14 +104,14 @@ Screener::screenStock(const std::string& symbol, const std::vector<quant::DailyB
         }
         rows.push_back(row);
     }
-    if (train.size() < minTrainDays || test.size() < minTestDays)
+    if (rows.empty() || rows.front().trainDays < minTrainDays || rows.front().testDays < minTestDays)
         return rows;   // not enough history (e.g. listed recently): nothing found
 
     // 2. Buy and hold over the test days, the benchmark every strategy has to beat
     quant::Vector closes;
     for (const auto& bar : test)
         closes.push_back(bar.Close);
-    quant::Performance buyHold = quant::performance(quant::simpleReturns(closes));
+    quant::Performance buyHold = quant::performance(quant::simpleReturns(closes), barsPerYear);
     for (auto& row : rows)
     {
         row.buyHoldReturn = buyHold.totalReturn;
@@ -208,8 +234,26 @@ Screener::topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades)
     return picks;
 }
 
+json
+Screener::strategySettings(const Row& pick) const
+{
+    json strategy = optimiser.currentSettings(pick.strategy);
+    for (const auto& [key, value] : pick.parameters.items())
+        strategy[key] = value;
+    return strategy;
+}
+
 quant::PriceTable
 Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<quant::DailyBar>>& daily) const
+{
+    std::map<std::string, std::vector<MarketCondition>> bars;
+    for (const auto& [symbol, days] : daily)
+        bars[symbol] = toBars(symbol, days);
+    return pickValues(picks, bars);
+}
+
+quant::PriceTable
+Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<MarketCondition>>& allBars) const
 {
     double maxPosition = baseConfig.value("max_position_size", 10.0);
     std::vector<std::string> names;
@@ -217,16 +261,12 @@ Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, 
 
     for (const auto& pick : picks)
     {
-        auto found = daily.find(pick.symbol);
-        if (found == daily.end() || found->second.empty())
+        auto found = allBars.find(pick.symbol);
+        if (found == allBars.end() || found->second.empty())
             continue;
 
-        // The chosen setting on top of the strategy's other settings
-        json strategySettings = optimiser.currentSettings(pick.strategy);
-        for (const auto& [key, value] : pick.parameters.items())
-            strategySettings[key] = value;
         json config = baseConfig;
-        config["strategies"] = json::array({strategySettings});
+        config["strategies"] = json::array({strategySettings(pick)});
 
         Backtester backtester(config);
         backtester.setStartingCapital(settings.value("starting_capital", 100000.0));
@@ -234,7 +274,7 @@ Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, 
         backtester.setSlippagePercentage(settings.value("slippage_percent", 0.01) / 100.0);
         backtester.getBroker().setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
         backtester.keepEquityCurve(true);
-        std::vector<MarketCondition> bars = toBars(pick.symbol, found->second);
+        const std::vector<MarketCondition>& bars = found->second;
         backtester.runOn(bars);
 
         const auto& curve = backtester.getEquityCurve();
@@ -243,13 +283,21 @@ Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, 
         double capital = maxPosition * bars.front().Close;
         double start = curve.front().second;
         std::string name = pick.symbol + " " + pick.strategy;
+        // One value per day: the last one (skipping the starting point, which repeats the first bar's time)
         std::vector<quant::DailyBar> series;
-        for (size_t i = 1; i < curve.size(); i++)   // skip the starting point (it repeats the first date)
+        for (size_t i = 1; i < curve.size(); i++)
         {
-            quant::DailyBar point;
-            point.date = curve[i].first.substr(0, 10);
-            point.close = std::max(capital * 0.01, capital + curve[i].second - start);
-            series.push_back(point);
+            std::string day = curve[i].first.substr(0, 10);
+            double value = std::max(capital * 0.01, capital + curve[i].second - start);
+            if (!series.empty() && series.back().date == day)
+                series.back().close = value;
+            else
+            {
+                quant::DailyBar point;
+                point.date = day;
+                point.close = value;
+                series.push_back(point);
+            }
         }
         names.push_back(name);
         values[name] = series;

@@ -42,6 +42,9 @@ class AlpacaHistory
         // Handles Alpaca's paging. Sets ok=false if a request failed.
         std::vector<MarketCondition> fetchBars(const std::string& startUtc, const std::string& endUtc, bool& ok);
 
+        // Only print errors (no per-month progress), e.g. when downloading 100 stocks
+        void setQuiet(bool value) { quiet = value; }
+
         // Path of the CSV for one day, e.g. <dataDir>/marketData_NVDA_2026-10-28.csv
         std::string csvPath(const std::string& dataDir, const std::string& date) const;
 
@@ -55,6 +58,7 @@ class AlpacaHistory
         std::string fileBaseName;
         std::string adjustment;
         bool regularHoursOnly;
+        bool quiet = false;
 
         // Download one calendar month (clipped to the requested range). Returns bars written or -1.
         int downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const std::string& startDate,

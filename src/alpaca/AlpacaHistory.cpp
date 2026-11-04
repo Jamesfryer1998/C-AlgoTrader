@@ -144,7 +144,8 @@ AlpacaHistory::downloadToCsv(const std::string& startDate, const std::string& en
                 doneMonths.insert(month.get<std::string>());
     }
 
-    std::cout << "Downloading " << symbol << " 1-minute bars (" << feed << " feed, " << adjustment << "-adjusted) "
+    if (!quiet)
+        std::cout << "Downloading " << symbol << " 1-minute bars (" << feed << " feed, " << adjustment << "-adjusted) "
               << startDate << " to " << endDate << " from Alpaca, a month at a time..." << std::endl;
 
     int written = 0;
@@ -166,7 +167,8 @@ AlpacaHistory::downloadToCsv(const std::string& startDate, const std::string& en
 
         if (!overwrite && doneMonths.count(monthKey))
         {
-            std::cout << "  " << monthKey << ": already downloaded" << std::endl;
+            if (!quiet)
+                std::cout << "  " << monthKey << ": already downloaded" << std::endl;
         }
         else
         {
@@ -190,7 +192,8 @@ AlpacaHistory::downloadToCsv(const std::string& startDate, const std::string& en
         month = nextMonth;
     }
 
-    std::cout << "Done: " << written << " new bars written to " << dataDir << std::endl;
+    if (!quiet)
+        std::cout << "Done: " << written << " new bars written to " << dataDir << std::endl;
     return written;
 }
 
@@ -250,7 +253,8 @@ AlpacaHistory::downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const
         written += dayBars.size();
     }
 
-    std::cout << "  " << firstDay.substr(0, 7) << ": " << byDay.size() << " trading days, "
+    if (!quiet)
+        std::cout << "  " << firstDay.substr(0, 7) << ": " << byDay.size() << " trading days, "
               << written << " bars written" << (skipped ? ", " + std::to_string(skipped) + " days already saved" : "")
               << std::endl;
     return written;

@@ -8,6 +8,7 @@
 #include <sstream>
 #include <thread>
 #include "../src/alpaca/AlpacaHistory.hpp"
+#include "../src/backtest/MinuteBars.hpp"
 #include "../src/backtest/Optimiser.hpp"
 #include "../src/data_access/CSVParser.hpp"
 #include "../src/data_access/DataStitcher.hpp"
@@ -40,60 +41,6 @@ static void printUsage()
               << "  --threads <n>                      Backtests run at once (default: all CPU cores)\n"
               << "  --download                         Download missing data from Alpaca first (uses .env keys)\n"
               << "  --help\n";
-}
-
-// Load every daily CSV in the range, keeping only rows from each file's own day (so old multi-day
-// Yahoo files sharing the naming scheme can't mix in), sorted oldest first.
-static std::vector<MarketCondition> loadBars(const std::string& dataDir, const std::string& ticker,
-                                             const std::string& start, const std::string& end, int threads)
-{
-    DataStitcher stitcher(dataDir, ticker);
-    std::vector<std::string> files = stitcher.findFilesInRange(start, end);
-    std::sort(files.begin(), files.end());
-
-    std::atomic<size_t> next{0};
-    std::mutex mutex;
-    std::vector<std::vector<MarketCondition>> perFile(files.size());
-
-    std::vector<std::thread> pool;
-    for (int t = 0; t < std::max(1, threads); t++)
-    {
-        pool.emplace_back([&]() {
-            while (true)
-            {
-                size_t i = next.fetch_add(1);
-                if (i >= files.size())
-                    return;
-                std::string fileDay = files[i].substr(files[i].size() - 14, 10);   // ..._YYYY-MM-DD.csv
-                try
-                {
-                    CSVParser parser;
-                    parser.Read(files[i]);
-                    for (const auto& bar : parser.GetData())
-                        if (MarketTime::datePart(bar.DateTime) == fileDay)
-                            perFile[i].push_back(bar);
-                }
-                catch (const std::exception& e)
-                {
-                    std::lock_guard<std::mutex> lock(mutex);
-                    std::cerr << "WARNING - skipping " << files[i] << ": " << e.what() << std::endl;
-                }
-            }
-        });
-    }
-    for (auto& thread : pool)
-        thread.join();
-
-    std::vector<MarketCondition> bars;
-    for (auto& fileBars : perFile)
-        bars.insert(bars.end(), fileBars.begin(), fileBars.end());
-    std::stable_sort(bars.begin(), bars.end(), [](const MarketCondition& a, const MarketCondition& b) {
-        return a.DateTime < b.DateTime;
-    });
-    bars.erase(std::unique(bars.begin(), bars.end(), [](const MarketCondition& a, const MarketCondition& b) {
-        return a.DateTime == b.DateTime;
-    }), bars.end());
-    return bars;
 }
 
 static std::string describe(const json& parameters)
@@ -219,7 +166,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "Loading " << ticker << " bars " << startDate << " to " << endDate << " from " << dataDir << "..." << std::endl;
-    std::vector<MarketCondition> bars = loadBars(dataDir, ticker, startDate, endDate, threads);
+    std::vector<MarketCondition> bars = MinuteBars::load(dataDir, ticker, startDate, endDate, threads);
     if (bars.empty())
     {
         std::cerr << "No data found. Download it first:\n  ./build/app/optimise_app --download\n";

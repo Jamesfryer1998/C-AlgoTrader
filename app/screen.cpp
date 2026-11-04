@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <set>
@@ -11,39 +13,66 @@
 #include <thread>
 #include <vector>
 #include "../src/alpaca/AlpacaDailyBars.hpp"
+#include "../src/alpaca/AlpacaHistory.hpp"
+#include "../src/backtest/MinuteBars.hpp"
 #include "../src/backtest/Screener.hpp"
 #include "../src/quant/MonteCarloRisk.hpp"
 #include "../src/util/Config.hpp"
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/Log.hpp"
+#include "../src/util/MarketTime.hpp"
 
 /*
  * Strategy screen: which stock / strategy combinations look worth trading?
  *
- * Every stock in src/config/screen.json (the S&P 100 by default) x every strategy (RSI, MACD, MEANREV), on
- * daily bars since 2016. Each strategy is tuned per stock on the training years, then only that pick is run
- * on the test years it never saw, and compared with buying and holding the stock.
+ * Every stock in src/config/screen.json (the S&P 100 by default) x every strategy (RSI, MACD, MEANREV).
+ * Each strategy is tuned per stock on a training period, then only that pick is run on a test period it
+ * never saw, and compared with buying and holding the stock. Ends with the top picks and the Monte Carlo
+ * risk of trading them together.
  *
- * Results: data/screen/screen_results.csv (one row per stock and strategy) and a printed report.
+ *   default   1-minute bars (the live app's bars): the last 24 months, the final 6 being the test period.
+ *             Settings are in minutes, so the picks can go straight into config.json.
+ *   --daily   daily bars since 2016, tested from 2024. Settings are in days.
+ *
+ * Results: data/screen/minute/ (or data/screen/daily/): screen_results.csv, top_picks.csv,
+ * top_picks_config.json, and a printed report.
  */
+
+// Loads one stock's saved bars
+using BarLoader = std::function<std::vector<MarketCondition>(const std::string& symbol)>;
 
 static void printUsage()
 {
     std::cout <<
-R"(Strategy screen: tune RSI / MACD / MEANREV per stock on the training years, judge on the test years
+R"(Strategy screen: tune RSI / MACD / MEANREV per stock on a training period, judge on a later test period
 
 Usage: screen_app [options]
+  --daily                   daily bars since 2016 instead of 1-minute bars (settings then mean days)
   --symbols AAPL,MSFT,...   stocks to screen (default: "universe" in src/config/screen.json, the S&P 100)
   --strategies RSI,MEANREV  strategies to try (default: all in screen.json)
-  --test-start 2024-01-01   first day of the test years (default: from screen.json)
-  --max-combinations 200    try a fixed random sample of each grid instead of all of it (faster)
+  --months 24               minute bars: months of history (default: from screen.json)
+  --test-months 6           minute bars: months at the end used as the test period (default: from screen.json)
+  --test-start 2024-01-01   daily bars: first day of the test period (default: from screen.json)
+  --max-combinations 300    try a fixed random sample of each grid instead of all of it (faster)
   --threads 8               backtests at once (default: all CPU cores)
-  --offline                 use the daily prices already in data/daily/ instead of downloading
-  --resume                  keep stocks already in data/screen/screen_results.csv and screen the rest
-  --report                  just print the report from data/screen/screen_results.csv
+  --download-only           just download the bars (e.g. overnight), don't screen
+  --offline                 use the bars already saved instead of downloading
+  --resume                  keep stocks already in the results file and screen the rest
+  --report                  just print the report from the saved results
   --top 5                   how many combinations to take forward and risk-check together (default 5)
   --value 100000            money split across the top picks, for the risk numbers in $ (default 100000)
 )";
+}
+
+// "YYYY-MM-DD" moved back by whole months (day clamped to 28 so it always exists)
+static std::string monthsBefore(const std::string& date, int months)
+{
+    int year = std::stoi(date.substr(0, 4)), month = std::stoi(date.substr(5, 2)), day = std::stoi(date.substr(8, 2));
+    month -= months;
+    while (month <= 0) { month += 12; year--; }
+    char text[48];
+    std::snprintf(text, sizeof(text), "%04d-%02d-%02d", year, month, std::min(day, 28));
+    return text;
 }
 
 static std::vector<std::string> split(const std::string& text)
@@ -103,7 +132,7 @@ static void printReport(const std::vector<Screener::Row>& rows, const std::vecto
     }
 
     std::cout << "\n=== Strategy screen: " << stocks.size() << " stocks x " << strategies.size() << " strategies ===\n"
-              << "Each strategy tuned per stock on the years before " << testStart << ", then judged on "
+              << "Each strategy tuned per stock on the bars before " << testStart << ", then judged on "
               << testStart << " to " << testEnd << " (never used for tuning).\n\n";
 
     // 1. Per strategy
@@ -117,8 +146,8 @@ static void printReport(const std::vector<Screener::Row>& rows, const std::vecto
                   << std::setw(8) << fixed(s.medianTrainSharpe) << std::setw(7) << fixed(s.medianTestSharpe)
                   << std::setw(13) << fixed(s.trainTestCorrelation) << "\n";
     std::cout << "  Tradable: some setting made at least min_closed_trades trades in training. Beat B&H: better Sharpe\n"
-              << "  than buying and holding that stock over the test years. Correlation near 0 means a good training\n"
-              << "  result said nothing about the test years.\n";
+              << "  than buying and holding that stock over the test period. Correlation near 0 means a good training\n"
+              << "  result said nothing about the test period.\n";
 
     // 2. Does picking by past results work?
     std::vector<Screener::Row> picks = Screener::topByTraining(rows, 10);
@@ -133,7 +162,7 @@ static void printReport(const std::vector<Screener::Row>& rows, const std::vecto
     }
     if (!picks.empty() && allCount > 0)
     {
-        std::cout << "\nThe 10 best combinations on the training years (what you'd pick knowing only the past)\n";
+        std::cout << "\nThe 10 best combinations on the training period (what you'd pick knowing only the past)\n";
         printRows(picks);
         std::cout << "  * return on a full position (max_position_size shares at the first test price)\n\n"
                   << "  Their average test Sharpe: " << fixed(pickTest / picks.size()) << " vs "
@@ -151,7 +180,7 @@ static void printReport(const std::vector<Screener::Row>& rows, const std::vecto
     if (!held.empty())
         printRows(held);
     std::cout << "  These are candidates to paper trade, not proof: with " << allCount
-              << " combinations tried, some will pass by luck, and this list was filtered using the test years.\n";
+              << " combinations tried, some will pass by luck, and this list was filtered using the test period.\n";
 }
 
 static std::string dollars(double value)
@@ -164,13 +193,13 @@ static std::string dollars(double value)
 }
 
 // The top picks, and the Monte Carlo risk of trading them together
-static void printTopPicks(const std::vector<Screener::Row>& rows, const Screener& screener, AlpacaDailyBars& source,
-                          const std::string& start, size_t n, double value, const std::string& outDir)
+static void printTopPicks(const std::vector<Screener::Row>& rows, const Screener& screener, const BarLoader& loadSaved,
+                          size_t n, double value, const std::string& outDir)
 {
     std::vector<Screener::Row> picks = Screener::topPicks(rows, n);
-    std::map<std::string, std::vector<quant::DailyBar>> daily;
+    std::map<std::string, std::vector<MarketCondition>> bars;
     for (const auto& r : picks)
-        daily[r.symbol] = source.load(r.symbol, start, "", true);   // saved by the screen, no download
+        bars[r.symbol] = loadSaved(r.symbol);   // saved by the screen, no download
 
     std::cout << "\n=== Top " << n << " to take forward ===\n"
               << "Held up in both periods (Sharpe >= 0.5 in training and test, beat buy and hold, 5+ test trades),\n"
@@ -178,7 +207,7 @@ static void printTopPicks(const std::vector<Screener::Row>& rows, const Screener
     if (picks.empty())
     {
         std::cout << "  Nothing passed. That is a real result: none of the tuned strategies did well enough on\n"
-                  << "  years they weren't tuned on to be worth trading over buying and holding.\n";
+                  << "  data they weren't tuned on to be worth trading over buying and holding.\n";
         return;
     }
     if (picks.size() < n)
@@ -210,10 +239,16 @@ static void printTopPicks(const std::vector<Screener::Row>& rows, const Screener
              << r.test.closedTrades << "\n";
     }
 
+    // The same picks as config.json strategy blocks, ready to paste (with the ticker each one is for)
+    json ready = json::array();
+    for (const auto& r : picks)
+        ready.push_back({{"ticker", r.symbol}, {"strategy", screener.strategySettings(r)}});
+    std::ofstream(outDir + "/top_picks_config.json") << ready.dump(4) << "\n";
+
     // Risk of running them together: each pick's daily P&L stream, simulated forward a month at a time
     if (picks.size() < 2)
         return;
-    quant::PriceTable values = screener.pickValues(picks, daily);
+    quant::PriceTable values = screener.pickValues(picks, bars);
     if (values.days() < 60 || values.symbols.size() < 2)
     {
         std::cout << "\n  (Not enough overlapping history to measure their combined risk.)\n";
@@ -256,8 +291,11 @@ static void printTopPicks(const std::vector<Screener::Row>& rows, const Screener
               << "  VaR 99%         " << std::setw(6) << pct(risk.at99.var, 1).substr(1) << "  " << std::setw(9) << dollars(risk.at99.var * value) << "\n"
               << "  ES 99%          " << std::setw(6) << pct(risk.at99.es, 1).substr(1) << "  " << std::setw(9) << dollars(risk.at99.es * value) << "\n"
               << "  Real months that lost more than VaR 95%: " << fixed(risk.historicalBreachRate95 * 100, 1)
-              << "% (model: 5%). Worst real month: " << pct(risk.worstHistorical, 1) << " from " << risk.worstHistoricalStart << ".\n"
-              << "  The training years are in this history and the settings were fitted to them, so expect returns to be\n"
+              << "% (model: 5%). "
+              << (risk.worstHistoricalStart.empty() ? std::string("No real month lost money.")
+                                                    : "Worst real month: " + pct(risk.worstHistorical, 1) + " from " + risk.worstHistoricalStart + ".")
+              << "\n"
+              << "  The training period is in this history and the settings were fitted to it, so expect returns to be\n"
               << "  lower than shown; the volatility and correlations are the more trustworthy part.\n";
 }
 
@@ -266,10 +304,10 @@ int main(int argc, char* argv[])
     std::vector<std::string> symbols, strategies;
     std::string testStart;
     int threads = std::max(1u, std::thread::hardware_concurrency());
-    int maxCombinations = -1;
+    int maxCombinations = -1, months = -1, testMonths = -1;
     size_t topN = 5;
     double portfolioValue = 100000;
-    bool offline = false, resume = false, reportOnly = false;
+    bool daily = false, offline = false, resume = false, reportOnly = false, downloadOnly = false;
 
     for (int i = 1; i < argc; i++)
     {
@@ -281,11 +319,15 @@ int main(int argc, char* argv[])
         try
         {
             if (arg == "--help") { printUsage(); return 0; }
+            else if (arg == "--daily") daily = true;
             else if (arg == "--symbols") symbols = split(value());
             else if (arg == "--strategies") strategies = split(value());
+            else if (arg == "--months") months = std::max(2, std::stoi(value()));
+            else if (arg == "--test-months") testMonths = std::max(1, std::stoi(value()));
             else if (arg == "--test-start") testStart = value();
             else if (arg == "--max-combinations") maxCombinations = std::stoi(value());
             else if (arg == "--threads") threads = std::max(1, std::stoi(value()));
+            else if (arg == "--download-only") downloadOnly = true;
             else if (arg == "--offline") offline = true;
             else if (arg == "--resume") resume = true;
             else if (arg == "--report") reportOnly = true;
@@ -310,29 +352,82 @@ int main(int argc, char* argv[])
 
         std::ifstream file(root + "/src/config/screen.json");
         if (!file) { std::cerr << "Missing src/config/screen.json\n"; return 1; }
-        json settings = json::parse(file, nullptr, true, true);
-        if (!testStart.empty()) settings["test_start"] = testStart;
+        json all = json::parse(file, nullptr, true, true);
+
+        // The common settings with the chosen section ("minute" or "daily") on top
+        std::string mode = daily ? "daily" : "minute";
+        json settings = all;
+        settings.erase("minute");
+        settings.erase("daily");
+        for (const auto& [key, value] : all.at(mode).items())
+            settings[key] = value;
         if (maxCombinations >= 0) settings["max_combinations"] = maxCombinations;
         if (symbols.empty()) symbols = settings.at("universe").get<std::vector<std::string>>();
         if (strategies.empty())
             for (const auto& [name, grid] : settings.at("strategies").items())
                 strategies.push_back(name);
 
+        // Dates. Minute bars: the last `history_months`, the final `test_months` being the test period.
+        std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(std::time(nullptr)));
+        std::string start, end = today;
+        if (daily)
+        {
+            start = settings.value("start", "2016-01-01");
+            if (!testStart.empty()) settings["test_start"] = testStart;
+        }
+        else
+        {
+            if (months > 0) settings["history_months"] = months;
+            if (testMonths > 0) settings["test_months"] = testMonths;
+            start = monthsBefore(today, settings.value("history_months", 24));
+            settings["test_start"] = monthsBefore(today, settings.value("test_months", 6));
+        }
+
         std::string dataRoot = root + "/" + baseConfig.value("marketDataBasePath", "data/");
-        std::string outDir = dataRoot + "screen";
+        std::string outDir = dataRoot + "screen/" + mode;
         std::filesystem::create_directories(outDir);
         std::string resultsPath = outDir + "/screen_results.csv";
 
+        // Where bars come from: daily bars in data/daily/<SYMBOL>.csv, minute bars in data/minute/<SYMBOL>/
+        AlpacaDailyBars dailySource(baseConfig, dataRoot + "daily");
+        auto minuteDir = [&](const std::string& symbol) { return dataRoot + "minute/" + symbol; };
+        auto download = [&](const std::string& symbol) -> bool {
+            if (daily)
+                return !dailySource.load(symbol, start, "", false).empty();
+            json stockConfig = baseConfig;
+            stockConfig["ticker"] = symbol;
+            AlpacaHistory history(stockConfig);
+            history.setQuiet(true);
+            return history.downloadToCsv(start, end, minuteDir(symbol)) >= 0;
+        };
+        BarLoader loadSaved = [&](const std::string& symbol) {
+            if (daily)
+                return Screener::toBars(symbol, dailySource.load(symbol, start, "", true));
+            return MinuteBars::load(minuteDir(symbol), symbol, start, end, threads);
+        };
+
         Screener screener(baseConfig, settings);
-        AlpacaDailyBars source(baseConfig, dataRoot + "daily");
-        std::string start = settings.value("start", "2016-01-01");
 
         if (reportOnly)
         {
             std::vector<Screener::Row> rows = Screener::readCsv(resultsPath);
             if (rows.empty()) { std::cerr << "No results in " << resultsPath << " yet\n"; return 1; }
             printReport(rows, strategies);
-            printTopPicks(rows, screener, source, start, topN, portfolioValue, outDir);
+            printTopPicks(rows, screener, loadSaved, topN, portfolioValue, outDir);
+            return 0;
+        }
+
+        if (downloadOnly)
+        {
+            for (size_t s = 0; s < symbols.size(); s++)
+            {
+                auto t0 = std::chrono::steady_clock::now();
+                bool ok = download(symbols[s]);
+                std::cout << "[" << std::setw(3) << s + 1 << "/" << symbols.size() << "] " << std::left << std::setw(6)
+                          << symbols[s] << std::right << (ok ? " downloaded" : " FAILED") << " ("
+                          << fixed(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), 0)
+                          << "s)" << std::endl;
+            }
             return 0;
         }
 
@@ -344,14 +439,19 @@ int main(int argc, char* argv[])
         size_t combinations = 0;
         for (const auto& name : strategies)
             combinations += screener.getOptimiser().parameterGrid(name).size();
-        std::cout << "Screening " << symbols.size() << " stocks x " << strategies.size() << " strategies ("
-                  << combinations << " settings per stock), test years from " << settings.value("test_start", "2024-01-01")
-                  << ", " << threads << " threads\n";
+        std::cout << "Screening " << symbols.size() << " stocks x " << strategies.size() << " strategies on "
+                  << (daily ? "daily" : "1-minute") << " bars (" << combinations << " settings per stock)\n"
+                  << "Training " << start << " to " << settings.value("test_start", "") << ", test "
+                  << settings.value("test_start", "") << " to " << end << ", " << threads << " threads\n";
         if (resume && !done.empty())
             std::cout << "Resuming: " << done.size() << " stocks already done\n";
 
         std::vector<std::string> skipped;
         auto started = std::chrono::steady_clock::now();
+        size_t screened = 0, toScreen = 0;
+        for (const auto& symbol : symbols)
+            if (!done.count(symbol))
+                toScreen++;
 
         for (size_t s = 0; s < symbols.size(); s++)
         {
@@ -359,18 +459,23 @@ int main(int argc, char* argv[])
             if (done.count(symbol))
                 continue;
 
-            std::vector<quant::DailyBar> daily = source.load(symbol, start, "", offline);
-            if (daily.empty())
+            if (!offline && !download(symbol))
+                std::cerr << "WARNING - download of " << symbol << " failed; using whatever is saved" << std::endl;
+            std::vector<MarketCondition> bars = loadSaved(symbol);
+            if (bars.empty())
             {
-                std::cerr << "Skipping " << symbol << ": no daily data\n";
+                std::cerr << "Skipping " << symbol << ": no data\n";
                 skipped.push_back(symbol);
                 continue;
             }
 
             auto stockStarted = std::chrono::steady_clock::now();
-            std::vector<Screener::Row> stockRows = screener.screenStock(symbol, daily, strategies, threads);
+            std::vector<Screener::Row> stockRows = screener.screenStock(symbol, bars, strategies, threads);
             double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - stockStarted).count();
+            screened++;
 
+            double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+            double remaining = elapsed / screened * (toScreen - screened);
             std::cout << "[" << std::setw(3) << s + 1 << "/" << symbols.size() << "] " << std::left << std::setw(6)
                       << symbol << std::right;
             for (const auto& r : stockRows)
@@ -378,7 +483,7 @@ int main(int argc, char* argv[])
                           << (r.found ? fixed(r.train.sharpeRatio) + "->" + fixed(r.test.sharpeRatio) : std::string("-"));
             if (!stockRows.empty())
                 std::cout << "  | B&H " << fixed(stockRows.front().buyHoldSharpe);
-            std::cout << "  (" << fixed(seconds, 0) << "s)" << std::endl;
+            std::cout << "  (" << fixed(seconds, 0) << "s, about " << fixed(remaining / 60.0, 0) << " min left)" << std::endl;
 
             rows.insert(rows.end(), stockRows.begin(), stockRows.end());
             Screener::writeCsv(resultsPath, rows);   // saved as we go, so --resume can pick up from here
@@ -394,8 +499,9 @@ int main(int argc, char* argv[])
         }
 
         printReport(rows, strategies);
-        printTopPicks(rows, screener, source, start, topN, portfolioValue, outDir);
-        std::cout << "\nAll results: " << resultsPath << " (top picks: " << outDir << "/top_picks.csv)\n";
+        printTopPicks(rows, screener, loadSaved, topN, portfolioValue, outDir);
+        std::cout << "\nAll results: " << resultsPath << "\nTop picks: " << outDir << "/top_picks.csv and "
+                  << outDir << "/top_picks_config.json (config.json strategy blocks)\n";
         return 0;
     }
     catch (const std::exception& e)

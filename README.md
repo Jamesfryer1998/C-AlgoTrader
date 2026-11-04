@@ -175,36 +175,45 @@ costs and with look-ahead (using the same close it trades on) to show how much t
 
 ### Strategy screen (`screen_app`)
 Which stock / strategy combinations look worth trading? `screen_app` backtests RSI, MACD and MEANREV on every
-stock in `src/config/screen.json` (the S&P 100 by default) using daily bars since 2016:
+stock in `src/config/screen.json` (the S&P 100 by default) using **1-minute bars**, the same bars the live app
+trades on, so the settings it finds can go straight into `config.json`:
 
-1. **Training years** (before `test_start`, 2024-01-01 by default): every setting in each strategy's grid is
+1. **Training period** (the last 24 months except the final 6): every setting in each strategy's grid is
    backtested and the one with the best Sharpe is picked (it needs at least `min_closed_trades` trades).
-2. **Test years** (from `test_start`): only that pick is run, on data it was never tuned on, and compared with
-   buying and holding the same stock over the same days.
+2. **Test period** (the final 6 months): only that pick is run, on data it was never tuned on, and compared
+   with buying and holding the same stock over the same bars.
 
 ```sh
-# Run from the project root directory (downloads daily prices into data/daily/ the first time)
-./build/app/screen_app                          # all 100 stocks, all three strategies (a few minutes)
+# Run from the project root directory. Minute bars are saved in data/minute/<SYMBOL>/ (about 12 MB per stock
+# for 2 years); only what's missing is downloaded on later runs.
+./build/app/screen_app --download-only          # optional: fetch all 100 stocks first (~20-30 min)
+./build/app/screen_app                          # screen all 100 (roughly an hour on 8 cores)
+./build/app/screen_app --max-combinations 300   # ~10x faster: a fixed random sample of each grid
 ./build/app/screen_app --symbols KO,PEP,MSFT    # a few stocks
-./build/app/screen_app --strategies MEANREV     # one strategy
+./build/app/screen_app --months 12 --test-months 3   # a shorter window
 ./build/app/screen_app --resume                 # carry on after stopping it part way
 ./build/app/screen_app --report                 # reprint the report from the saved results
+./build/app/screen_app --daily                  # the same screen on daily bars since 2016 (settings in days)
 ```
 
-The report shows, per strategy, how often the training pick made money and beat buy and hold on the test
-years, and whether a better training Sharpe predicted a better test Sharpe. It then lists the 10 best
+The report shows, per strategy, how often the training pick made money and beat buy and hold in the test
+period, and whether a better training Sharpe predicted a better test Sharpe. It then lists the 10 best
 combinations by training Sharpe (what you'd pick knowing only the past) with how they did afterwards, and the
-combinations that held up in both periods. Every row is saved in `data/screen/screen_results.csv`.
+combinations that held up in both periods.
 
 It finishes with the **top 5 to take forward** (`--top N` to change): combinations that held up in both periods,
-ranked by the weaker of their training and test Sharpe so both must be good, one strategy per stock (saved in
-`data/screen/top_picks.csv`). It then runs the **Monte Carlo risk** model on those picks traded together: each
-pick's daily P&L with its chosen setting becomes a return stream, and 10,000 simulated months give the
-combined volatility, the correlation between the picks, VaR and expected shortfall (`--value` sets the money, $100k by default).
+ranked by the weaker of their training and test Sharpe so both must be good, one strategy per stock. It then
+runs the **Monte Carlo risk** model on those picks traded together: each pick's end-of-day P&L with its chosen
+setting becomes a return stream, and 10,000 simulated months give the combined volatility, the correlation
+between the picks, VaR and expected shortfall (`--value` sets the money, $100k by default).
 
-Read it with care: hundreds of combinations are tried, so some will look good by luck; today's S&P 100 is a
-list of past winners (survivorship bias); and "held up" is filtered using the test years. Treat what it finds
-as candidates to paper trade, not proof.
+Results go to `data/screen/minute/` (`data/screen/daily/` with `--daily`): `screen_results.csv` (every stock and
+strategy), `top_picks.csv`, and `top_picks_config.json` with each pick's full strategy block for `config.json`.
+
+Read it with care: thousands of settings are tried, so some will look good by luck; today's S&P 100 is a list
+of past winners (survivorship bias); "held up" is filtered using the test period; and the backtest fills at the
+close of the bar that gave the signal plus `slippage_percent`, so strategies that trade hundreds of times are
+sensitive to that cost. Treat what it finds as candidates to paper trade, not proof.
 
 ### Running Tests
 ```sh
