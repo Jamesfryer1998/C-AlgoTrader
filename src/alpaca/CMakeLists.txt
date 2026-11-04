@@ -1,5 +1,5 @@
 # Everything that talks to Alpaca (market data stream + order REST API) lives in this folder.
-file(GLOB SOURCES *.cpp)
+file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 
 add_library(alpaca_lib ${SOURCES})
 

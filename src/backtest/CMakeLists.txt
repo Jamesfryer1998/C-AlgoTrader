@@ -1,5 +1,5 @@
-file(GLOB SOURCES *.cpp)
-file(GLOB HEADERS *.hpp)
+file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
+file(GLOB HEADERS CONFIGURE_DEPENDS *.hpp)
 
 # Create a library for the backtester
 add_library(backtester_lib ${SOURCES} ${HEADERS})

@@ -1,4 +1,4 @@
-file(GLOB SOURCES *.cpp)
+file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 add_executable(data_access_tests ${SOURCES})
 
 target_link_libraries(data_access_tests 

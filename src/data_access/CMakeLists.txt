@@ -1,5 +1,5 @@
-file(GLOB SOURCES *.cpp)
-file(GLOB HEADERS *.hpp)
+file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
+file(GLOB HEADERS CONFIGURE_DEPENDS *.hpp)
 
 # Create a library for shared functionality
 add_library(data_access_lib ${SOURCES} ${HEADERS})

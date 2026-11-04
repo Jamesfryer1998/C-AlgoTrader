@@ -1,4 +1,4 @@
-file(GLOB SOURCES *.cpp)
+file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 
 # Create a library for shared functionality
 add_library(strategy_lib ${SOURCES})
