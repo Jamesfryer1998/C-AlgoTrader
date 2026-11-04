@@ -48,16 +48,21 @@ class Optimiser
         // The strategy's current settings from config.json (forced active)
         json currentSettings(const std::string& strategyName) const;
 
-        // Backtest one strategy setting over bars and return its performance
-        PerformanceSummary evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars) const;
+        // Backtest one strategy setting over bars and return its performance. The first warmupBars bars only
+        // fill the strategy's history (see Backtester::setWarmupBars).
+        PerformanceSummary evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars,
+                                    size_t warmupBars = 0) const;
 
         // Run every setting on the training bars using `threads` threads, then the top ones on the test bars.
         // Results come back best first. onProgress(done, total) is called as runs finish.
+        // testWarmupBars: how many bars at the start of `test` are history only (e.g. the end of the training
+        // period, so strategies start the test period warmed up).
         std::vector<Result> search(const std::vector<json>& candidates,
                                    const std::vector<MarketCondition>& train,
                                    const std::vector<MarketCondition>& test,
                                    int threads,
-                                   const std::function<void(size_t, size_t)>& onProgress = nullptr) const;
+                                   const std::function<void(size_t, size_t)>& onProgress = nullptr,
+                                   size_t testWarmupBars = 0) const;
 
         // The number we rank by (higher is better), from optimisation.json "objective"
         double objective(const PerformanceSummary& summary) const;

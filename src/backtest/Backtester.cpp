@@ -14,7 +14,8 @@ Backtester::Backtester(const json& algoConfig)
           detailedLogging(false),
           resultsFilename(""),
           numThreads(0), // 0 means use all available cores
-          useDirectData(false)
+          useDirectData(false),
+          periodsPerYear(algoConfig.value("bars_per_year", PerformanceTracker::MINUTE_BARS_PER_YEAR))
 {
     // Initialize the performance metrics
     metrics = PerformanceMetrics();
@@ -127,7 +128,7 @@ void
 Backtester::runOn(const std::vector<MarketCondition>& bars)
 {
     auto startTime = std::chrono::high_resolution_clock::now();
-    if (bars.empty()) {
+    if (bars.size() <= warmupBars) {
         std::cerr << "ERROR: No market data available for backtesting." << std::endl;
         return;
     }
@@ -138,12 +139,16 @@ Backtester::runOn(const std::vector<MarketCondition>& bars)
 
     stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
     initializeBacktest();
-    equityCurve.push_back({bars.front().DateTime, broker.getCurrentEquity()});
 
-    Log::out() << "Processing " << bars.size() << " market data points" << std::endl;
+    // Warm-up bars only build the strategies' history
+    for (size_t i = 0; i < warmupBars; i++)
+        marketData.addBar(bars[i], windowBars);
+    equityCurve.push_back({bars[warmupBars].DateTime, broker.getCurrentEquity()});
+
+    Log::out() << "Processing " << bars.size() - warmupBars << " market data points" << std::endl;
     size_t progressStep = std::max<size_t>(1, bars.size() / 20);   // progress every 5%
 
-    for (size_t i = 0; i < bars.size(); i++) {
+    for (size_t i = warmupBars; i < bars.size(); i++) {
         executeTimeStep(bars[i]);
 
         if ((i + 1) % progressStep == 0)
@@ -169,7 +174,7 @@ Backtester::initializeBacktest()
     // Reset performance tracking
     equityCurve.clear();
     customMetrics.clear();
-    tracker = PerformanceTracker(broker.getStartingCapital(), PerformanceTracker::MINUTE_BARS_PER_YEAR);
+    tracker = PerformanceTracker(broker.getStartingCapital(), periodsPerYear);
     fillsRecorded = 0;
     
     // Log initial state

@@ -92,7 +92,7 @@ Optimiser::searchedParameters(const json& strategySettings) const
 }
 
 PerformanceSummary
-Optimiser::evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars) const
+Optimiser::evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars, size_t warmupBars) const
 {
     json config = baseConfig;
     config["strategies"] = json::array({strategySettings});
@@ -103,6 +103,7 @@ Optimiser::evaluate(const json& strategySettings, const std::vector<MarketCondit
     backtester.setSlippagePercentage(settings.value("slippage_percent", 0.01) / 100.0);
     backtester.getBroker().setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
     backtester.keepEquityCurve(false);
+    backtester.setWarmupBars(warmupBars);
     backtester.runOn(bars);
     return backtester.getSummary();
 }
@@ -123,7 +124,8 @@ Optimiser::search(const std::vector<json>& candidates,
                   const std::vector<MarketCondition>& train,
                   const std::vector<MarketCondition>& test,
                   int threads,
-                  const std::function<void(size_t, size_t)>& onProgress) const
+                  const std::function<void(size_t, size_t)>& onProgress,
+                  size_t testWarmupBars) const
 {
     std::vector<Result> results(candidates.size());
     int minTrades = settings.value("min_closed_trades", 30);
@@ -146,7 +148,7 @@ Optimiser::search(const std::vector<json>& candidates,
                 Result& result = results[indices[i]];
                 if (onTest)
                 {
-                    result.test = evaluate(result.settings, test);
+                    result.test = evaluate(result.settings, test, testWarmupBars);
                     result.tested = true;
                 }
                 else
@@ -190,7 +192,7 @@ Optimiser::search(const std::vector<json>& candidates,
     // 3. The top ones on the test data
     std::vector<size_t> top;
     for (size_t i = 0; i < results.size() && top.size() < topN; i++)
-        if (results[i].eligible && !test.empty())
+        if (results[i].eligible && test.size() > testWarmupBars)
             top.push_back(i);
     runAll(top, true);
 

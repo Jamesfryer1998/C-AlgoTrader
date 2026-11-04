@@ -70,6 +70,10 @@ public:
     // Bars kept in memory for strategies (default 1000; strategies only look back a fixed amount)
     void setWindowBars(size_t bars) { windowBars = bars; }
 
+    // The first `bars` bars passed to runOn only fill the strategies' history: no decisions, no trades,
+    // not counted in the results. Lets a test period start with strategies already warmed up.
+    void setWarmupBars(size_t bars) { warmupBars = bars; }
+
     // Keep a timestamped equity point per bar (only needed for --output files). Off saves memory.
     void keepEquityCurve(bool keep) { keepCurve = keep; }
 
@@ -111,6 +115,8 @@ private:
     int numThreads;
     bool useDirectData;
     size_t windowBars = 1000;
+    size_t warmupBars = 0;
+    double periodsPerYear;                    // bars in a year, for Sharpe: config "bars_per_year" (default 1-minute bars)
     bool keepCurve = true;
     
     // Performance tracking

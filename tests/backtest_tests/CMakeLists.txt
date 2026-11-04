@@ -3,6 +3,7 @@ add_executable(backtest_tests ${SOURCES})
 
 target_link_libraries(backtest_tests 
     backtester_lib
+    quant_lib
     broker_lib
     strategy_lib
     oms_lib

@@ -15,6 +15,7 @@ target_link_libraries(backtester_lib
     broker_lib
     strategy_lib
     oms_lib
+    quant_lib
     util_lib
     nlohmann_json
 )

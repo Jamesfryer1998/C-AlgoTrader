@@ -1,0 +1,102 @@
+#pragma once
+
+#include <functional>
+#include <string>
+#include <vector>
+#include <nlohmann/json.hpp>
+#include "Optimiser.hpp"
+#include "../data_access/MarketCondition.hpp"
+#include "../oms/PerformanceTracker.hpp"
+#include "../quant/DailyBars.hpp"
+
+using json = nlohmann::json;
+
+/**
+ * Screener
+ *
+ * Which stock / strategy combinations look worth trading? For every stock in a list and every strategy
+ * (RSI, MACD, MEANREV), on daily bars:
+ *
+ *   1. Training years (before test_start): backtest every setting in the strategy's grid and pick the one
+ *      with the best Sharpe (needing at least min_closed_trades trades). This is the optimiser's search.
+ *   2. Test years (from test_start): run only that pick, on data it was never tuned on, and compare it with
+ *      simply buying and holding the stock over the same days.
+ *
+ * The test years never influence a choice, so they show what tuning-then-trading would really have done.
+ * Strategies start the test years warmed up (the end of the training years is fed in as history first).
+ *
+ * Settings: src/config/screen.json (stock list, test_start, costs, and the grid for each strategy).
+ */
+class Screener
+{
+    public:
+        struct Row
+        {
+            std::string symbol;
+            std::string strategy;
+            bool found = false;              // some setting traded enough on the training years to be ranked
+            json parameters;                 // the searched parameters of the pick, e.g. {"period":21,...}
+            int combinations = 0;
+            int trainDays = 0, testDays = 0;
+            std::string testStart, testEnd;
+
+            PerformanceSummary train;        // the pick on the training years
+            PerformanceSummary test;         // the same setting on the test years
+            double testReturnOnMaxPosition = 0;   // test P&L / (max_position_size shares at the first test price)
+
+            double buyHoldReturn = 0;        // buy and hold over the test days
+            double buyHoldSharpe = 0;
+            double buyHoldMaxDrawdown = 0;   // fraction, positive
+
+            bool beatsBuyHold() const { return found && test.sharpeRatio > buyHoldSharpe; }
+        };
+
+        // One line per strategy, over all stocks
+        struct StrategySummary
+        {
+            std::string strategy;
+            int stocks = 0;
+            int found = 0;                   // stocks where a setting could be picked
+            int positiveTest = 0;            // ...and it made money (Sharpe > 0) on the test years
+            int beatBuyHold = 0;             // ...and had a better Sharpe than buy and hold
+            double medianTrainSharpe = 0;
+            double medianTestSharpe = 0;
+            double trainTestCorrelation = 0; // across stocks: does a better training Sharpe mean a better test one?
+        };
+
+        // baseConfig: config.json (risk limits, current strategy settings); settings: screen.json
+        Screener(const json& baseConfig, const json& settings);
+
+        // Daily bars in the form the backtester reads (one bar per day at the close)
+        static std::vector<MarketCondition> toBars(const std::string& symbol, const std::vector<quant::DailyBar>& daily);
+
+        // Screen one stock with every strategy in `strategies`. Rows come back in the same order.
+        // onProgress(done, total) reports backtests finished for the current strategy.
+        std::vector<Row> screenStock(const std::string& symbol, const std::vector<quant::DailyBar>& daily,
+                                     const std::vector<std::string>& strategies, int threads,
+                                     const std::function<void(const std::string&, size_t, size_t)>& onProgress = nullptr) const;
+
+        static std::vector<StrategySummary> summarise(const std::vector<Row>& rows, const std::vector<std::string>& strategies);
+
+        // The n combinations with the best training Sharpe (what you'd pick knowing only the past)
+        static std::vector<Row> topByTraining(const std::vector<Row>& rows, size_t n);
+
+        // Combinations that did well in both periods and beat buy and hold on the test years
+        static std::vector<Row> heldUp(const std::vector<Row>& rows, double minTrainSharpe, double minTestSharpe,
+                                       int minTestTrades);
+
+        // Save / load results (so a long screen can be resumed)
+        static bool writeCsv(const std::string& path, const std::vector<Row>& rows);
+        static std::vector<Row> readCsv(const std::string& path);
+
+        // "period 21, oversold_threshold 35, ..." from the searched parameters
+        static std::string describe(const json& parameters);
+
+        const json& getSettings() const { return settings; }
+        Optimiser& getOptimiser() { return optimiser; }
+
+    private:
+        json baseConfig;
+        json settings;
+        Optimiser optimiser;
+};

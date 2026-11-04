@@ -173,6 +173,33 @@ otherwise. The signal from one close only earns returns from the next day, every
 the result is compared with buy and hold over exactly the same days. It also prints the same strategy without
 costs and with look-ahead (using the same close it trades on) to show how much those mistakes flatter a backtest.
 
+### Strategy screen (`screen_app`)
+Which stock / strategy combinations look worth trading? `screen_app` backtests RSI, MACD and MEANREV on every
+stock in `src/config/screen.json` (the S&P 100 by default) using daily bars since 2016:
+
+1. **Training years** (before `test_start`, 2024-01-01 by default): every setting in each strategy's grid is
+   backtested and the one with the best Sharpe is picked (it needs at least `min_closed_trades` trades).
+2. **Test years** (from `test_start`): only that pick is run, on data it was never tuned on, and compared with
+   buying and holding the same stock over the same days.
+
+```sh
+# Run from the project root directory (downloads daily prices into data/daily/ the first time)
+./build/app/screen_app                          # all 100 stocks, all three strategies (a few minutes)
+./build/app/screen_app --symbols KO,PEP,MSFT    # a few stocks
+./build/app/screen_app --strategies MEANREV     # one strategy
+./build/app/screen_app --resume                 # carry on after stopping it part way
+./build/app/screen_app --report                 # reprint the report from the saved results
+```
+
+The report shows, per strategy, how often the training pick made money and beat buy and hold on the test
+years, and whether a better training Sharpe predicted a better test Sharpe. It then lists the 10 best
+combinations by training Sharpe (what you'd pick knowing only the past) with how they did afterwards, and the
+combinations that held up in both periods. Every row is saved in `data/screen/screen_results.csv`.
+
+Read it with care: hundreds of combinations are tried, so some will look good by luck; today's S&P 100 is a
+list of past winners (survivorship bias); and "held up" is filtered using the test years. Treat what it finds
+as candidates to paper trade, not proof.
+
 ### Running Tests
 ```sh
 # From the build directory
