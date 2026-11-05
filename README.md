@@ -52,6 +52,24 @@ At start-up the app back-fills exactly the bars the active strategies need (the 
 
 Outside US market hours, set `"data_feed": "test"` to see bars flowing.
 
+#### Trading several stocks (`"portfolio"`)
+Add a `"portfolio"` list to `src/config/config.json` and the app trades every stock in it at once, each with
+its own strategy and settings, from a single Alpaca stream:
+
+```json
+"portfolio": [
+    {"ticker": "TXN", "strategy": {"name": "MEANREV", "lookback_period": 60, "moving_average_period": 60,
+                                   "entry_threshold": 3.0, "exit_threshold": 0.0, "stop_loss": 1, "take_profit": 2}},
+    {"ticker": "WMT", "strategies": [{"name": "RSI", "period": 45, "overbought_threshold": 80,
+                                      "oversold_threshold": 25, "stop_loss": 5, "take_profit": 5}]}
+]
+```
+
+The format is the same as `data/screen/minute/top_picks_config.json` from `screen_app`, so the screen's picks
+can be pasted in as they are. Each stock gets its own price history, back-fill and strategies; one OMS, one
+`trades.csv` and one P&L book cover them all, and `max_position_size` applies per stock. Without a portfolio
+the app trades the top-level `"ticker"` with the top-level `"strategies"`, as before.
+
 #### Saved state and P&L
 While running, the app saves its state to `data/live/` (`data/live_dry_run/` for dry runs). The files are only written while running and only read once at start-up, so they never slow down a decision:
 

@@ -178,3 +178,83 @@ TEST(StrategyEngineConsensusTests, EachStrategyAloneWouldHaveTraded)
         EXPECT_EQ(broker.orders.size(), 1u) << name;
     }
 }
+
+// ---------- Several stocks: one engine each, one shared OMS ----------
+
+namespace
+{
+    std::vector<MarketCondition> renamed(std::vector<MarketCondition> bars, const std::string& ticker)
+    {
+        for (auto& bar : bars)
+            bar.Ticker = ticker;
+        return bars;
+    }
+
+    std::vector<MarketCondition> quiet(const std::string& ticker)
+    {
+        std::vector<MarketCondition> bars = quietThenDip();
+        bars.pop_back();   // no dip
+        return renamed(bars, ticker);
+    }
+}
+
+TEST(SharedOmsTests, EachStockTradesOnItsOwnPricesThroughOneOms)
+{
+    json config = twoStrategies();
+    CountingBroker broker;
+    OrderManagement shared;
+    shared.setUp(config, &broker);
+
+    // Two lanes, as the live app builds them
+    json aaaConfig = config, bbbConfig = config, cccConfig = config;
+    aaaConfig["ticker"] = "AAA";
+    bbbConfig["ticker"] = "BBB";
+    cccConfig["ticker"] = "CCC";
+    StrategyFactory aaaFactory(aaaConfig), bbbFactory(bbbConfig), cccFactory(cccConfig);
+    StrategyEngine aaa, bbb, ccc;
+    MarketData aaaData, bbbData, cccData;
+    for (auto* engine : {&aaa, &bbb, &ccc})
+        engine->useSharedOms(&shared);
+    aaa.setUp(aaaConfig, aaaFactory, aaaData, &broker);
+    bbb.setUp(bbbConfig, bbbFactory, bbbData, &broker);
+    ccc.setUp(cccConfig, cccFactory, cccData, &broker);
+    EXPECT_EQ(aaa.getOms(), &shared);
+    EXPECT_EQ(ccc.getOms(), &shared);
+
+    // Bars interleave like the live stream: AAA dips, BBB dips, CCC stays quiet
+    std::vector<MarketCondition> a = renamed(quietThenDip(), "AAA");
+    std::vector<MarketCondition> b = renamed(quietThenDip(), "BBB");
+    std::vector<MarketCondition> c = quiet("CCC");
+    for (size_t i = 0; i < a.size(); i++)
+    {
+        aaaData.addBar(a[i]);
+        aaa.run();
+        bbbData.addBar(b[i]);
+        bbb.run();
+        if (i < c.size())
+        {
+            cccData.addBar(c[i]);
+            ccc.run();
+        }
+    }
+
+    // One order per dipping stock, each for its own ticker at its own price; none for the quiet one
+    ASSERT_EQ(broker.orders.size(), 2u);
+    EXPECT_EQ(broker.orders[0].getTicker(), "AAA");
+    EXPECT_EQ(broker.orders[1].getTicker(), "BBB");
+    EXPECT_FLOAT_EQ(broker.orders[0].getPrice(), 97.0f);
+    ASSERT_EQ(shared.getOrders().size(), 2u);   // both in the one shared book
+    EXPECT_NE(shared.getOrders()[0].getId(), shared.getOrders()[1].getId());
+}
+
+TEST(SharedOmsTests, EngineUsesItsOwnOmsByDefault)
+{
+    StrategyEngine one, two;
+    EXPECT_NE(one.getOms(), nullptr);
+    EXPECT_NE(one.getOms(), two.getOms());
+    OrderManagement shared;
+    one.useSharedOms(&shared);
+    EXPECT_EQ(one.getOms(), &shared);
+    one.useSharedOms(nullptr);   // back to its own
+    EXPECT_NE(one.getOms(), &shared);
+}

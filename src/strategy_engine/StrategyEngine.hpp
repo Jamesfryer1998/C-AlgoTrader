@@ -25,7 +25,12 @@ class StrategyEngine
         int barsNeeded() const;
 
         // Get the order management system
-        OrderManagement* getOms() { return oms.get(); }
+        OrderManagement* getOms() { return oms; }
+
+        // Use an OMS shared with other engines instead of this engine's own (live trading of several
+        // stocks: one engine per stock, one OMS for all, so orders, positions and saved trades are in one place).
+        // Call before setUp. The engine points the shared OMS at its own market data each time it runs.
+        void useSharedOms(OrderManagement* shared) { oms = shared ? shared : ownOms.get(); }
 
         // Given the orders every strategy proposed this bar, decide which (if any) to send.
         // All proposals must agree on ticker and direction (all buys or all sells); if they disagree,
@@ -41,6 +46,7 @@ class StrategyEngine
 
         json configData;
         MarketData* marketData; // Use a pointer to the MarketData object
-        std::unique_ptr<OrderManagement> oms = std::make_unique<OrderManagement>(); // one per engine, so backtests don't share orders/positions
+        std::unique_ptr<OrderManagement> ownOms = std::make_unique<OrderManagement>(); // one per engine, so backtests don't share orders/positions
+        OrderManagement* oms = ownOms.get();   // ownOms, or one shared with other engines
         std::vector<std::unique_ptr<StrategyBase>> strategyList;
 };  

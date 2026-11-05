@@ -14,14 +14,24 @@ AlpacaStream::AlpacaStream(const json& config)
 
     feed = alpaca.value("data_feed", "iex");
     symbol = (feed == "test") ? "FAKEPACA" : config.at("ticker").get<std::string>();
+    symbols = {symbol};
 
     std::string defaultStreamUrl = "wss://stream.data.alpaca.markets/v2/" + feed;
     streamUrl = alpaca.value("stream_url", defaultStreamUrl);
     dataUrl = alpaca.value("data_url", "https://data.alpaca.markets");
 }
 
+void
+AlpacaStream::setSymbols(const std::vector<std::string>& tickers)
+{
+    if (feed == "test" || tickers.empty())
+        return;
+    symbols = tickers;
+    symbol = tickers.front();
+}
+
 std::vector<MarketCondition>
-AlpacaStream::fetchRecentBars(int count)
+AlpacaStream::fetchRecentBars(const std::string& ticker, int count)
 {
     std::vector<MarketCondition> bars;
 
@@ -43,7 +53,7 @@ AlpacaStream::fetchRecentBars(int count)
     char startText[32];
     std::strftime(startText, sizeof(startText), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&start));
 
-    std::string url = dataUrl + "/v2/stocks/" + symbol + "/bars"
+    std::string url = dataUrl + "/v2/stocks/" + ticker + "/bars"
                     + "?timeframe=1Min&feed=" + feed
                     + "&limit=" + std::to_string(count)
                     + "&sort=desc&start=" + startText;
@@ -51,16 +61,16 @@ AlpacaStream::fetchRecentBars(int count)
     HttpResult result = client.get(url);
     if (!result.ok() || !result.body.contains("bars") || !result.body["bars"].is_array())
     {
-        std::cerr << "WARNING - Could not download recent bars (" << result.status << "): "
+        std::cerr << "WARNING - Could not download recent " << ticker << " bars (" << result.status << "): "
                   << result.error << ". Strategies will start with no history." << std::endl;
         return bars;
     }
 
     for (const auto& bar : result.body["bars"])
-        bars.push_back(parseBar(bar, symbol));
+        bars.push_back(parseBar(bar, ticker));
 
     std::reverse(bars.begin(), bars.end()); // We asked for newest first, strategies want oldest first
-    std::cout << "Back-filled " << bars.size() << " of " << count << " recent " << symbol << " bars from Alpaca" << std::endl;
+    std::cout << "Back-filled " << bars.size() << " of " << count << " recent " << ticker << " bars from Alpaca" << std::endl;
     if (static_cast<int>(bars.size()) < count)
         std::cerr << "WARNING - Only " << bars.size() << " bars available; strategies needing more will "
                   << "start deciding once enough live bars arrive" << std::endl;
@@ -77,7 +87,10 @@ AlpacaStream::start(BarCallback onBar)
     socket.enableAutomaticReconnection();  // Reconnect by itself if the connection drops
     socket.setOnMessageCallback([this](const ix::WebSocketMessagePtr& msg) { onMessage(msg); });
 
-    std::cout << "Connecting to " << streamUrl << " for " << symbol << " 1-minute bars..." << std::endl;
+    std::string names;
+    for (const auto& s : symbols)
+        names += (names.empty() ? "" : ", ") + s;
+    std::cout << "Connecting to " << streamUrl << " for " << names << " 1-minute bars..." << std::endl;
     socket.start();
 }
 
@@ -144,10 +157,10 @@ AlpacaStream::handleAlpacaMessage(const json& message)
     }
     else if (type == "success" && message.value("msg", "") == "authenticated")
     {
-        // Step 2: ask for 1-minute bars for our symbol
-        json subscribe = {{"action", "subscribe"}, {"bars", {symbol}}};
+        // Step 2: ask for 1-minute bars for every ticker
+        json subscribe = {{"action", "subscribe"}, {"bars", symbols}};
         socket.send(subscribe.dump());
-        std::cout << "Stream authenticated, subscribing to " << symbol << " bars" << std::endl;
+        std::cout << "Stream authenticated, subscribing to " << symbols.size() << " ticker(s)" << std::endl;
     }
     else if (type == "subscription")
     {

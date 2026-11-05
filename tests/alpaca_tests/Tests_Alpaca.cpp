@@ -98,6 +98,29 @@ TEST(AlpacaStreamTests, TestFeedUsesFakeSymbol)
     EXPECT_EQ(stream.getSymbol(), "FAKEPACA");
 }
 
+TEST(AlpacaStreamTests, SubscribesToEveryPortfolioTicker)
+{
+    json config = {{"ticker", "NVDA"}, {"alpaca", {{"data_feed", "iex"}}}};
+    AlpacaStream stream(config);
+    EXPECT_EQ(stream.getSymbols(), std::vector<std::string>{"NVDA"});
+
+    stream.setSymbols({"TXN", "DHR", "WMT"});
+    EXPECT_EQ(stream.getSymbols().size(), 3u);
+    EXPECT_EQ(stream.getSymbol(), "TXN");
+
+    // The test feed only has its fake symbol
+    json test = {{"ticker", "NVDA"}, {"alpaca", {{"data_feed", "test"}}}};
+    AlpacaStream fake(test);
+    fake.setSymbols({"TXN", "DHR"});
+    EXPECT_EQ(fake.getSymbols(), std::vector<std::string>{"FAKEPACA"});
+}
+
+TEST(AlpacaStreamTests, BarsKeepTheirOwnTicker)
+{
+    json bar = json::parse(R"({"T":"b","S":"WMT","o":10,"c":11,"v":5,"t":"2026-10-27T19:59:00Z"})");
+    EXPECT_EQ(AlpacaStream::parseBar(bar, "TXN").Ticker, "WMT");
+}
+
 // ---------- Rolling window of live bars ----------
 
 TEST(MarketDataLiveTests, AddBarKeepsOnlyNewestBars)
