@@ -1,4 +1,5 @@
 #include "ReplayStream.hpp"
+#include "../util/MarketTime.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -31,8 +32,12 @@ ReplayStream::savedDays(const std::string& dataRoot, const std::string& ticker)
     for (const auto& entry : fs::directory_iterator(folderFor(dataRoot, ticker), error))
     {
         std::string name = entry.path().filename().string();
-        if (name.rfind(prefix, 0) == 0 && name.size() == prefix.size() + 14 && name.substr(name.size() - 4) == ".csv")
-            found.push_back(name.substr(prefix.size(), 10));
+        // marketData_<TICKER>_YYYY-MM-DD.csv
+        const std::string extension = ".csv";
+        bool isDayFile = name.rfind(prefix, 0) == 0 && name.size() == prefix.size() + MarketTime::DATE_LENGTH + extension.size()
+                      && name.compare(name.size() - extension.size(), extension.size(), extension) == 0;
+        if (isDayFile)
+            found.push_back(name.substr(prefix.size(), MarketTime::DATE_LENGTH));
     }
     std::sort(found.begin(), found.end());
     return found;
@@ -82,15 +87,14 @@ ReplayStream::load()
         std::cout << "No saved bars for every stock on " << firstDay << "; replaying from " << *from << std::endl;
     days.assign(from, std::min(from + dayCount, all.end()));
 
-    // History: up to 5 saved days before the first replayed day (enough for any strategy's back-fill)
-    std::string historyStart = from - all.begin() >= 5 ? *(from - 5) : all.front();
+    std::string historyStart = from - all.begin() >= HISTORY_DAYS ? *(from - HISTORY_DAYS) : all.front();
 
     for (const auto& ticker : tickers)
     {
-        std::vector<MarketCondition> bars = MinuteBars::load(folderFor(dataRoot, ticker), ticker, historyStart, days.back(), 4);
+        std::vector<MarketCondition> bars = MinuteBars::load(folderFor(dataRoot, ticker), ticker, historyStart, days.back(), LOADING_THREADS);
         for (const auto& bar : bars)
         {
-            std::string day = bar.DateTime.substr(0, 10);
+            std::string day = MarketTime::datePart(bar.DateTime);
             if (day < days.front())
                 before[ticker].push_back(bar);
             else if (std::binary_search(days.begin(), days.end(), day))

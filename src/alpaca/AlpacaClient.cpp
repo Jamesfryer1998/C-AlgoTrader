@@ -1,6 +1,8 @@
 #include "AlpacaClient.hpp"
 
 #include <cstdlib>
+#include <iostream>
+#include <thread>
 
 static std::string readEnv(const char* name)
 {
@@ -50,6 +52,22 @@ HttpResult
 AlpacaClient::get(const std::string& url)
 {
     return toResult(http.get(url, makeArgs()));
+}
+
+HttpResult
+AlpacaClient::getWhenFree(const std::string& url, int maxAttempts, std::chrono::seconds firstWait)
+{
+    HttpResult result;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        result = get(url);
+        if (!result.isBusy() || attempt == maxAttempts)
+            break;
+        std::chrono::seconds wait = firstWait * attempt;
+        std::cerr << "  Alpaca busy (" << result.status << "), retrying in " << wait.count() << "s..." << std::endl;
+        std::this_thread::sleep_for(wait);
+    }
+    return result;
 }
 
 HttpResult

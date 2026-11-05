@@ -4,7 +4,9 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include "../backtest/BacktestCosts.hpp"
 #include "../util/Format.hpp"
+#include "../util/MarketTime.hpp"
 #include "../util/OutputCapture.hpp"
 
 std::atomic<bool> LiveTrader::stopRequested{false};
@@ -16,7 +18,7 @@ LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std
       alpaca(config),
       simulated(simulatedFeed),
       stream(config),
-      tracker(config.value("starting_capital", 100000.0))
+      tracker(config.value("starting_capital", BacktestCosts::DEFAULT_STARTING_CAPITAL))
 {
 }
 
@@ -51,7 +53,7 @@ LiveTrader::connectBroker()
         simulated.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
         simulated.setSlippage(config.value("replay_slippage_percent", DEFAULT_REPLAY_SLIPPAGE_PERCENT) / 100.0);
         simulated.setCommission(0.0);
-        simulated.setStartingCapital(config.value("starting_capital", 100000.0));
+        simulated.setStartingCapital(config.value("starting_capital", BacktestCosts::DEFAULT_STARTING_CAPITAL));
 
         broker = &simulated;
         auto replayAccount = std::make_unique<SimulatedAccountMonitor>(simulated);
@@ -212,7 +214,7 @@ LiveTrader::onBar(const MarketCondition& bar)
     OutputCapture decisionOutput;
     if (replayMonitor)
     {
-        replayMonitor->onDay(bar.DateTime.substr(0, 10));
+        replayMonitor->onDay(MarketTime::datePart(bar.DateTime));
         simulatedFeed.addBar(bar, SIMULATED_BROKER_BARS);   // the simulated broker prices orders off this bar
     }
     double decisionMs = lane.decide(bar);

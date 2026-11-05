@@ -182,7 +182,7 @@ AlpacaBroker::hasPendingOrder(const std::string& ticker)
 bool
 AlpacaBroker::cancelOpenOrders(const std::string& ticker)
 {
-    std::string listUrl = tradingUrl + "/v2/orders?status=open&limit=500&symbols=" + ticker;
+    std::string listUrl = tradingUrl + "/v2/orders?status=open&symbols=" + ticker;
     HttpResult open = client.get(listUrl);
     if (!open.ok() || !open.body.is_array())
         return false;
@@ -194,13 +194,13 @@ AlpacaBroker::cancelOpenOrders(const std::string& ticker)
     std::cout << "Cancelled " << open.body.size() << " open " << ticker
               << " order(s) (earlier stop loss / take profit) so the exit can go through" << std::endl;
 
-    // Cancels are usually immediate, but wait up to ~2s for Alpaca to confirm
-    for (int attempt = 0; attempt < 10; attempt++)
+    // Cancels are usually immediate, but give Alpaca a couple of seconds to confirm
+    for (int attempt = 0; attempt < CANCEL_CHECKS; attempt++)
     {
         HttpResult check = client.get(listUrl);
         if (check.ok() && check.body.is_array() && check.body.empty())
             return true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(CANCEL_CHECK_INTERVAL);
     }
     return false;
 }
@@ -215,14 +215,14 @@ AlpacaBroker::sendExit(Order& order, json body)
         std::cerr << "WARNING - " << order.getTicker() << " still has open orders; trying the exit anyway" << std::endl;
 
     HttpResult result;
-    for (int attempt = 1; attempt <= 3; attempt++)
+    for (int attempt = 1; attempt <= EXIT_ATTEMPTS; attempt++)
     {
         result = client.post(tradingUrl + "/v2/orders", body);
         // Shares can stay reserved for a moment after a cancel: try again shortly
-        bool reserved = result.status == 403 && result.error.find("insufficient qty") != std::string::npos;
+        bool reserved = result.status == HTTP_FORBIDDEN && result.error.find("insufficient qty") != std::string::npos;
         if (!reserved)
             break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(EXIT_RETRY_WAIT);
     }
     lastReceipt.roundTripMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
 

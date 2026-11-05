@@ -93,14 +93,17 @@ class Screener
         // The n combinations with the best training Sharpe (what you'd pick knowing only the past)
         static std::vector<Row> topByTraining(const std::vector<Row>& rows, size_t n);
 
-        // Combinations that did well in both periods and beat buy and hold on the test years
-        static std::vector<Row> heldUp(const std::vector<Row>& rows, double minTrainSharpe, double minTestSharpe,
-                                       int minTestTrades);
+        // A combination "held up" if its Sharpe was at least this in training and test, it beat buy and hold
+        // on the test years and made enough test trades to mean something
+        static constexpr double HELD_UP_SHARPE = 0.5;
+        static constexpr int HELD_UP_TEST_TRADES = 3;
+        static constexpr int PICK_TEST_TRADES = 5;   // picks to trade need a few more
 
-        // The n to take forward: held up in both periods (Sharpe >= 0.5 in each, beat buy and hold, at least
-        // minTestTrades test trades), ranked by the weaker of the two Sharpe ratios so both periods must be good,
-        // and at most one strategy per stock. May return fewer than n.
-        static std::vector<Row> topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades = 5);
+        static std::vector<Row> heldUp(const std::vector<Row>& rows, int minTestTrades = HELD_UP_TEST_TRADES);
+
+        // The n to take forward: held up with at least minTestTrades test trades, ranked by the weaker of the
+        // two Sharpe ratios so both periods must be good, and at most one strategy per stock. May return fewer than n.
+        static std::vector<Row> topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades = PICK_TEST_TRADES);
 
         // Each pick's value at the end of every day over its whole history (training and test) with its chosen
         // setting, as if max_position_size shares at the first price were the capital: value = that capital + P&L
@@ -125,7 +128,15 @@ class Screener
         Optimiser& getOptimiser() { return optimiser; }
 
     private:
+        // Defaults for settings missing from screen.json
+        static constexpr const char* DEFAULT_TEST_START = "2024-01-01";
+        static constexpr int DEFAULT_MIN_TRAIN_DAYS = 500;
+        static constexpr int DEFAULT_MIN_TEST_DAYS = 120;
+        // Bars of training data fed in before the test years, so strategies start them warmed up
+        static constexpr size_t DEFAULT_TEST_WARMUP_BARS = 320;
+
         json baseConfig;
         json settings;
+        double maxPosition;   // max_position_size from config.json
         Optimiser optimiser;
 };

@@ -51,6 +51,13 @@ void Backtester::setSlippagePercentage(double slippage) {
               << (slippage * 100.0) << "% (random variation within +/- this range)" << std::endl;
 }
 
+void Backtester::useCosts(const BacktestCosts& costs) {
+    setStartingCapital(costs.startingCapital);
+    setCommissionPerTrade(costs.commissionPerTrade);
+    setSlippagePercentage(costs.slippageFraction());
+    broker.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
+}
+
 void Backtester::enableDetailedLogging(bool enable) {
     detailedLogging = enable;
 }

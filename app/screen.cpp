@@ -172,7 +172,7 @@ static void printReport(const std::vector<Screener::Row>& rows, const std::vecto
     }
 
     // 3. Held up in both periods
-    std::vector<Screener::Row> held = Screener::heldUp(rows, 0.5, 0.5, 3);
+    std::vector<Screener::Row> held = Screener::heldUp(rows);
     std::cout << "\nHeld up: training Sharpe >= 0.5, test Sharpe >= 0.5 with 3+ trades, and beat buy and hold (" << held.size()
               << " found)\n";
     if (held.size() > 20)

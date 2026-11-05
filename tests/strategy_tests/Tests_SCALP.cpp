@@ -48,7 +48,7 @@ namespace
         // A quiet session from 09:30: alternating 100.1 / 99.9 for `minutes` minutes (VWAP 100, sigma 0.1)
         void quietUntil(int endMinute, const std::string& day = "2026-11-05")
         {
-            for (int m = SCALP::OPEN_MINUTE; m < endMinute; m++)
+            for (int m = MarketTime::OPEN_MINUTE; m < endMinute; m++)
                 bar(m, (m % 2) ? 100.1f : 99.9f, 1000, day);
         }
     };
@@ -59,8 +59,8 @@ namespace
 TEST(SCALPTests, VwapAndBandsAreVolumeWeighted)
 {
     Runner r(scalpSettings());
-    r.bar(SCALP::OPEN_MINUTE, 100.0f, 1000);
-    r.bar(SCALP::OPEN_MINUTE + 1, 103.0f, 3000);   // 3x the volume
+    r.bar(MarketTime::OPEN_MINUTE, 100.0f, 1000);
+    r.bar(MarketTime::OPEN_MINUTE + 1, 103.0f, 3000);   // 3x the volume
     // VWAP = (100 x 1000 + 103 x 3000) / 4000 = 102.25
     EXPECT_NEAR(r.scalp.vwap(), 102.25, 1e-9);
     // sigma^2 = (1000 x 100^2 + 3000 x 103^2) / 4000 - 102.25^2 = 1.6875
@@ -106,7 +106,7 @@ TEST(SCALPTests, TimeLimitClosesASlowTrade)
 TEST(SCALPTests, NoEntriesDuringWarmupOrNearTheClose)
 {
     Runner r(scalpSettings(2.0, 0.0, 1000, 15));
-    for (int m = SCALP::OPEN_MINUTE; m < SCALP::OPEN_MINUTE + 15; m++)
+    for (int m = MarketTime::OPEN_MINUTE; m < MarketTime::OPEN_MINUTE + 15; m++)
         EXPECT_EQ(r.bar(m, (m % 2) ? 101.0f : 99.0f), "") << "minute " << m;   // big swings, but warming up
 
     Runner late(scalpSettings());
@@ -154,7 +154,7 @@ TEST(SCALPTests, RebuildsVwapAfterABackFill)
 {
     // The live app back-fills bars, then the strategy runs for the first time mid-session
     Runner r(scalpSettings());
-    for (int m = SCALP::OPEN_MINUTE; m < T1000; m++)
+    for (int m = MarketTime::OPEN_MINUTE; m < T1000; m++)
         r.data.addBar(MarketCondition(at(m), "TEST", 100.0f + (m % 2), 100.0f + (m % 2), 1000, "1m"), 500);
     r.bar(T1000, 100.5f);
     EXPECT_NEAR(r.scalp.vwap(), 100.5, 0.02);   // built from every bar since the open

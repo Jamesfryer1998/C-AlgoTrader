@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <ctime>
 #include <string>
 #include <ixwebsocket/IXHttpClient.h>
 #include <nlohmann/json.hpp>
@@ -22,11 +24,20 @@ struct HttpResult
     std::string error;      // Network error or Alpaca's error message
 
     bool ok() const { return status >= 200 && status < 300; }
+
+    // Rate limited (429), no connection (0) or a server error: worth asking again shortly
+    bool isBusy() const { return status == 429 || status == 0 || status >= 500; }
 };
 
 class AlpacaClient
 {
     public:
+        // The most bars Alpaca returns for one request (more come in pages)
+        static constexpr int MAX_BARS_PER_REQUEST = 10000;
+
+        // The free plan can't query the most recent 15 minutes of SIP (all-exchange) data: keep clear of it
+        static constexpr std::time_t SIP_DELAY_SECONDS = 16 * 60;
+
         AlpacaClient();
 
         bool hasKeys() const { return !keyId.empty() && !secretKey.empty(); }
@@ -34,6 +45,10 @@ class AlpacaClient
         const std::string& getSecretKey() const { return secretKey; }
 
         HttpResult get(const std::string& url);
+
+        // GET, asking again while Alpaca is busy and waiting a little longer each time
+        // (firstWait, then 2 x firstWait, ...). Gives up after maxAttempts requests.
+        HttpResult getWhenFree(const std::string& url, int maxAttempts, std::chrono::seconds firstWait);
         HttpResult post(const std::string& url, const json& body);
         HttpResult del(const std::string& url);   // HTTP DELETE, e.g. cancel an order
 

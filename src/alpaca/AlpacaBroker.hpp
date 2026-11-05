@@ -64,6 +64,14 @@ class AlpacaBroker : public BrokerBase
         static bool isWorkingStatus(const std::string& status);
 
     private:
+        // After cancelling orders, check this many times, this far apart, for Alpaca to confirm
+        static constexpr int CANCEL_CHECKS = 10;
+        static constexpr std::chrono::milliseconds CANCEL_CHECK_INTERVAL{200};
+        // Shares can stay reserved for a moment after a cancel: retry the exit this many times
+        static constexpr int EXIT_ATTEMPTS = 3;
+        static constexpr std::chrono::milliseconds EXIT_RETRY_WAIT{300};
+        static constexpr int HTTP_FORBIDDEN = 403;
+
         AlpacaClient client;
         std::string tradingUrl;
         std::string dataUrl;

@@ -58,13 +58,12 @@ AlpacaDailyBars::download(const std::string& symbol, const std::string& startDat
         return false;
     }
 
-    // The SIP feed is free for data older than 15 minutes, so end 20 minutes ago at the latest
     std::time_t now = std::time(nullptr);
-    std::string end = MarketTime::formatUtc(now - 20 * 60);
+    std::string end = MarketTime::formatUtc(now - AlpacaClient::SIP_DELAY_SECONDS);
     if (!endDate.empty())
     {
-        std::time_t requested = MarketTime::parseDate(endDate) + 24 * 60 * 60;   // include that whole day
-        if (requested > 0 && requested < now - 20 * 60)
+        std::time_t requested = MarketTime::parseDate(endDate) + MarketTime::SECONDS_PER_DAY;   // include that whole day
+        if (requested > 0 && requested < now - AlpacaClient::SIP_DELAY_SECONDS)
             end = MarketTime::formatUtc(requested);
     }
     std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(now));
@@ -73,21 +72,13 @@ AlpacaDailyBars::download(const std::string& symbol, const std::string& startDat
     bars.clear();
     do
     {
-        std::string url = dataUrl + "/v2/stocks/" + symbol + "/bars?timeframe=1Day&adjustment=all&limit=10000"
+        std::string url = dataUrl + "/v2/stocks/" + symbol + "/bars?timeframe=1Day&adjustment=all&limit="
+                        + std::to_string(AlpacaClient::MAX_BARS_PER_REQUEST)
                         + "&sort=asc&feed=" + feed + "&start=" + startDate + "T00:00:00Z&end=" + end;
         if (!pageToken.empty())
             url += "&page_token=" + pageToken;
 
-        HttpResult result;
-        for (int attempt = 1; attempt <= 5; attempt++)
-        {
-            result = client.get(url);
-            bool retry = result.status == 429 || result.status == 0 || result.status >= 500;
-            if (!retry)
-                break;
-            std::cerr << "  Alpaca busy (" << result.status << "), retrying in " << 3 * attempt << "s..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(3 * attempt));
-        }
+        HttpResult result = client.getWhenFree(url, MAX_ATTEMPTS, FIRST_RETRY_WAIT);
         if (!result.ok())
         {
             std::cerr << "WARNING - Could not download " << symbol << " daily bars (" << result.status << "): "

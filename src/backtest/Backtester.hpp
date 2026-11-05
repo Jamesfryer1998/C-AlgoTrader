@@ -13,6 +13,7 @@
 #include "../strategy_engine/StrategyEngine.hpp"
 #include "../strategy_engine/StrategyFactory.hpp"
 #include "../broker/SimulatedBroker.hpp"
+#include "BacktestCosts.hpp"
 #include "BacktestMarketDataAdapter.hpp"
 #include "../oms/PerformanceTracker.hpp"
 
@@ -89,6 +90,8 @@ public:
     void setStartingCapital(double capital);
     void setCommissionPerTrade(double commission);
     void setSlippagePercentage(double slippage);
+    // Capital, commission and slippage together (slippage always against us, as in live trading)
+    void useCosts(const BacktestCosts& costs);
     void setDataTimeframe(const std::string& timeframe);
     void enableDetailedLogging(bool enable);
     void saveResultsToFile(const std::string& filename);

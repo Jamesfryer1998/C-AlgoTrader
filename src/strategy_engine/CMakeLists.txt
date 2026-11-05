@@ -5,4 +5,5 @@ add_library(strategy_lib ${SOURCES})
 
 target_link_libraries(strategy_lib 
     nlohmann_json
-    oms_lib)
+    oms_lib
+    util_lib)

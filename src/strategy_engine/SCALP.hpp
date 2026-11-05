@@ -2,8 +2,8 @@
 
 #include "StrategyBase.hpp"
 #include "../util/Log.hpp"
+#include "../util/MarketTime.hpp"
 #include <cmath>
-#include <cstdio>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -38,21 +38,19 @@ class SCALP : public StrategyBase {
     public:
         SCALP(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
-        static constexpr int OPEN_MINUTE = 9 * 60 + 30;
-        static constexpr int CLOSE_MINUTE = 16 * 60;
         static constexpr int LAST_ENTRY_MINUTE = 15 * 60 + 45;
         static constexpr int FLAT_MINUTE = 15 * 60 + 55;
 
         // A whole session, so the VWAP can be built from the open after a mid-day start
-        int barsNeeded() const override { return 391; }
+        int barsNeeded() const override { return MarketTime::CLOSE_MINUTE - MarketTime::OPEN_MINUTE + 1; }
 
         void execute() override
         {
             if (!marketData || marketData->getData().empty())
                 return;
             const MarketCondition& bar = currentBar();
-            int minute = minuteOfDay(bar.DateTime);
-            if (minute < OPEN_MINUTE || minute >= CLOSE_MINUTE)
+            int minute = MarketTime::minuteOfDay(bar.DateTime);
+            if (minute < MarketTime::OPEN_MINUTE || minute >= MarketTime::CLOSE_MINUTE)
                 return;   // pre-market / after-hours: not part of the session
 
             bool newBar = bar.DateTime != lastTime;
@@ -88,7 +86,7 @@ class SCALP : public StrategyBase {
             }
 
             // Flat: look for a stretch, inside trading hours, once the VWAP has had time to settle
-            if (minute < OPEN_MINUTE + _strategyAttribute.warmup_minutes || minute >= LAST_ENTRY_MINUTE || sigma <= 0)
+            if (minute < MarketTime::OPEN_MINUTE + _strategyAttribute.warmup_minutes || minute >= LAST_ENTRY_MINUTE || sigma <= 0)
                 return;
             double band = _strategyAttribute.entry_threshold * sigma;
             if (bar.Close < vwap - band)       { signal(OrderType::BUY);  state = +1; }
@@ -111,23 +109,6 @@ class SCALP : public StrategyBase {
         int getState() const { return state; }
         int getBarsHeld() const { return barsHeld; }
 
-        // Minutes since midnight as "HH:MM"
-        static std::string clock(int minute)
-        {
-            char text[16];
-            std::snprintf(text, sizeof(text), "%02d:%02d", (minute / 60) % 100, minute % 60);
-            return text;
-        }
-
-        // "HH:MM" of a "YYYY-MM-DD HH:MM:SS" time as minutes since midnight (-1 if unreadable)
-        static int minuteOfDay(const std::string& dateTime)
-        {
-            if (dateTime.size() < 16)
-                return -1;
-            try { return std::stoi(dateTime.substr(11, 2)) * 60 + std::stoi(dateTime.substr(14, 2)); }
-            catch (const std::exception&) { return -1; }
-        }
-
         // VWAP / bands while flat, the trade and its target while in one, or why it's waiting
         std::string status() const override
         {
@@ -147,10 +128,10 @@ class SCALP : public StrategyBase {
                 double band = _strategyAttribute.entry_threshold * sigma;
                 out << "L: " << vwap - band << " | C: " << lastClose << " | U: " << vwap + band
                     << "   BUY below L, SELL above U";
-                int minute = minuteOfDay(lastTime);
-                int first = OPEN_MINUTE + _strategyAttribute.warmup_minutes;
+                int minute = MarketTime::minuteOfDay(lastTime);
+                int first = MarketTime::OPEN_MINUTE + _strategyAttribute.warmup_minutes;
                 if (minute < first || minute >= LAST_ENTRY_MINUTE)
-                    out << "  (no new trades now: " << clock(first) << "-" << clock(LAST_ENTRY_MINUTE) << ")";
+                    out << "  (no new trades now: " << MarketTime::clock(first) << "-" << MarketTime::clock(LAST_ENTRY_MINUTE) << ")";
             }
             return out.str();
         }
@@ -180,10 +161,10 @@ class SCALP : public StrategyBase {
                 double band = _strategyAttribute.entry_threshold * sigma;
                 l.lower = number(vwap - band);
                 l.upper = number(vwap + band);
-                int minute = minuteOfDay(lastTime), first = OPEN_MINUTE + _strategyAttribute.warmup_minutes;
+                int minute = MarketTime::minuteOfDay(lastTime), first = MarketTime::OPEN_MINUTE + _strategyAttribute.warmup_minutes;
                 l.state = "flat, " + atVwap;
                 if (minute < first || minute >= LAST_ENTRY_MINUTE)
-                    l.state += " (entries " + clock(first) + "-" + clock(LAST_ENTRY_MINUTE) + ")";
+                    l.state += " (entries " + MarketTime::clock(first) + "-" + MarketTime::clock(LAST_ENTRY_MINUTE) + ")";
             }
             return l;
         }
@@ -209,7 +190,7 @@ class SCALP : public StrategyBase {
         {
             const auto& bars = marketData->getData();
             const MarketCondition& newest = bars.back();
-            std::string day = newest.DateTime.substr(0, 10);
+            std::string day = MarketTime::datePart(newest.DateTime);
             if (newest.DateTime == lastTime)
                 return;
 
@@ -221,7 +202,7 @@ class SCALP : public StrategyBase {
                 sessionDay = day;
                 weight = weightedPrice = weightedSquare = 0;
                 for (const auto& b : bars)
-                    if (b.DateTime.compare(0, 10, day) == 0)
+                    if (b.DateTime.compare(0, MarketTime::DATE_LENGTH, day) == 0)
                         add(b);
             }
             else
@@ -231,8 +212,8 @@ class SCALP : public StrategyBase {
 
         void add(const MarketCondition& b)
         {
-            int minute = minuteOfDay(b.DateTime);
-            if (minute < OPEN_MINUTE || minute >= CLOSE_MINUTE)
+            int minute = MarketTime::minuteOfDay(b.DateTime);
+            if (minute < MarketTime::OPEN_MINUTE || minute >= MarketTime::CLOSE_MINUTE)
                 return;
             double w = b.Volume > 0 ? static_cast<double>(b.Volume) : 1.0;   // no volume (e.g. test data): equal weights
             weight += w;

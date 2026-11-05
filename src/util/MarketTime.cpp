@@ -1,6 +1,7 @@
 #include "MarketTime.hpp"
 
 #include <cstdio>
+#include <exception>
 #include <iomanip>
 #include <sstream>
 
@@ -80,7 +81,7 @@ MarketTime::isNewYorkDst(std::time_t utc)
 std::string
 MarketTime::toNewYorkTime(std::time_t utc)
 {
-    std::time_t local = utc - (isNewYorkDst(utc) ? 4 : 5) * 3600;
+    std::time_t local = utc - (isNewYorkDst(utc) ? 4 : 5) * SECONDS_PER_HOUR;
     std::tm tm{};
     gmtime_r(&local, &tm);
     char text[32];
@@ -91,14 +92,37 @@ MarketTime::toNewYorkTime(std::time_t utc)
 std::string
 MarketTime::datePart(const std::string& dateTime)
 {
-    return dateTime.substr(0, 10);
+    return dateTime.substr(0, DATE_LENGTH);
+}
+
+int
+MarketTime::minuteOfDay(const std::string& dateTime)
+{
+    // "YYYY-MM-DD HH:MM..."
+    const size_t hourAt = DATE_LENGTH + 1, minuteAt = hourAt + 3;
+    if (dateTime.size() < minuteAt + 2)
+        return -1;
+    try
+    {
+        return std::stoi(dateTime.substr(hourAt, 2)) * 60 + std::stoi(dateTime.substr(minuteAt, 2));
+    }
+    catch (const std::exception&)
+    {
+        return -1;
+    }
+}
+
+std::string
+MarketTime::clock(int minute)
+{
+    char text[16];
+    std::snprintf(text, sizeof(text), "%02d:%02d", (minute / 60) % 100, minute % 60);
+    return text;
 }
 
 bool
 MarketTime::isRegularSession(const std::string& newYorkDateTime)
 {
-    if (newYorkDateTime.size() < 16)
-        return false;
-    std::string hhmm = newYorkDateTime.substr(11, 5); // "HH:MM"
-    return hhmm >= "09:30" && hhmm < "16:00";
+    int minute = minuteOfDay(newYorkDateTime);
+    return minute >= OPEN_MINUTE && minute < CLOSE_MINUTE;
 }

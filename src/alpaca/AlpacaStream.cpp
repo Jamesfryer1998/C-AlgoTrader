@@ -38,18 +38,15 @@ AlpacaStream::fetchRecentBars(const std::string& ticker, int count)
     if (feed == "test" || count <= 0)
         return bars; // The test stream has no history
 
-    // One request returns at most 10,000 bars
-    const int maxPerRequest = 10000;
-    if (count > maxPerRequest)
+    if (count > AlpacaClient::MAX_BARS_PER_REQUEST)
     {
-        std::cerr << "WARNING - Strategies want " << count << " bars; loading the newest " << maxPerRequest << std::endl;
-        count = maxPerRequest;
+        std::cerr << "WARNING - Strategies want " << count << " bars; loading the newest "
+                  << AlpacaClient::MAX_BARS_PER_REQUEST << std::endl;
+        count = AlpacaClient::MAX_BARS_PER_REQUEST;
     }
 
-    // Search far enough back to find that many bars: a few days covers a Monday morning or a holiday,
-    // plus a day for every ~300 bars (IEX skips minutes with no trades, so a day has under 390)
-    int days = 4 + count / 300;
-    std::time_t start = std::time(nullptr) - static_cast<std::time_t>(days) * 24 * 60 * 60;
+    int days = EXTRA_DAYS_TO_SEARCH + count / IEX_BARS_PER_DAY;
+    std::time_t start = std::time(nullptr) - static_cast<std::time_t>(days) * MarketTime::SECONDS_PER_DAY;
     char startText[32];
     std::strftime(startText, sizeof(startText), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&start));
 

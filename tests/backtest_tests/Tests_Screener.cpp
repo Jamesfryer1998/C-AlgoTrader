@@ -210,7 +210,7 @@ TEST(ScreenerTests, SummaryPicksAndCsv)
     EXPECT_EQ(top[0].symbol, "A");
     EXPECT_EQ(top[1].symbol, "B");
 
-    auto held = Screener::heldUp(rows, 0.5, 0.5, 3);
+    auto held = Screener::heldUp(rows);
     ASSERT_EQ(held.size(), 2u);
     EXPECT_EQ(held[0].symbol, "B");   // best test Sharpe first
     EXPECT_EQ(held[1].strategy, "MACD");

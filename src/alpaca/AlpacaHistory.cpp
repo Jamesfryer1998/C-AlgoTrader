@@ -58,23 +58,12 @@ AlpacaHistory::fetchBars(const std::string& startUtc, const std::string& endUtc,
     do
     {
         std::string url = dataUrl + "/v2/stocks/" + symbol + "/bars"
-                        + "?timeframe=1Min&adjustment=" + adjustment + "&limit=10000&sort=asc"
+                        + "?timeframe=1Min&adjustment=" + adjustment + "&limit=" + std::to_string(AlpacaClient::MAX_BARS_PER_REQUEST) + "&sort=asc"
                         + "&feed=" + feed + "&start=" + startUtc + "&end=" + endUtc;
         if (!pageToken.empty())
             url += "&page_token=" + pageToken;
 
-        // Retry when rate limited (HTTP 429) or the connection drops, waiting a little longer each time
-        HttpResult result;
-        for (int attempt = 1; attempt <= 6; attempt++)
-        {
-            result = client.get(url);
-            bool retry = result.status == 429 || result.status == 0 || result.status >= 500;
-            if (!retry)
-                break;
-            int waitSeconds = 5 * attempt;
-            std::cerr << "  Alpaca busy (" << result.status << "), retrying in " << waitSeconds << "s..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(waitSeconds));
-        }
+        HttpResult result = client.getWhenFree(url, MAX_ATTEMPTS, FIRST_RETRY_WAIT);
 
         if (!result.ok() || !result.body.is_object())
         {
@@ -206,10 +195,9 @@ AlpacaHistory::downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const
     // A New York day runs 04:00/05:00 UTC to 04:00/05:00 UTC the next day, so ask for a little extra
     // either side and keep only bars whose New York date is in range.
     std::time_t requestStart = chunkStart;
-    std::time_t requestEnd = chunkEnd + 32 * 3600;
+    std::time_t requestEnd = chunkEnd + 32 * MarketTime::SECONDS_PER_HOUR;
 
-    // The free plan can't query the most recent 15 minutes of SIP data
-    std::time_t latestAllowed = std::time(nullptr) - 16 * 60;
+    std::time_t latestAllowed = std::time(nullptr) - AlpacaClient::SIP_DELAY_SECONDS;
     if (requestEnd > latestAllowed)
         requestEnd = latestAllowed;
     if (requestEnd <= requestStart)

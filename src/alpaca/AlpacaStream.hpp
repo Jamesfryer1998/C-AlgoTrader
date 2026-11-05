@@ -54,6 +54,11 @@ class AlpacaStream
         static MarketCondition parseBar(const json& bar, const std::string& symbol);
 
     private:
+        // How far back to look for the bars strategies need: a few days covers a weekend or a holiday,
+        // plus a day for every ~300 bars (IEX skips minutes with no trades, so a day has under 390)
+        static constexpr int EXTRA_DAYS_TO_SEARCH = 4;
+        static constexpr int IEX_BARS_PER_DAY = 300;
+
         void onMessage(const ix::WebSocketMessagePtr& msg);
         void handleAlpacaMessage(const json& message);
 

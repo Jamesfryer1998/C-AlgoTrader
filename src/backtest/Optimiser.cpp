@@ -98,10 +98,7 @@ Optimiser::evaluate(const json& strategySettings, const std::vector<MarketCondit
     config["strategies"] = json::array({strategySettings});
 
     Backtester backtester(config);
-    backtester.setStartingCapital(settings.value("starting_capital", 100000.0));
-    backtester.setCommissionPerTrade(settings.value("commission_per_trade", 0.0));
-    backtester.setSlippagePercentage(settings.value("slippage_percent", 0.01) / 100.0);
-    backtester.getBroker().setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
+    backtester.useCosts(BacktestCosts(settings));
     backtester.keepEquityCurve(false);
     backtester.setWarmupBars(warmupBars);
     backtester.runOn(bars);

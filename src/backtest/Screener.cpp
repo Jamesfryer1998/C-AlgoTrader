@@ -10,6 +10,7 @@
 #include "Backtester.hpp"
 #include <sstream>
 #include "../quant/Stats.hpp"
+#include "../util/MarketTime.hpp"
 
 // Sharpe ratios annualised for the bar size being screened (from the settings; daily if not given)
 static json withBarsPerYear(json config, const json& settings)
@@ -27,6 +28,7 @@ static json pickOnlyTheBest(json settings)
 Screener::Screener(const json& baseConfig, const json& settings)
     : baseConfig(withBarsPerYear(baseConfig, settings)),
       settings(settings),
+      maxPosition(baseConfig.at("max_position_size").get<double>()),
       optimiser(withBarsPerYear(baseConfig, settings), pickOnlyTheBest(settings))
 {
 }
@@ -53,7 +55,7 @@ Screener::countDays(const std::vector<MarketCondition>& bars)
     std::string last;
     for (const auto& bar : bars)
     {
-        std::string day = bar.DateTime.substr(0, 10);
+        std::string day = MarketTime::datePart(bar.DateTime);
         if (day != last)
         {
             days++;
@@ -76,18 +78,17 @@ Screener::screenStock(const std::string& symbol, const std::vector<MarketConditi
                       const std::vector<std::string>& strategies, int threads,
                       const std::function<void(const std::string&, size_t, size_t)>& onProgress) const
 {
-    std::string testStart = settings.value("test_start", "2024-01-01");
-    int minTrainDays = settings.value("min_train_days", 500);
-    int minTestDays = settings.value("min_test_days", 120);
+    std::string testStart = settings.value("test_start", DEFAULT_TEST_START);
+    int minTrainDays = settings.value("min_train_days", DEFAULT_MIN_TRAIN_DAYS);
+    int minTestDays = settings.value("min_test_days", DEFAULT_MIN_TEST_DAYS);
     double barsPerYear = baseConfig.value("bars_per_year", quant::TRADING_DAYS);
-    size_t warmupWanted = settings.value("test_warmup_bars", 320);
-    double maxPosition = baseConfig.value("max_position_size", 10.0);
+    size_t warmupWanted = settings.value("test_warmup_bars", DEFAULT_TEST_WARMUP_BARS);
 
     // 1. Split: training years before test_start, test years from it. The test run is given the last
     //    training bars first as history only, so strategies start the test years warmed up.
     std::vector<MarketCondition> train, test;
     for (const auto& bar : all)
-        (bar.DateTime.substr(0, 10) < testStart ? train : test).push_back(bar);
+        (MarketTime::datePart(bar.DateTime) < testStart ? train : test).push_back(bar);
 
     std::vector<Row> rows;
     for (const auto& name : strategies)
@@ -99,8 +100,8 @@ Screener::screenStock(const std::string& symbol, const std::vector<MarketConditi
         row.testDays = countDays(test);
         if (!test.empty())
         {
-            row.testStart = test.front().DateTime.substr(0, 10);
-            row.testEnd = test.back().DateTime.substr(0, 10);
+            row.testStart = MarketTime::datePart(test.front().DateTime);
+            row.testEnd = MarketTime::datePart(test.back().DateTime);
         }
         rows.push_back(row);
     }
@@ -202,11 +203,11 @@ Screener::topByTraining(const std::vector<Row>& rows, size_t n)
 }
 
 std::vector<Screener::Row>
-Screener::heldUp(const std::vector<Row>& rows, double minTrainSharpe, double minTestSharpe, int minTestTrades)
+Screener::heldUp(const std::vector<Row>& rows, int minTestTrades)
 {
     std::vector<Row> out;
     for (const auto& row : rows)
-        if (row.found && row.train.sharpeRatio >= minTrainSharpe && row.test.sharpeRatio >= minTestSharpe &&
+        if (row.found && row.train.sharpeRatio >= HELD_UP_SHARPE && row.test.sharpeRatio >= HELD_UP_SHARPE &&
             row.test.closedTrades >= minTestTrades && row.beatsBuyHold())
             out.push_back(row);
     std::stable_sort(out.begin(), out.end(),
@@ -217,7 +218,7 @@ Screener::heldUp(const std::vector<Row>& rows, double minTrainSharpe, double min
 std::vector<Screener::Row>
 Screener::topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades)
 {
-    std::vector<Row> candidates = heldUp(rows, 0.5, 0.5, minTestTrades);
+    std::vector<Row> candidates = heldUp(rows, minTestTrades);
     auto weaker = [](const Row& r) { return std::min(r.train.sharpeRatio, r.test.sharpeRatio); };
     std::stable_sort(candidates.begin(), candidates.end(),
                      [&](const Row& a, const Row& b) { return weaker(a) > weaker(b); });
@@ -255,7 +256,6 @@ Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, 
 quant::PriceTable
 Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<MarketCondition>>& allBars) const
 {
-    double maxPosition = baseConfig.value("max_position_size", 10.0);
     std::vector<std::string> names;
     std::map<std::string, std::vector<quant::DailyBar>> values;
 
@@ -269,10 +269,7 @@ Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, 
         config["strategies"] = json::array({strategySettings(pick)});
 
         Backtester backtester(config);
-        backtester.setStartingCapital(settings.value("starting_capital", 100000.0));
-        backtester.setCommissionPerTrade(settings.value("commission_per_trade", 0.0));
-        backtester.setSlippagePercentage(settings.value("slippage_percent", 0.01) / 100.0);
-        backtester.getBroker().setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
+        backtester.useCosts(BacktestCosts(settings));
         backtester.keepEquityCurve(true);
         const std::vector<MarketCondition>& bars = found->second;
         backtester.runOn(bars);
@@ -287,7 +284,7 @@ Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, 
         std::vector<quant::DailyBar> series;
         for (size_t i = 1; i < curve.size(); i++)
         {
-            std::string day = curve[i].first.substr(0, 10);
+            std::string day = MarketTime::datePart(curve[i].first);
             double value = std::max(capital * 0.01, capital + curve[i].second - start);
             if (!series.empty() && series.back().date == day)
                 series.back().close = value;
