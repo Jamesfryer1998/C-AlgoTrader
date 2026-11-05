@@ -5,6 +5,16 @@
 #include <random>
 #include <stdexcept>
 
+namespace
+{
+    // Fewer shared days than this and the correlations aren't worth trusting
+    const size_t MIN_DAYS = 60;
+
+    // Confidence levels for value at risk: the worst 1 period in 20, and in 100
+    const double CONFIDENCE_95 = 0.95;
+    const double CONFIDENCE_99 = 0.99;
+}
+
 namespace quant
 {
     Vector
@@ -78,8 +88,8 @@ namespace quant
         size_t k = prices.symbols.size();
         if (k == 0)
             throw std::runtime_error("No stocks given");
-        if (prices.days() < 60)
-            throw std::runtime_error("Need at least 60 days of prices that all stocks share");
+        if (prices.days() < MIN_DAYS)
+            throw std::runtime_error("Need at least " + std::to_string(MIN_DAYS) + " days of prices that all stocks share");
 
         RiskResult result;
         result.symbols = prices.symbols;
@@ -139,10 +149,10 @@ namespace quant
         result.meanReturn = mean(simulated);
         result.probabilityOfLoss = static_cast<double>(std::count_if(simulated.begin(), simulated.end(),
                                        [](double r) { return r < 0; })) / simulated.size();
-        result.at95 = tailRisk(simulated, 0.95);
-        result.at99 = tailRisk(simulated, 0.99);
-        result.uncorrelated95 = tailRisk(uncorrelated, 0.95);
-        result.uncorrelated99 = tailRisk(uncorrelated, 0.99);
+        result.at95 = tailRisk(simulated, CONFIDENCE_95);
+        result.at99 = tailRisk(simulated, CONFIDENCE_99);
+        result.uncorrelated95 = tailRisk(uncorrelated, CONFIDENCE_95);
+        result.uncorrelated99 = tailRisk(uncorrelated, CONFIDENCE_99);
         std::sort(simulated.begin(), simulated.end());
         result.simulatedReturns = simulated;
 

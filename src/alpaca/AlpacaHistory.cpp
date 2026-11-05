@@ -16,7 +16,6 @@ namespace
     // Used when config.json doesn't say
     const std::string DEFAULT_FEED = AlpacaApi::SIP_FEED;   // all exchanges: real volumes
     const std::string DEFAULT_ADJUSTMENT = "split";          // prices adjusted for stock splits
-    const std::string DEFAULT_FILE_BASE_NAME = "marketData";
 
     // Retry when rate limited or the connection drops: waits 5 s, 10 s, ... between six attempts
     const int MAX_ATTEMPTS = 6;
@@ -47,7 +46,7 @@ AlpacaHistory::AlpacaHistory(const json& config)
     symbol = config.at("ticker").get<std::string>();
     feed = alpaca.value("history_feed", DEFAULT_FEED);
     dataUrl = alpaca.value("data_url", AlpacaApi::DATA_URL);
-    fileBaseName = config.value("baseDataFileName", DEFAULT_FILE_BASE_NAME);
+    fileBaseName = config.value("baseDataFileName", DEFAULT_MARKET_DATA_FILE_NAME);
     adjustment = alpaca.value("history_adjustment", DEFAULT_ADJUSTMENT);
     regularHoursOnly = alpaca.value("history_regular_hours_only", true);
 }
@@ -55,7 +54,7 @@ AlpacaHistory::AlpacaHistory(const json& config)
 std::string
 AlpacaHistory::csvPath(const std::string& dataDir, const std::string& date) const
 {
-    return (std::filesystem::path(dataDir) / (fileBaseName + "_" + symbol + "_" + date + ".csv")).string();
+    return (std::filesystem::path(dataDir) / (fileBaseName + "_" + symbol + "_" + date + CSV_EXTENSION)).string();
 }
 
 // Is <path> a finished download of <day>? Its first bar must be from that day (old Yahoo files shared these

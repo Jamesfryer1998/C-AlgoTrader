@@ -5,6 +5,16 @@
 #include <map>
 #include <stdexcept>
 
+namespace
+{
+    // The year-by-year test skips part years at the edges of the data
+    const size_t MIN_DAYS_IN_A_YEAR = 200;
+
+    // The rolling fit needs at least this many days to say anything
+    const int MIN_LOOKBACK_DAYS = 20;
+
+}
+
 namespace quant
 {
     static Vector logs(const Vector& prices)
@@ -28,7 +38,7 @@ namespace quant
 
         std::vector<std::pair<std::string, CointegrationResult>> results;
         for (const auto& [year, series] : byYear)
-            if (series.first.size() >= 200)   // skip part years at the edges
+            if (series.first.size() >= MIN_DAYS_IN_A_YEAR)
                 results.emplace_back(year, engleGranger(series.second, series.first));
         return results;
     }
@@ -61,7 +71,7 @@ namespace quant
         size_t delay = static_cast<size_t>(std::max(0, settings.signalDelayDays));
         if (y.size() != n || x.size() != n)
             throw std::runtime_error("Pair prices must cover the same dates");
-        if (lookback < 20 || n < lookback + delay + 2)
+        if (lookback < MIN_LOOKBACK_DAYS || n < lookback + delay + 2)
             throw std::runtime_error("Not enough data: need more days than the lookback (" +
                                      std::to_string(lookback) + ") plus a few to trade");
 
@@ -113,12 +123,12 @@ namespace quant
                 if (settings.stopZ > 0 && stretch >= settings.stopZ)
                 {
                     side = 0;
-                    reasonAt[t] = "stop";
+                    reasonAt[t] = PairTrade::STOPPED;
                 }
                 else if (stretch <= settings.exitZ)
                 {
                     side = 0;
-                    reasonAt[t] = "reverted";
+                    reasonAt[t] = PairTrade::REVERTED;
                 }
             }
             target[t] = side;
@@ -126,7 +136,7 @@ namespace quant
         }
 
         // 2. Positions: what was decided `delay` closes earlier. Daily P&L on $1 of gross exposure.
-        double cost = settings.costBps / 10000.0;
+        double cost = settings.costBps / BASIS_POINTS_PER_UNIT;
         double previous = 0;
         PairTrade open;
         double tradeEquity = 1.0;
@@ -158,7 +168,7 @@ namespace quant
                 tradeEquity *= 1.0 - exitCost;
                 open.exitDate = dates[t - 1];
                 open.exitZ = zAt[signalDay];
-                open.exitReason = reasonAt[signalDay].empty() ? "reverted" : reasonAt[signalDay];
+                open.exitReason = reasonAt[signalDay].empty() ? PairTrade::REVERTED : reasonAt[signalDay];
                 open.returnPct = tradeEquity - 1.0;
                 result.trades.push_back(open);
             }
@@ -188,9 +198,9 @@ namespace quant
 
         if (previous != 0)
         {
-            open.exitDate = "open";
+            open.exitDate = PairTrade::STILL_OPEN;
             open.exitZ = zAt[n - 1];
-            open.exitReason = "end of data";
+            open.exitReason = PairTrade::END_OF_DATA;
             open.returnPct = tradeEquity - 1.0;
             result.trades.push_back(open);
         }

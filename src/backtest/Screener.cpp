@@ -12,6 +12,22 @@
 #include "../quant/Stats.hpp"
 #include "../util/MarketTime.hpp"
 
+namespace
+{
+    // Defaults for settings missing from screen.json
+    const std::string DEFAULT_TEST_START = "2024-01-01";
+    const int DEFAULT_MIN_TRAIN_DAYS = 500;
+    const int DEFAULT_MIN_TEST_DAYS = 120;
+    // Bars of training data fed in before the test years, so strategies start them warmed up
+    const size_t DEFAULT_TEST_WARMUP_BARS = 320;
+
+    // Daily bars are stamped at the close
+    const std::string DAILY_BAR_TIME = " 16:00:00";
+
+    // A pick's value never drops below this share of its starting capital (keeps the returns finite)
+    const double LOWEST_VALUE_FRACTION = 0.01;
+}
+
 // Sharpe ratios annualised for the bar size being screened (from the settings; daily if not given)
 static json withBarsPerYear(json config, const json& settings)
 {
@@ -42,7 +58,7 @@ Screener::toBars(const std::string& symbol, const std::vector<quant::DailyBar>& 
     {
         // Volume isn't used by the strategies; clamp it so huge split-adjusted volumes fit
         int volume = static_cast<int>(std::min(d.volume, static_cast<double>(INT_MAX)));
-        bars.emplace_back(d.date + " 16:00:00", symbol, static_cast<float>(d.open), static_cast<float>(d.close),
+        bars.emplace_back(d.date + DAILY_BAR_TIME, symbol, static_cast<float>(d.open), static_cast<float>(d.close),
                           volume, "1d");
     }
     return bars;
@@ -285,7 +301,7 @@ Screener::dailyValues(const std::vector<Row>& picks, const std::map<std::string,
         for (size_t i = 1; i < curve.size(); i++)
         {
             std::string day = MarketTime::datePart(curve[i].first);
-            double value = std::max(capital * 0.01, capital + curve[i].second - start);
+            double value = std::max(capital * LOWEST_VALUE_FRACTION, capital + curve[i].second - start);
             if (!series.empty() && series.back().date == day)
                 series.back().close = value;
             else

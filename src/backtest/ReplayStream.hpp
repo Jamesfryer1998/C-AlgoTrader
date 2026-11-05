@@ -49,10 +49,6 @@ class ReplayStream
         static std::vector<std::string> savedDays(const std::string& dataRoot, const std::string& ticker);
 
     private:
-        // Saved days loaded before the first replayed day, enough for any strategy's back-fill
-        static constexpr int HISTORY_DAYS = 5;
-        static constexpr int LOADING_THREADS = 4;
-
         std::string dataRoot;
         std::vector<std::string> tickers;
         std::string firstDay;

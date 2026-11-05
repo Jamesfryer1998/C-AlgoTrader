@@ -24,12 +24,23 @@
  */
 class MACD : public StrategyBase {
     public:
+        static constexpr const char* NAME = "MACD";
+
+        // signal_type: trade when the MACD crosses its signal line, or when it crosses zero
+        static constexpr const char* CROSSOVER = "crossover";
+        static constexpr const char* ZERO_CROSS = "zero_cross";
+
+        // Bars needed: this many times the slowest average, so the averages have settled
+        static constexpr int WARMUP_MULTIPLE = 5;
+
+        // MACD values are small (price differences), so show more decimals
+        static constexpr int DECIMALS = 4;
+
         MACD(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
         struct Values { double macd = 0, signal = 0, previousMacd = 0, previousSignal = 0; };
 
-        // A long window so the moving averages have settled
-        int barsNeeded() const override { return 5 * (_strategyAttribute.long_period + _strategyAttribute.signal_period); }
+        int barsNeeded() const override { return WARMUP_MULTIPLE * (_strategyAttribute.long_period + _strategyAttribute.signal_period); }
 
         void execute() override
         {
@@ -42,7 +53,7 @@ class MACD : public StrategyBase {
             last = v;
             ready = true;
 
-            bool zeroCross = _strategyAttribute.signal_type == "zero_cross";
+            bool zeroCross = _strategyAttribute.signal_type == ZERO_CROSS;
             double lineNow  = zeroCross ? 0.0 : v.signal;
             double lineThen = zeroCross ? 0.0 : v.previousSignal;
 
@@ -88,7 +99,7 @@ class MACD : public StrategyBase {
         {
             if (!ready)
                 return "";
-            bool zeroCross = _strategyAttribute.signal_type == "zero_cross";
+            bool zeroCross = _strategyAttribute.signal_type == ZERO_CROSS;
             double line = zeroCross ? 0.0 : last.signal;
             double gap = last.macd - line;
             std::ostringstream out;
@@ -113,11 +124,11 @@ class MACD : public StrategyBase {
                       std::to_string(_strategyAttribute.long_period) + "/" + std::to_string(_strategyAttribute.signal_period) + ")";
             if (!ready)
                 return levels;
-            bool zeroCross = _strategyAttribute.signal_type == "zero_cross";
+            bool zeroCross = _strategyAttribute.signal_type == ZERO_CROSS;
             double line = zeroCross ? 0.0 : last.signal;
             levels.ready = true;
-            levels.current = Format::number(last.macd, 4);
-            (last.macd >= line ? levels.lower : levels.upper) = Format::number(line, 4);
+            levels.current = Format::number(last.macd, DECIMALS);
+            (last.macd >= line ? levels.lower : levels.upper) = Format::number(line, DECIMALS);
             levels.state = std::string(last.macd >= line ? "above " : "below ") + (zeroCross ? "0" : "signal line");
             return levels;
         }
@@ -132,8 +143,8 @@ class MACD : public StrategyBase {
                 throw std::runtime_error("MACD signal_period not set");
             if(_strategyAttribute.short_period >= _strategyAttribute.long_period)
                 throw std::runtime_error("MACD short_period must be less than long_period");
-            if(_strategyAttribute.signal_type != "crossover" && _strategyAttribute.signal_type != "zero_cross")
-                throw std::runtime_error("MACD signal_type must be \"crossover\" or \"zero_cross\"");
+            if(_strategyAttribute.signal_type != CROSSOVER && _strategyAttribute.signal_type != ZERO_CROSS)
+                throw std::runtime_error(std::string("MACD signal_type must be \"") + CROSSOVER + "\" or \"" + ZERO_CROSS + "\"");
         }
 
     private:

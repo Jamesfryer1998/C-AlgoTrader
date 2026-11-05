@@ -37,13 +37,15 @@
  */
 class SCALP : public StrategyBase {
     public:
+        static constexpr const char* NAME = "SCALP";
+        static constexpr int LAST_ENTRY_MINUTE = 15 * 60 + 45;   // 15:45: no new trades after this
+        static constexpr int FLAT_MINUTE = 15 * 60 + 55;         // 15:55: close whatever is open
+        static constexpr int MAX_WARMUP_MINUTES = 300;           // warmup_minutes beyond this leaves no time to trade
+
         SCALP(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
-        static constexpr int LAST_ENTRY_MINUTE = 15 * 60 + 45;
-        static constexpr int FLAT_MINUTE = 15 * 60 + 55;
-
         // A whole session, so the VWAP can be built from the open after a mid-day start
-        int barsNeeded() const override { return MarketTime::CLOSE_MINUTE - MarketTime::OPEN_MINUTE + 1; }
+        int barsNeeded() const override { return MarketTime::MINUTES_PER_SESSION + 1; }
 
         void execute() override
         {
@@ -140,7 +142,7 @@ class SCALP : public StrategyBase {
         DecisionLevels decisionLevels() const override
         {
             DecisionLevels levels;
-            levels.label = "SCALP";
+            levels.label = NAME;
             if (weight <= 0)
                 return levels;
             levels.ready = true;
@@ -178,8 +180,8 @@ class SCALP : public StrategyBase {
                 throw std::runtime_error("SCALP exit_threshold must be >= 0 and below entry_threshold");
             if (_strategyAttribute.max_hold_bars <= 0)
                 throw std::runtime_error("SCALP max_hold_bars must be > 0");
-            if (_strategyAttribute.warmup_minutes < 0 || _strategyAttribute.warmup_minutes > 300)
-                throw std::runtime_error("SCALP warmup_minutes must be between 0 and 300");
+            if (_strategyAttribute.warmup_minutes < 0 || _strategyAttribute.warmup_minutes > MAX_WARMUP_MINUTES)
+                throw std::runtime_error("SCALP warmup_minutes must be between 0 and " + std::to_string(MAX_WARMUP_MINUTES));
             if (_strategyAttribute.stop_loss <= 0 || _strategyAttribute.take_profit <= 0)
                 throw std::runtime_error("SCALP needs a stop_loss and take_profit (in %, e.g. 0.3 and 1)");
         }

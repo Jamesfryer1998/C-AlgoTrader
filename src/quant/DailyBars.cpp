@@ -7,6 +7,14 @@
 #include <set>
 #include <sstream>
 
+namespace
+{
+    // data/daily/<SYMBOL>.csv
+    const std::string CSV_HEADER = "Date,Open,High,Low,Close,Volume";
+    const size_t CSV_COLUMNS = 6;
+    const int PRICE_DIGITS = 10;   // enough to keep split-adjusted prices exact
+}
+
 namespace quant
 {
     bool writeDailyCsv(const std::string& path, const std::vector<DailyBar>& bars)
@@ -14,10 +22,10 @@ namespace quant
         std::ofstream file(path);
         if (!file)
             return false;
-        file << "Date,Open,High,Low,Close,Volume\n" << std::setprecision(10);
+        file << CSV_HEADER << "\n" << std::setprecision(PRICE_DIGITS);
         for (const auto& b : bars)
             file << b.date << "," << b.open << "," << b.high << "," << b.low << "," << b.close << ","
-                 << std::fixed << std::setprecision(0) << b.volume << std::defaultfloat << std::setprecision(10) << "\n";
+                 << std::fixed << std::setprecision(0) << b.volume << std::defaultfloat << std::setprecision(PRICE_DIGITS) << "\n";
         return static_cast<bool>(file);
     }
 
@@ -39,7 +47,7 @@ namespace quant
             std::vector<std::string> fields;
             while (std::getline(row, field, ','))
                 fields.push_back(field);
-            if (fields.size() < 6)
+            if (fields.size() < CSV_COLUMNS)
                 continue;
             try
             {

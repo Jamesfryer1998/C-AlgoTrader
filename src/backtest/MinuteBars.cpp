@@ -32,7 +32,8 @@ MinuteBars::load(const std::string& dataDir, const std::string& ticker,
                 size_t i = next.fetch_add(1);
                 if (i >= files.size())
                     return;
-                std::string fileDay = files[i].substr(files[i].size() - 14, 10);   // ..._YYYY-MM-DD.csv
+                std::string fileDay = files[i].substr(files[i].size() - CSV_EXTENSION.size() - MarketTime::DATE_LENGTH,
+                                                      MarketTime::DATE_LENGTH);   // ..._YYYY-MM-DD.csv
                 try
                 {
                     CSVParser parser;

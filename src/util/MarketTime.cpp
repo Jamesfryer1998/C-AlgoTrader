@@ -27,6 +27,9 @@ namespace
     const int DST_START_MONTH = 3, DST_START_SUNDAY = 2, DST_START_HOUR_UTC = 7;
     const int DST_END_MONTH = 11, DST_END_SUNDAY = 1, DST_END_HOUR_UTC = 6;
 
+    const size_t MONTH_LENGTH = 7;            // "YYYY-MM"
+    const std::string FIRST_DAY = "-01";
+
     // monthsBefore keeps the day of the month, capped so it exists in every month
     const int LAST_DAY_IN_EVERY_MONTH = 28;
 
@@ -115,6 +118,12 @@ std::string
 MarketTime::datePart(const std::string& dateTime)
 {
     return dateTime.substr(0, DATE_LENGTH);
+}
+
+std::string
+MarketTime::firstOfMonth(const std::string& date)
+{
+    return date.substr(0, MONTH_LENGTH) + FIRST_DAY;
 }
 
 std::string

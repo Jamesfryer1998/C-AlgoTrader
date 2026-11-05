@@ -17,6 +17,11 @@
  */
 class RSI : public StrategyBase {
     public:
+        static constexpr const char* NAME = "RSI";
+        static constexpr float NEUTRAL = 50.0f;    // no gains or losses to go on
+        static constexpr float MAXIMUM = 100.0f;   // only gains
+        static constexpr float HUNDREDTHS = 100.0f;   // RSI is rounded to 2 decimal places
+
         RSI(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
         void execute() override
@@ -53,7 +58,7 @@ class RSI : public StrategyBase {
         float calculateRSI(const std::vector<float>& closes)
         {
             if (closes.size() <= 1)
-                return 50.0f;   // neutral
+                return NEUTRAL;
 
             float gainSum = 0.0f;
             float lossSum = 0.0f;
@@ -69,13 +74,13 @@ class RSI : public StrategyBase {
             float avgLoss = lossSum / (closes.size() - 1);
 
             if (avgLoss == 0.0f && avgGain == 0.0f)
-                return 50.0f;    // no movement
+                return NEUTRAL;
             if (avgLoss == 0.0f)
-                return 100.0f;   // only gains
+                return MAXIMUM;
 
             float rs = avgGain / avgLoss;
-            float value = 100.0f - (100.0f / (1.0f + rs));
-            return std::round(value * 100) / 100;
+            float value = MAXIMUM - (MAXIMUM / (1.0f + rs));
+            return std::round(value * HUNDREDTHS) / HUNDREDTHS;
         }
 
         int barsNeeded() const override { return _strategyAttribute.period; }
@@ -118,6 +123,6 @@ class RSI : public StrategyBase {
                        << _strategyAttribute.overbought_threshold << ")" << std::endl;
         }
 
-        float rsi = 50.0f;
+        float rsi = NEUTRAL;
         bool ready = false;
 };

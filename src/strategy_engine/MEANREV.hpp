@@ -23,6 +23,9 @@
  */
 class MEANREV : public StrategyBase {
     public:
+        static constexpr const char* NAME = "MEANREV";
+        static constexpr int MIN_LOOKBACK = 2;   // a standard deviation needs at least two prices
+
         MEANREV(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
         int barsNeeded() const override
@@ -81,8 +84,8 @@ class MEANREV : public StrategyBase {
 
         void validate() override
         {
-            if(_strategyAttribute.lookback_period < 2)
-                throw std::runtime_error("MEANREV lookback_period must be at least 2");
+            if(_strategyAttribute.lookback_period < MIN_LOOKBACK)
+                throw std::runtime_error("MEANREV lookback_period must be at least " + std::to_string(MIN_LOOKBACK));
             if(_strategyAttribute.moving_average_period < 1)
                 throw std::runtime_error("MEANREV moving_average_period not set");
             if(_strategyAttribute.entry_threshold <= 0)

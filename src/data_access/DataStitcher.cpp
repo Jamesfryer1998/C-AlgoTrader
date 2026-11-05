@@ -6,7 +6,6 @@
 
 namespace
 {
-    const std::string CSV_EXTENSION = ".csv";
     // The date in a file name, e.g. marketData_NVDA_2025-03-31.csv
     const std::regex DATE_IN_FILE_NAME(".*_(\\d{4}-\\d{2}-\\d{2})\\.csv");
 }

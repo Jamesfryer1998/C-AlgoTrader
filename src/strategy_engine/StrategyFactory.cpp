@@ -60,13 +60,13 @@ StrategyFactory::generateStrategies()
             continue;
 
         std::unique_ptr<StrategyBase> strategy;
-        if(name == "RSI")
+        if(name == RSI::NAME)
             strategy = std::make_unique<RSI>(attributes);
-        else if (name == "MACD")
+        else if (name == MACD::NAME)
             strategy = std::make_unique<MACD>(attributes);
-        else if (name == "MEANREV")
+        else if (name == MEANREV::NAME)
             strategy = std::make_unique<MEANREV>(attributes);
-        else if (name == "SCALP")
+        else if (name == SCALP::NAME)
             strategy = std::make_unique<SCALP>(attributes);
         else
             throw std::runtime_error("Unknown strategy in config: " + name);

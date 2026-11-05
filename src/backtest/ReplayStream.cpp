@@ -8,6 +8,16 @@
 #include <set>
 #include "MinuteBars.hpp"
 
+namespace
+{
+    // Minute bars a screen downloaded: data/minute/<TICKER>/marketData_<TICKER>_<YYYY-MM-DD>.csv
+    const std::string MINUTE_FOLDER = "minute";
+
+    // Saved days loaded before the first replayed day, enough for any strategy's back-fill
+    const int HISTORY_DAYS = 5;
+    const int LOADING_THREADS = 4;
+}
+
 namespace fs = std::filesystem;
 
 ReplayStream::ReplayStream(const std::string& dataRoot, const std::vector<std::string>& tickers, std::string date,
@@ -19,7 +29,7 @@ ReplayStream::ReplayStream(const std::string& dataRoot, const std::vector<std::s
 std::string
 ReplayStream::folderFor(const std::string& dataRoot, const std::string& ticker)
 {
-    fs::path own = fs::path(dataRoot) / "minute" / ticker;
+    fs::path own = fs::path(dataRoot) / MINUTE_FOLDER / ticker;
     return fs::is_directory(own) ? own.string() : dataRoot;
 }
 
@@ -27,15 +37,13 @@ std::vector<std::string>
 ReplayStream::savedDays(const std::string& dataRoot, const std::string& ticker)
 {
     std::vector<std::string> found;
-    std::string prefix = "marketData_" + ticker + "_";
+    std::string prefix = DEFAULT_MARKET_DATA_FILE_NAME + "_" + ticker + "_";
     std::error_code error;
     for (const auto& entry : fs::directory_iterator(folderFor(dataRoot, ticker), error))
     {
         std::string name = entry.path().filename().string();
-        // marketData_<TICKER>_YYYY-MM-DD.csv
-        const std::string extension = ".csv";
-        bool isDayFile = name.rfind(prefix, 0) == 0 && name.size() == prefix.size() + MarketTime::DATE_LENGTH + extension.size()
-                      && name.compare(name.size() - extension.size(), extension.size(), extension) == 0;
+        bool isDayFile = name.rfind(prefix, 0) == 0 && name.size() == prefix.size() + MarketTime::DATE_LENGTH + CSV_EXTENSION.size()
+                      && name.compare(name.size() - CSV_EXTENSION.size(), CSV_EXTENSION.size(), CSV_EXTENSION) == 0;
         if (isDayFile)
             found.push_back(name.substr(prefix.size(), MarketTime::DATE_LENGTH));
     }

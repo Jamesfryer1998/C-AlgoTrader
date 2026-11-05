@@ -5,6 +5,14 @@
 #include <limits>
 #include <stdexcept>
 
+namespace
+{
+    // The ADF regression needs this many points beyond its lags to be meaningful
+    const size_t MIN_ADF_POINTS = 10;
+    // A half-life needs a few points of the spread
+    const size_t MIN_HALF_LIFE_POINTS = 3;
+}
+
 namespace quant
 {
     double mean(const Vector& values)
@@ -243,7 +251,7 @@ namespace quant
         // Regress diff[t] on: 1, series[t-1], diff[t-1], ..., diff[t-lags]
         size_t n = series.size();
         size_t first = static_cast<size_t>(lags) + 1;
-        if (n < first + 10)
+        if (n < first + MIN_ADF_POINTS)
             return 0.0;
 
         Matrix rows;
@@ -264,7 +272,7 @@ namespace quant
     double halfLife(const Vector& spread)
     {
         // spread[t] - spread[t-1] = c + gamma * spread[t-1]  ->  deviations shrink by (1 + gamma) a day
-        if (spread.size() < 3)
+        if (spread.size() < MIN_HALF_LIFE_POINTS)
             return std::numeric_limits<double>::infinity();
         Vector lagged(spread.begin(), spread.end() - 1);
         Vector change;

@@ -78,7 +78,7 @@ namespace quant
         for (size_t t = signalStart; t < n; t++)
             signal[t] = fast[t] > slow[t];
 
-        double cost = settings.costBps / 10000.0;
+        double cost = settings.costBps / BASIS_POINTS_PER_UNIT;
         size_t delay = static_cast<size_t>(std::max(0, settings.signalDelayDays));
         Run honest = simulate(signal, closes, signalStart, first, delay, cost);
         Run noCosts = simulate(signal, closes, signalStart, first, delay, 0.0);

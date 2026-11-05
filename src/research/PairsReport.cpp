@@ -62,8 +62,8 @@ PairsReport::printBacktest(std::ostream& out) const
     int reverted = 0, stopped = 0, wins = 0, daysHeld = 0;
     for (const auto& trade : result.trades)
     {
-        if (trade.exitReason == "reverted") reverted++;
-        if (trade.exitReason == "stop") stopped++;
+        if (trade.exitReason == quant::PairTrade::REVERTED) reverted++;
+        if (trade.exitReason == quant::PairTrade::STOPPED) stopped++;
         if (trade.returnPct > 0) wins++;
         daysHeld += trade.days;
     }

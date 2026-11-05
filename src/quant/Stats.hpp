@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <numbers>
 #include <cstdint>
 #include <random>
 #include <string>
@@ -17,6 +18,7 @@ namespace quant
     using Matrix = std::vector<Vector>;   // Matrix[row][column]
 
     constexpr double TRADING_DAYS = MarketTime::TRADING_DAYS_PER_YEAR;
+    constexpr double BASIS_POINTS_PER_UNIT = 10000.0;   // 1 bp = 0.01%
 
     // Standard normal random numbers that are the same on every platform for a given seed.
     // (std::normal_distribution is implemented differently by libstdc++ and libc++, so a seeded
@@ -38,7 +40,7 @@ namespace quant
                 while (u1 <= 0.0)
                     u1 = uniform();
                 double radius = std::sqrt(-2.0 * std::log(u1));
-                double angle = 2.0 * 3.14159265358979323846 * u2;
+                double angle = 2.0 * std::numbers::pi * u2;
                 spare = radius * std::sin(angle);
                 haveSpare = true;
                 return radius * std::cos(angle);

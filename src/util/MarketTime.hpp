@@ -43,6 +43,9 @@ namespace MarketTime
     // "YYYY-MM-DD" of a "YYYY-MM-DD HH:MM:SS" string
     std::string datePart(const std::string& dateTime);
 
+    // "YYYY-MM-01" of the month a "YYYY-MM-DD..." falls in
+    std::string firstOfMonth(const std::string& date);
+
     // "YYYY-MM-DD" moved back by whole months (day capped at 28 so it always exists)
     std::string monthsBefore(const std::string& date, int months);
 

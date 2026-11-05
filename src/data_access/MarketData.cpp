@@ -13,7 +13,6 @@
 namespace
 {
     const std::string DATA_FOLDER = "/data";
-    const std::string CSV_EXTENSION = ".csv";
     const char* const DATE_FORMAT = "%Y-%m-%d";
 }
 

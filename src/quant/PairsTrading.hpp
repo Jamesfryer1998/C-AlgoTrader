@@ -43,6 +43,12 @@ namespace quant
 
     struct PairTrade
     {
+        // Why a trade ended (exitReason), and the exitDate of one still running
+        static inline const std::string REVERTED = "reverted";
+        static inline const std::string STOPPED = "stop";
+        static inline const std::string END_OF_DATA = "end of data";
+        static inline const std::string STILL_OPEN = "open";
+
         std::string entryDate;      // close the trade was opened at
         std::string exitDate;       // close it was closed at ("open" if still running)
         int side = 0;               // +1 long spread (buy Y, sell X), -1 short spread

@@ -130,13 +130,6 @@ class Screener
         Optimiser& getOptimiser() { return optimiser; }
 
     private:
-        // Defaults for settings missing from screen.json
-        static constexpr const char* DEFAULT_TEST_START = "2024-01-01";
-        static constexpr int DEFAULT_MIN_TRAIN_DAYS = 500;
-        static constexpr int DEFAULT_MIN_TEST_DAYS = 120;
-        // Bars of training data fed in before the test years, so strategies start them warmed up
-        static constexpr size_t DEFAULT_TEST_WARMUP_BARS = 320;
-
         json baseConfig;
         json settings;
         double maxPosition;   // max_position_size from config.json
