@@ -30,6 +30,8 @@ namespace AlpacaApi
     inline const std::string POSITIONS_PATH = "/v2/positions";
     inline const std::string STOCKS_PATH = "/v2/stocks/";   // + symbol + what about it, e.g. "/bars"
 
+    inline const std::string FIRST_HISTORY_DAY = "2016-01-01";   // Alpaca's bar history starts in 2016
+
     inline const std::string ONE_MINUTE = "1Min";
     inline const std::string ONE_DAY = "1Day";
 
@@ -38,6 +40,17 @@ namespace AlpacaApi
 
     // The free plan can't query the most recent 15 minutes of SIP data: keep a minute clear of it
     constexpr std::time_t SIP_DELAY_SECONDS = 16 * 60;
+
+    // Fields of a position, e.g. {"qty":"5","side":"long","avg_entry_price":"181.20","unrealized_pl":"1.5",...}
+    inline const std::string QUANTITY = "qty";
+    inline const std::string SIDE = "side";
+    inline const std::string SHORT = "short";
+    inline const std::string AVERAGE_PRICE = "avg_entry_price";
+    inline const std::string UNREALISED_PNL = "unrealized_pl";
+    inline const std::string UNREALISED_FRACTION = "unrealized_plpc";
+
+    // Alpaca sends numbers as text, e.g. "100123.45": the number, or 0 if missing or unreadable
+    double numberField(const json& body, const std::string& key);
 
     // Bars for one stock: <dataUrl>/v2/stocks/<SYMBOL>/bars?timeframe=<timeframe>
     // (add the other query parameters with "&...")

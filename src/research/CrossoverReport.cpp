@@ -5,6 +5,14 @@
 #include "PerformanceTable.hpp"
 #include "../util/Format.hpp"
 
+namespace
+{
+    // data/quant/macross_<SYMBOL>.csv
+    const std::string FILE_PREFIX = "/macross_";
+    const std::string FILE_EXTENSION = ".csv";
+    const std::string CSV_HEADER = "date,close,fast_ma,slow_ma,position,strategy_return,buy_hold_return";
+}
+
 using Format::number;
 using Format::percent;
 using Format::percentChange;
@@ -47,9 +55,9 @@ CrossoverReport::print(std::ostream& out) const
 std::string
 CrossoverReport::save(const std::string& folder) const
 {
-    std::string path = folder + "/macross_" + symbol + ".csv";
+    std::string path = folder + FILE_PREFIX + symbol + FILE_EXTENSION;
     std::ofstream file(path);
-    file << "date,close,fast_ma,slow_ma,position,strategy_return,buy_hold_return\n";
+    file << CSV_HEADER << "\n";
     for (size_t i = 0; i < result.dates.size(); i++)
         file << result.dates[i] << "," << result.closes[i] << "," << result.fastAverage[i] << "," << result.slowAverage[i]
              << "," << result.position[i] << "," << result.strategyReturns[i] << "," << result.buyHoldReturns[i] << "\n";

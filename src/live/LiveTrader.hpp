@@ -43,16 +43,6 @@ using json = nlohmann::json;
 class LiveTrader
 {
     public:
-        // How long a minute's table waits for stocks that haven't sent a bar (a quiet stock can have no IEX
-        // trades, and so no bar, in a minute)
-        static constexpr std::chrono::seconds WAIT_FOR_MISSING_BARS{8};
-        // How often the main thread checks for Ctrl+C and overdue tables
-        static constexpr std::chrono::milliseconds CHECK_INTERVAL{200};
-        // Replay fills: slippage against us on every fill (config "replay_slippage_percent" overrides)
-        static constexpr double DEFAULT_REPLAY_SLIPPAGE_PERCENT = 0.01;
-        // The simulated broker only needs the bar being processed
-        static constexpr size_t SIMULATED_BROKER_BARS = 5;
-
         LiveTrader(const json& config, const LiveOptions& options, const std::string& dataRoot);
 
         // Runs until Ctrl+C (or the end of a replay). Returns the process exit code.

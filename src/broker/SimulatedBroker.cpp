@@ -9,9 +9,6 @@ namespace
 {
     const std::string BROKER_NAME = "Simulated";
 
-    // Defaults until the backtester or the replay sets its own
-    const double DEFAULT_SLIPPAGE = 0.0005;     // 0.05% of the price
-    const double DEFAULT_COMMISSION = 1.0;      // $ per trade
     const unsigned DEFAULT_RANDOM_SEED = 42;    // for repeatable random slippage in tests
 
     // What a simulated order looks like to the rest of the app
@@ -35,8 +32,8 @@ SimulatedBroker::SimulatedBroker(MarketData& marketdata)
     currentCash = startingCapital;
     currentEquity = startingCapital;
     highestEquity = startingCapital;
-    slippagePercentage = DEFAULT_SLIPPAGE;
-    commissionPerTrade = DEFAULT_COMMISSION;
+    slippagePercentage = Defaults::SLIPPAGE;
+    commissionPerTrade = Defaults::COMMISSION_PER_TRADE;
     totalTrades = 0;
     step = 0;
     detailedLogging = false; // Detailed logging disabled by default

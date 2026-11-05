@@ -4,6 +4,13 @@
 #include "../util/Format.hpp"
 #include "../util/TextTable.hpp"
 
+namespace
+{
+    // data/quant/risk_simulations.csv
+    const std::string SIMULATIONS_FILE = "/risk_simulations.csv";
+    const std::string CSV_HEADER = "simulation,return,pnl";
+}
+
 using Format::dollars;
 using Format::number;
 using Format::percent;
@@ -74,9 +81,9 @@ RiskReport::printRealityCheck(std::ostream& out) const
 std::string
 RiskReport::save(const std::string& folder) const
 {
-    std::string path = folder + "/risk_simulations.csv";
+    std::string path = folder + SIMULATIONS_FILE;
     std::ofstream file(path);
-    file << "simulation,return,pnl\n";
+    file << CSV_HEADER << "\n";
     for (size_t i = 0; i < result.simulatedReturns.size(); i++)
         file << i + 1 << "," << result.simulatedReturns[i] << ","
              << result.simulatedReturns[i] * settings.portfolioValue << "\n";

@@ -3,6 +3,7 @@
 #include <ostream>
 #include <string>
 #include <vector>
+#include "../alpaca/AlpacaApi.hpp"
 #include "../quant/MonteCarloRisk.hpp"
 #include "../quant/MovingAverageCrossover.hpp"
 #include "../quant/PairsTrading.hpp"
@@ -20,7 +21,7 @@ struct QuantOptions
 {
     enum class Project { Risk, Pairs, Scan, Crossover };
 
-    static constexpr const char* DEFAULT_START = "2016-01-01";   // Alpaca's daily history starts in 2016
+    static inline const std::string DEFAULT_START = AlpacaApi::FIRST_HISTORY_DAY;
 
     Project project = Project::Risk;
     bool showHelp = false;

@@ -8,15 +8,22 @@
 #include "RiskReport.hpp"
 #include "../alpaca/AlpacaDailyBars.hpp"
 
+namespace
+{
+    // Under data/: the daily bars downloaded, and the projects' CSVs
+    const std::string DAILY_FOLDER = "daily";
+    const std::string OUTPUT_FOLDER = "quant";
+}
+
 QuantProjects::QuantProjects(const json& algoConfig, const std::string& dataRoot)
-    : algoConfig(algoConfig), dataRoot(dataRoot), outputFolder(dataRoot + "quant")
+    : algoConfig(algoConfig), dataRoot(dataRoot), outputFolder(dataRoot + OUTPUT_FOLDER)
 {
 }
 
 int
 QuantProjects::run(const QuantOptions& options)
 {
-    AlpacaDailyBars source(algoConfig, dataRoot + "daily");
+    AlpacaDailyBars source(algoConfig, dataRoot + DAILY_FOLDER);
     std::map<std::string, std::vector<quant::DailyBar>> bars;
     if (!source.loadAll(options.symbols, options.start, options.end, options.offline, bars))
         return 1;
@@ -54,8 +61,8 @@ QuantProjects::runPairs(const QuantOptions& options, const quant::PriceTable& pr
                                                               prices[0], prices[1], options.pairs);
     PairsReport report(prices, options.pairs, result);
     report.print(std::cout);
-    std::string saved = report.save(outputFolder);
-    std::cout << "\nSaved " << saved << "_daily.csv and " << saved << "_trades.csv\n";
+    std::vector<std::string> saved = report.save(outputFolder);
+    std::cout << "\nSaved " << saved[0] << " and " << saved[1] << "\n";
 }
 
 void

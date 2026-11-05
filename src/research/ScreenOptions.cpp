@@ -4,6 +4,11 @@
 #include <thread>
 #include "../util/CommandLine.hpp"
 
+namespace
+{
+    const int MIN_HISTORY_MONTHS = 2;   // at least a month to train on and one to test
+}
+
 ScreenOptions::ScreenOptions()
     : threads(static_cast<int>(std::max(1u, std::thread::hardware_concurrency())))
 {

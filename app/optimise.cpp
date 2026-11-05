@@ -17,6 +17,8 @@
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/Log.hpp"
 #include "../src/util/MarketTime.hpp"
+#include "../src/alpaca/AlpacaApi.hpp"
+#include "../src/util/Defaults.hpp"
 
 /*
  * optimise_app - find the best settings for each strategy
@@ -100,7 +102,7 @@ static void writeResultsCsv(const std::string& path, const Optimiser& optimiser,
 int main(int argc, char* argv[])
 {
     std::string strategyArg = "all";
-    std::string startDate = "2016-01-01";
+    std::string startDate = AlpacaApi::FIRST_HISTORY_DAY;
     std::string endDate;
     int testMonths = -1;
     long maxCombinations = -1;
@@ -146,7 +148,7 @@ int main(int argc, char* argv[])
     if (strategies.empty()) { std::cerr << "Unknown strategy " << strategyArg << std::endl; return 1; }
 
     std::string ticker = baseConfig.at("ticker");
-    std::string dataDir = root + "/" + baseConfig.value("marketDataBasePath", "data/");
+    std::string dataDir = root + "/" + baseConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
 
     // ---- Data ----
     if (download)

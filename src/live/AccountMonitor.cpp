@@ -2,10 +2,16 @@
 
 #include <cmath>
 #include <sstream>
+#include "../alpaca/AlpacaApi.hpp"
 #include "../util/Format.hpp"
 
 namespace
 {
+    const std::string FLAT = "-";            // shown for a stock we don't hold
+    const int PNL_PERCENT_DECIMALS = 2;      // minute moves are small
+    const std::string REPLAY_NOTE = "REPLAY";
+    const std::string DRY_RUN_NOTE = "dry run estimate ";
+
     // A position at the latest price: P&L in dollars and as a fraction of what it cost
     PositionSnapshot valuePosition(double quantity, double averagePrice, double lastPrice)
     {
@@ -18,19 +24,13 @@ namespace
         return snapshot;
     }
 
-    // Alpaca sends numbers as text, e.g. {"qty": "5"}
-    double numberField(const json& body, const char* key)
-    {
-        try { return body.contains(key) && body[key].is_string() ? std::stod(body[key].get<std::string>()) : 0.0; }
-        catch (const std::exception&) { return 0.0; }
-    }
 }
 
 std::string
 PositionSnapshot::describe() const
 {
     if (!isOpen())
-        return "-";
+        return FLAT;
     std::ostringstream text;
     text << quantity << " @ " << Format::number(averagePrice);
     return text.str();
@@ -40,14 +40,14 @@ std::string
 PositionSnapshot::describePnL() const
 {
     if (!isOpen())
-        return "-";
-    return Format::dollarChange(unrealisedPnL) + " (" + Format::percentChange(unrealisedFraction, 2) + ")";
+        return FLAT;
+    return Format::dollarChange(unrealisedPnL) + " (" + Format::percentChange(unrealisedFraction, PNL_PERCENT_DECIMALS) + ")";
 }
 
 json
 PositionSnapshot::toJson() const
 {
-    return {{"qty", quantity}, {"avg_entry_price", averagePrice}, {"unrealized_pl", unrealisedPnL}};
+    return {{AlpacaApi::QUANTITY, quantity}, {AlpacaApi::AVERAGE_PRICE, averagePrice}, {AlpacaApi::UNREALISED_PNL, unrealisedPnL}};
 }
 
 PositionSnapshot
@@ -59,12 +59,12 @@ AlpacaAccountMonitor::position(const std::string& ticker, double lastPrice)
         return PositionSnapshot();
 
     PositionSnapshot snapshot;
-    snapshot.quantity = std::fabs(numberField(details, "qty"));
-    if (details.value("side", "long") == "short")
+    snapshot.quantity = std::fabs(AlpacaApi::numberField(details, AlpacaApi::QUANTITY));
+    if (details.value(AlpacaApi::SIDE, "") == AlpacaApi::SHORT)
         snapshot.quantity = -snapshot.quantity;
-    snapshot.averagePrice = numberField(details, "avg_entry_price");
-    snapshot.unrealisedPnL = numberField(details, "unrealized_pl");
-    snapshot.unrealisedFraction = numberField(details, "unrealized_plpc");
+    snapshot.averagePrice = AlpacaApi::numberField(details, AlpacaApi::AVERAGE_PRICE);
+    snapshot.unrealisedPnL = AlpacaApi::numberField(details, AlpacaApi::UNREALISED_PNL);
+    snapshot.unrealisedFraction = AlpacaApi::numberField(details, AlpacaApi::UNREALISED_FRACTION);
     return snapshot;
 }
 
@@ -107,7 +107,13 @@ DryRunAccountMonitor::position(const std::string& ticker, double lastPrice)
 }
 
 std::string
+SimulatedAccountMonitor::headerNote() const
+{
+    return REPLAY_NOTE;
+}
+
+std::string
 DryRunAccountMonitor::headerNote() const
 {
-    return "dry run estimate " + Format::dollarChange(tracker.summary().totalPnL);
+    return DRY_RUN_NOTE + Format::dollarChange(tracker.summary().totalPnL);
 }

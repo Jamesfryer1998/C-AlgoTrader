@@ -13,10 +13,25 @@ using Format::percentChange;
 
 namespace
 {
+    const size_t RECENT_TRADES_SHOWN = 10;
+    const size_t SCAN_ROWS_SHOWN = 15;
+    // Testing at 95% confidence: about 1 pair in 20 looks cointegrated by chance alone
+    const double FALSE_POSITIVE_RATE = 0.05;
+
+    // data/quant/pairs_<Y>_<X>_daily.csv and _trades.csv, and pair_scan.csv
+    const std::string PAIRS_FILE_PREFIX = "/pairs_";
+    const std::string DAILY_FILE_SUFFIX = "_daily.csv";
+    const std::string TRADES_FILE_SUFFIX = "_trades.csv";
+    const std::string SCAN_FILE = "/pair_scan.csv";
+    const std::string DAILY_CSV_HEADER = "date,z,hedge_ratio,position,return";
+    const std::string TRADES_CSV_HEADER = "entry_date,exit_date,side,hedge_ratio,entry_z,exit_z,days,return,exit_reason";
+    const std::string SCAN_CSV_HEADER = "y,x,adf,verdict,hedge_ratio,half_life_days,return_correlation";
+    const std::string NEVER = "never";   // the half-life of a spread that doesn't revert
+
     // Half-life of the spread in days, or "never" if it doesn't revert
     std::string halfLife(double days)
     {
-        return std::isfinite(days) ? number(days, 0) + "d" : "never";
+        return std::isfinite(days) ? number(days, 0) + "d" : NEVER;
     }
 
     std::string dateRange(const quant::PriceTable& prices)
@@ -101,23 +116,23 @@ PairsReport::printRecentTrades(std::ostream& out) const
     out << "\n  Recent trades\n" << trades.render("  ");
 }
 
-std::string
+std::vector<std::string>
 PairsReport::save(const std::string& folder) const
 {
-    std::string base = folder + "/pairs_" + result.y + "_" + result.x;
+    std::string base = folder + PAIRS_FILE_PREFIX + result.y + "_" + result.x;
 
-    std::ofstream daily(base + "_daily.csv");
-    daily << "date,z,hedge_ratio,position,return\n";
+    std::ofstream daily(base + DAILY_FILE_SUFFIX);
+    daily << DAILY_CSV_HEADER << "\n";
     for (size_t i = 0; i < result.dates.size(); i++)
         daily << result.dates[i] << "," << result.z[i] << "," << result.hedgeRatio[i] << "," << result.position[i]
               << "," << result.dailyReturns[i] << "\n";
 
-    std::ofstream trades(base + "_trades.csv");
-    trades << "entry_date,exit_date,side,hedge_ratio,entry_z,exit_z,days,return,exit_reason\n";
+    std::ofstream trades(base + TRADES_FILE_SUFFIX);
+    trades << TRADES_CSV_HEADER << "\n";
     for (const auto& t : result.trades)
         trades << t.entryDate << "," << t.exitDate << "," << t.side << "," << t.hedgeRatio << "," << t.entryZ << ","
                << t.exitZ << "," << t.days << "," << t.returnPct << "," << t.exitReason << "\n";
-    return base;
+    return {base + DAILY_FILE_SUFFIX, base + TRADES_FILE_SUFFIX};
 }
 
 PairScanReport::PairScanReport(const quant::PriceTable& prices, const std::vector<quant::PairScan>& rows)
@@ -130,7 +145,7 @@ PairScanReport::print(std::ostream& out) const
 {
     TextTable table({"Y", "X", "ADF", "Cointegrated?", "Hedge", "Half-life", "Return corr"},
                     {false, false, true, false, true, true, true});
-    size_t shown = std::min(rows.size(), ROWS_SHOWN);
+    size_t shown = std::min(rows.size(), SCAN_ROWS_SHOWN);
     for (size_t i = 0; i < shown; i++)
     {
         const quant::PairScan& row = rows[i];
@@ -149,9 +164,9 @@ PairScanReport::print(std::ostream& out) const
 std::string
 PairScanReport::save(const std::string& folder) const
 {
-    std::string path = folder + "/pair_scan.csv";
+    std::string path = folder + SCAN_FILE;
     std::ofstream file(path);
-    file << "y,x,adf,verdict,hedge_ratio,half_life_days,return_correlation\n";
+    file << SCAN_CSV_HEADER << "\n";
     for (const auto& row : rows)
         file << row.y << "," << row.x << "," << row.test.adf << "," << row.test.verdict() << "," << row.test.beta << ","
              << row.test.halfLifeDays << "," << row.returnCorrelation << "\n";

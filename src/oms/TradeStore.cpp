@@ -289,6 +289,13 @@ TradeStore::upgradeOldTradesFile()
               << " trade(s) kept, original saved as trades.csv.old)" << std::endl;
 }
 
+void
+TradeStore::removeFiles(const std::string& directory)
+{
+    for (const char* file : {TRADES_FILE, POSITIONS_FILE, PERFORMANCE_FILE})
+        std::filesystem::remove(std::filesystem::path(directory) / file);
+}
+
 std::vector<TradeRecord>
 TradeStore::loadTrades() const
 {

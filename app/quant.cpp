@@ -4,6 +4,7 @@
 #include "../src/research/QuantProjects.hpp"
 #include "../src/util/Config.hpp"
 #include "../src/util/DotEnv.hpp"
+#include "../src/util/Defaults.hpp"
 
 /*
  * Quant finance learning projects on daily data from Alpaca (cached in data/daily/):
@@ -40,7 +41,7 @@ int main(int argc, char* argv[])
         Config config;
         DotEnv::load(config.getProjectRoot() + "/.env");
         json algoConfig = config.loadConfig();
-        std::string dataRoot = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/");
+        std::string dataRoot = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
 
         QuantProjects projects(algoConfig, dataRoot);
         return projects.run(options);

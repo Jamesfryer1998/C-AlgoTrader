@@ -6,6 +6,12 @@
 #include "../src/util/Config.hpp"
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/MarketTime.hpp"
+#include "../src/util/Defaults.hpp"
+
+namespace
+{
+    const double PERCENT = 100.0;
+}
 
 void printUsage() {
     std::cout << "AlgoTrader Backtester" << std::endl;
@@ -28,9 +34,9 @@ void printUsage() {
 
 int main(int argc, char* argv[]) {
     // Default settings
-    double startingCapital = 100000.0;
-    double commission = 1.0;
-    double slippage = 0.0005;
+    double startingCapital = Defaults::STARTING_CAPITAL;
+    double commission = Defaults::COMMISSION_PER_TRADE;
+    double slippage = Defaults::SLIPPAGE;
     bool detailedLogging = false;
     std::string outputFile = "";
     std::string startDate = "";
@@ -92,13 +98,13 @@ int main(int argc, char* argv[]) {
         if (endDate.empty())
             endDate = MarketTime::datePart(MarketTime::toNewYorkTime(now));
         if (startDate.empty())
-            startDate = MarketTime::datePart(MarketTime::formatUtc(MarketTime::parseDate(endDate) - 7 * 24 * 3600));
+            startDate = MarketTime::datePart(MarketTime::formatUtc(MarketTime::parseDate(endDate) - Defaults::BACKTEST_DAYS * MarketTime::SECONDS_PER_DAY));
         backtester.setDateRange(startDate, endDate);
 
         // Optionally fetch the data from Alpaca first
         if (download) {
             DotEnv::load(config.getProjectRoot() + "/.env");
-            std::string dataDir = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/");
+            std::string dataDir = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
             AlpacaHistory history(algoConfig);
             if (history.downloadToCsv(startDate, endDate, dataDir) < 0) {
                 std::cerr << "Download failed - check your keys in .env and the dates" << std::endl;
@@ -116,7 +122,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Starting backtest with:" << std::endl;
         std::cout << "- Starting capital: $" << startingCapital << std::endl;
         std::cout << "- Commission per trade: $" << commission << std::endl;
-        std::cout << "- Slippage: " << (slippage * 100.0) << "%" << std::endl;
+        std::cout << "- Slippage: " << (slippage * PERCENT) << "%" << std::endl;
         std::cout << "- Threads: " << (numThreads > 0 ? std::to_string(numThreads) : "all available") << std::endl;
         
         backtester.run();

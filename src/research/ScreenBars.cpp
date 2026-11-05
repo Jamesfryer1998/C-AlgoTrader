@@ -4,9 +4,16 @@
 #include "../backtest/MinuteBars.hpp"
 #include "../backtest/Screener.hpp"
 
+namespace
+{
+    // Under data/: daily bars in daily/<SYMBOL>.csv, minute bars in minute/<SYMBOL>/ (one CSV per day)
+    const std::string DAILY_FOLDER = "daily";
+    const std::string MINUTE_FOLDER = "minute/";
+}
+
 ScreenBars::ScreenBars(const json& baseConfig, const std::string& dataRoot, const ScreenSettings& screen, int threads)
     : baseConfig(baseConfig), dataRoot(dataRoot), screen(screen), threads(threads),
-      dailySource(baseConfig, dataRoot + "daily")
+      dailySource(baseConfig, dataRoot + DAILY_FOLDER)
 {
 }
 
@@ -34,5 +41,5 @@ ScreenBars::load(const std::string& symbol)
 std::string
 ScreenBars::minuteFolder(const std::string& symbol) const
 {
-    return dataRoot + "minute/" + symbol;
+    return dataRoot + MINUTE_FOLDER + symbol;
 }

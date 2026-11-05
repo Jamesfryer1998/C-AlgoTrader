@@ -10,4 +10,11 @@ namespace Defaults
 {
     constexpr double STARTING_CAPITAL = 100000.0;   // $ in a fresh paper account
     constexpr int BACKTEST_DAYS = 7;                // a backtest with no dates covers the last week
+
+    // Backtest costs until set otherwise
+    constexpr double COMMISSION_PER_TRADE = 1.0;    // $
+    constexpr double SLIPPAGE = 0.0005;             // 0.05% of the price
+
+    // Where market data and records live, under the project root (config "marketDataBasePath")
+    inline constexpr const char* DATA_FOLDER = "data/";
 }

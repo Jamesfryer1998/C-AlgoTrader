@@ -4,6 +4,7 @@
 #include "../src/live/LiveTrader.hpp"
 #include "../src/util/Config.hpp"
 #include "../src/util/DotEnv.hpp"
+#include "../src/util/Defaults.hpp"
 
 /*
  * Live trading on Alpaca, or a replay of saved bars with a simulated broker (--replay). See LiveTrader.
@@ -40,7 +41,7 @@ int main(int argc, char* argv[])
     Config config;
     DotEnv::load(config.getProjectRoot() + "/.env");
     json algoConfig = config.loadConfig();
-    std::string dataRoot = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/");
+    std::string dataRoot = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
 
     LiveTrader trader(algoConfig, options, dataRoot);
     return trader.run();

@@ -353,20 +353,12 @@ AlpacaBroker::getLatestPosition(std::string ticker)
     }
     lastPosition = result.body;
 
-    // Alpaca sends numbers as text, e.g. {"qty":"5","avg_entry_price":"181.20","side":"long"}
-    float quantity = std::fabs(std::stof(result.body.value("qty", "0")));
-    if (result.body.value("side", "long") == "short")
+    float quantity = std::fabs(AlpacaApi::numberField(result.body, AlpacaApi::QUANTITY));
+    if (result.body.value(AlpacaApi::SIDE, "") == AlpacaApi::SHORT)
         quantity = -quantity;
 
-    float avgPrice = std::stof(result.body.value("avg_entry_price", "0"));
+    float avgPrice = AlpacaApi::numberField(result.body, AlpacaApi::AVERAGE_PRICE);
     return Position(ticker, quantity, avgPrice);
-}
-
-static double numberField(const json& body, const char* key)
-{
-    // Alpaca sends numbers as text, e.g. "100123.45"
-    try { return body.contains(key) && body[key].is_string() ? std::stod(body[key].get<std::string>()) : 0.0; }
-    catch (const std::exception&) { return 0.0; }
 }
 
 AccountSnapshot
@@ -381,8 +373,8 @@ AlpacaBroker::getAccount()
         return snapshot;
 
     snapshot.available = true;
-    snapshot.equity = numberField(result.body, "equity");
-    snapshot.lastEquity = numberField(result.body, "last_equity");
-    snapshot.cash = numberField(result.body, "cash");
+    snapshot.equity = AlpacaApi::numberField(result.body, "equity");
+    snapshot.lastEquity = AlpacaApi::numberField(result.body, "last_equity");
+    snapshot.cash = AlpacaApi::numberField(result.body, "cash");
     return snapshot;
 }

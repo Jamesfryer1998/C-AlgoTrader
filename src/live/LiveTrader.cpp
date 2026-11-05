@@ -11,6 +11,30 @@
 #include "../util/OutputCapture.hpp"
 #include "../util/Defaults.hpp"
 
+namespace
+{
+    // How long a minute's table waits for stocks that haven't sent a bar (a quiet stock can have no IEX
+    // trades, and so no bar, in a minute)
+    const std::chrono::seconds WAIT_FOR_MISSING_BARS{8};
+
+    // How often the main thread checks for Ctrl+C and overdue tables
+    const std::chrono::milliseconds CHECK_INTERVAL{200};
+
+    // Replay fills: slippage against us on every fill (config "replay_slippage_percent" overrides), no commission
+    const double DEFAULT_REPLAY_SLIPPAGE_PERCENT = 0.01;
+    const double REPLAY_COMMISSION = 0.0;
+
+    // The simulated broker only needs the bar being processed
+    const size_t SIMULATED_BROKER_BARS = 5;
+
+    // Where each run's trades, positions and performance go, under data/
+    const std::string LIVE_FOLDER = "live";
+    const std::string DRY_RUN_FOLDER = "live_dry_run";
+    const std::string REPLAY_FOLDER = "replay/";   // + the first replayed day
+
+    const double PERCENT = 100.0;
+}
+
 std::atomic<bool> LiveTrader::stopRequested{false};
 
 LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std::string& dataRoot)
@@ -53,8 +77,8 @@ LiveTrader::connectBroker()
         simulated.followLatestBar(true);
         simulated.allowSeveralStocks(true);
         simulated.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
-        simulated.setSlippage(config.value("replay_slippage_percent", DEFAULT_REPLAY_SLIPPAGE_PERCENT) / 100.0);
-        simulated.setCommission(0.0);
+        simulated.setSlippage(config.value("replay_slippage_percent", DEFAULT_REPLAY_SLIPPAGE_PERCENT) / PERCENT);
+        simulated.setCommission(REPLAY_COMMISSION);
         simulated.setStartingCapital(config.value("starting_capital", Defaults::STARTING_CAPITAL));
 
         broker = &simulated;
@@ -151,11 +175,10 @@ LiveTrader::backfillLanes()
 void
 LiveTrader::openRecords()
 {
-    std::string folder = replay ? "replay/" + replay->getDays().front() : (alpaca.isDryRun() ? "live_dry_run" : "live");
+    std::string folder = replay ? REPLAY_FOLDER + replay->getDays().front() : (alpaca.isDryRun() ? DRY_RUN_FOLDER : LIVE_FOLDER);
     recordsDir = dataRoot + folder;
     if (replay)
-        for (const char* file : {"trades.csv", "positions.csv", "performance.json"})
-            std::filesystem::remove(std::filesystem::path(recordsDir) / file);
+        TradeStore::removeFiles(recordsDir);
 
     store = std::make_unique<TradeStore>(recordsDir);
     oms.setMarketData(lanes.front()->getMarketData());

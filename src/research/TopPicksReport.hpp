@@ -17,9 +17,6 @@
 class TopPicksReport
 {
     public:
-        // Fewer overlapping days than this and the picks' combined risk can't be measured
-        static constexpr size_t MIN_DAYS_FOR_RISK = 60;
-
         // bars: each pick's saved bars by symbol (for the risk check)
         TopPicksReport(const std::vector<Screener::Row>& rows, const Screener& screener, size_t count,
                        double portfolioValue, const std::map<std::string, std::vector<MarketCondition>>& bars);
@@ -28,8 +25,8 @@ class TopPicksReport
 
         void print(std::ostream& out) const;
 
-        // Saves top_picks.csv and top_picks_config.json in `folder`
-        void save(const std::string& folder) const;
+        // Saves top_picks.csv and top_picks_config.json in `folder`; returns their paths
+        std::vector<std::string> save(const std::string& folder) const;
 
     private:
         void printPicks(std::ostream& out) const;

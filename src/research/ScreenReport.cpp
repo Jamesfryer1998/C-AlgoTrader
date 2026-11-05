@@ -10,6 +10,9 @@ using Format::percentChange;
 
 namespace
 {
+    const size_t BEST_ON_TRAINING_SHOWN = 10;
+    const size_t HELD_UP_SHOWN = 20;
+
     // "12 (40%)"
     std::string countAndShare(int part, int whole)
     {

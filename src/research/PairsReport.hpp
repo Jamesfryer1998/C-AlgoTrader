@@ -14,14 +14,12 @@
 class PairsReport
 {
     public:
-        static constexpr size_t RECENT_TRADES_SHOWN = 10;
-
         PairsReport(const quant::PriceTable& prices, const quant::PairsSettings& settings, const quant::PairsResult& result);
 
         void print(std::ostream& out) const;
 
-        // Saves pairs_<Y>_<X>_daily.csv and _trades.csv in `folder`; returns the paths' common start
-        std::string save(const std::string& folder) const;
+        // Saves pairs_<Y>_<X>_daily.csv and _trades.csv in `folder`; returns their paths
+        std::vector<std::string> save(const std::string& folder) const;
 
     private:
         void printCointegration(std::ostream& out) const;
@@ -41,10 +39,6 @@ class PairsReport
 class PairScanReport
 {
     public:
-        static constexpr size_t ROWS_SHOWN = 15;
-        // Testing at 95% confidence: about 1 pair in 20 looks cointegrated by chance alone
-        static constexpr double FALSE_POSITIVE_RATE = 0.05;
-
         PairScanReport(const quant::PriceTable& prices, const std::vector<quant::PairScan>& rows);
 
         void print(std::ostream& out) const;

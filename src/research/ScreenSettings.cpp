@@ -3,16 +3,25 @@
 #include <ctime>
 #include <fstream>
 #include <stdexcept>
+#include "../alpaca/AlpacaApi.hpp"
 #include "../util/MarketTime.hpp"
 
 namespace
 {
+    // Defaults for settings missing from screen.json
+    const std::string DEFAULT_DAILY_START = AlpacaApi::FIRST_HISTORY_DAY;
+    const int DEFAULT_HISTORY_MONTHS = 24;   // minute bars: two years...
+    const int DEFAULT_TEST_MONTHS = 6;       // ...the last six months of which are the test period
+
+    const std::string MINUTE = "minute";
+    const std::string DAILY = "daily";
+
     // The common settings with one section's settings on top
     json mergeSection(const json& all, const std::string& section)
     {
         json merged = all;
-        merged.erase("minute");
-        merged.erase("daily");
+        merged.erase(MINUTE);
+        merged.erase(DAILY);
         for (const auto& [key, value] : all.at(section).items())
             merged[key] = value;
         return merged;
@@ -29,7 +38,7 @@ ScreenSettings::load(const std::string& screenJsonPath, const ScreenOptions& opt
 
     ScreenSettings screen;
     screen.daily = options.daily;
-    screen.mode = options.daily ? "daily" : "minute";
+    screen.mode = options.daily ? DAILY : MINUTE;
     screen.settings = mergeSection(all, screen.mode);
     json& settings = screen.settings;
 

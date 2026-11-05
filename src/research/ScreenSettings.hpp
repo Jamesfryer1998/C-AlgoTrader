@@ -18,10 +18,6 @@ using json = nlohmann::json;
  */
 struct ScreenSettings
 {
-    static constexpr const char* DEFAULT_DAILY_START = "2016-01-01";   // Alpaca's history starts in 2016
-    static constexpr int DEFAULT_HISTORY_MONTHS = 24;
-    static constexpr int DEFAULT_TEST_MONTHS = 6;
-
     json settings;      // what the Screener reads (with "test_start" filled in)
     std::string mode;   // "minute" or "daily": the screen.json section, and the results folder
     bool daily = false;

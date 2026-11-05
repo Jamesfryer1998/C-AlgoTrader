@@ -15,6 +15,10 @@ using Format::number;
 
 namespace
 {
+    const std::string SCREEN_SETTINGS = "/src/config/screen.json";   // under the project root
+    const std::string RESULTS_FOLDER = "screen/";                    // under data/, then minute/ or daily/
+    const std::string RESULTS_FILE = "/screen_results.csv";
+
     double secondsSince(std::chrono::steady_clock::time_point start)
     {
         return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
@@ -32,9 +36,9 @@ namespace
 StockScreen::StockScreen(const json& baseConfig, const std::string& projectRoot, const std::string& dataRoot,
                          const ScreenOptions& options)
     : options(options),
-      screen(ScreenSettings::load(projectRoot + "/src/config/screen.json", options)),
-      resultsFolder(dataRoot + "screen/" + screen.mode),
-      resultsPath(resultsFolder + "/screen_results.csv"),
+      screen(ScreenSettings::load(projectRoot + SCREEN_SETTINGS, options)),
+      resultsFolder(dataRoot + RESULTS_FOLDER + screen.mode),
+      resultsPath(resultsFolder + RESULTS_FILE),
       screener(baseConfig, screen.settings),
       bars(baseConfig, dataRoot, screen, options.threads)
 {
@@ -158,8 +162,8 @@ StockScreen::printResults(const std::vector<Screener::Row>& rows)
         pickBars[pick.symbol] = bars.load(pick.symbol);   // saved by the screen, no download
     TopPicksReport topPicks(rows, screener, options.topPicks, options.portfolioValue, pickBars);
     topPicks.print(std::cout);
-    topPicks.save(resultsFolder);
+    std::vector<std::string> saved = topPicks.save(resultsFolder);
 
-    std::cout << "\nAll results: " << resultsPath << "\nTop picks: " << resultsFolder << "/top_picks.csv and "
-              << resultsFolder << "/top_picks_config.json (config.json strategy blocks)\n";
+    std::cout << "\nAll results: " << resultsPath << "\nTop picks: " << saved[0] << " and " << saved[1]
+              << " (config.json strategy blocks)\n";
 }

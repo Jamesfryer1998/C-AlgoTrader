@@ -11,12 +11,19 @@ namespace
                                                            "HD", "LOW", "UPS", "FDX", "GS", "MS"};
     const std::string DEFAULT_CROSSOVER_SYMBOL = "SPY";
 
+    // The first word: which project to run
+    const std::string RISK = "risk";
+    const std::string PAIRS = "pairs";
+    const std::string SCAN = "scan";
+    const std::string CROSSOVER = "macross";
+    const int FIRST_OPTION = 2;   // options start after the project
+
     QuantOptions::Project projectNamed(const std::string& name)
     {
-        if (name == "risk")    return QuantOptions::Project::Risk;
-        if (name == "pairs")   return QuantOptions::Project::Pairs;
-        if (name == "scan")    return QuantOptions::Project::Scan;
-        if (name == "macross") return QuantOptions::Project::Crossover;
+        if (name == RISK)      return QuantOptions::Project::Risk;
+        if (name == PAIRS)     return QuantOptions::Project::Pairs;
+        if (name == SCAN)      return QuantOptions::Project::Scan;
+        if (name == CROSSOVER) return QuantOptions::Project::Crossover;
         throw std::invalid_argument("Unknown project: " + name);
     }
 
@@ -45,7 +52,7 @@ QuantOptions::parse(int argc, char* argv[])
     }
     options.project = projectNamed(first);
 
-    CommandLine args(argc, argv, 2);
+    CommandLine args(argc, argv, FIRST_OPTION);
     while (args.next())
     {
         if (args.is("--help"))

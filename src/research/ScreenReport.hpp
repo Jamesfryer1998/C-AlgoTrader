@@ -16,9 +16,6 @@
 class ScreenReport
 {
     public:
-        static constexpr size_t BEST_ON_TRAINING_SHOWN = 10;
-        static constexpr size_t HELD_UP_SHOWN = 20;
-
         ScreenReport(const std::vector<Screener::Row>& rows, const std::vector<std::string>& strategies);
 
         void print(std::ostream& out) const;

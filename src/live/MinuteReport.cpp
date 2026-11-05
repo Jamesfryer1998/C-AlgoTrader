@@ -6,10 +6,12 @@
 namespace
 {
     const size_t TIME_WITHOUT_SECONDS = 16;   // "2026-11-05 15:57:00" -> "2026-11-05 15:57"
+    const std::string NOTHING = "-";
+    const std::string NO_BAR = "no bar this minute";
 
     std::string orDash(const std::string& text)
     {
-        return text.empty() ? "-" : text;
+        return text.empty() ? NOTHING : text;
     }
 }
 
@@ -72,8 +74,8 @@ MinuteReport::print(std::ostream& out)
         if (found == rows.end())
         {
             auto last = lastPrice.find(ticker);
-            table.addRow({ticker, "", last != lastPrice.end() ? Format::number(last->second) : "-", "", "", "",
-                          "no bar this minute"});
+            table.addRow({ticker, "", last != lastPrice.end() ? Format::number(last->second) : NOTHING, "", "", "",
+                          NO_BAR});
             continue;
         }
 

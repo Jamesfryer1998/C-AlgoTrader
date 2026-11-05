@@ -8,10 +8,6 @@
 
 namespace
 {
-    // Costs until set otherwise (setCommissionPerTrade / setSlippagePercentage / useCosts)
-    const double DEFAULT_COMMISSION = 1.0;     // $ per trade
-    const double DEFAULT_SLIPPAGE = 0.0005;    // 0.05% of the price
-
     const double PERCENT = 100.0;
     const double CENT = 0.01;                  // P&L figures closer than this agree
     const char* const TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S";
@@ -37,8 +33,8 @@ Backtester::Backtester(const json& algoConfig)
     
     // Configure the broker with default settings
     broker.setStartingCapital(Defaults::STARTING_CAPITAL);
-    broker.setCommission(DEFAULT_COMMISSION);
-    broker.setSlippage(DEFAULT_SLIPPAGE);
+    broker.setCommission(Defaults::COMMISSION_PER_TRADE);
+    broker.setSlippage(Defaults::SLIPPAGE);
     broker.followLatestBar(true);   // the broker trades on the newest bar of the rolling window
 
     // Default date range: the last few days (thread-safe; many Backtesters may be created at once)

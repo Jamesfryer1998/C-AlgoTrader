@@ -6,6 +6,17 @@
 #include "../util/Format.hpp"
 #include "../util/TextTable.hpp"
 
+namespace
+{
+    // Fewer overlapping days than this and the picks' combined risk can't be measured
+    const size_t MIN_DAYS_FOR_RISK = 60;
+
+    // data/screen/<minute|daily>/
+    const std::string PICKS_FILE = "/top_picks.csv";
+    const std::string PICKS_CONFIG_FILE = "/top_picks_config.json";   // config.json strategy blocks, ready to paste
+    const int JSON_INDENT = 4;
+}
+
 using Format::dollars;
 using Format::number;
 using Format::percent;
@@ -96,14 +107,16 @@ TopPicksReport::printRisk(std::ostream& out) const
         << "  lower than shown; the volatility and correlations are the more trustworthy part.\n";
 }
 
-void
+std::vector<std::string>
 TopPicksReport::save(const std::string& folder) const
 {
-    Screener::writeTopPicksCsv(folder + "/top_picks.csv", picks);
+    std::string picksPath = folder + PICKS_FILE, configPath = folder + PICKS_CONFIG_FILE;
+    Screener::writeTopPicksCsv(picksPath, picks);
 
     // The same picks as config.json strategy blocks, with the ticker each one is for
     json ready = json::array();
     for (const auto& pick : picks)
         ready.push_back({{"ticker", pick.symbol}, {"strategy", screener.strategySettings(pick)}});
-    std::ofstream(folder + "/top_picks_config.json") << ready.dump(4) << "\n";
+    std::ofstream(configPath) << ready.dump(JSON_INDENT) << "\n";
+    return {picksPath, configPath};
 }

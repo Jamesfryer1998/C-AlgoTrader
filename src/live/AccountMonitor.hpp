@@ -63,7 +63,7 @@ class SimulatedAccountMonitor : public AccountMonitor
         explicit SimulatedAccountMonitor(SimulatedBroker& broker) : broker(broker) {}
         AccountSnapshot account() override;
         PositionSnapshot position(const std::string& ticker, double lastPrice) override;
-        std::string headerNote() const override { return "REPLAY"; }
+        std::string headerNote() const override;
 
         // Call with each bar's day; a new day resets "today"
         void onDay(const std::string& day);
