@@ -13,7 +13,7 @@
         "history_feed": "sip",
         "history_adjustment": "split"
     },
-    "_portfolio_comment": "Stocks traded live, each with its own strategy. From screen_app's top 5 (data/screen/minute/top_picks_config.json, 2026-11-04). Remove \"portfolio\" to trade the single \"ticker\" with the \"strategies\" below.",
+    "_portfolio_comment": "Stocks traded live, each with its own strategy. From screen_app's top 5 (data/screen/minute/top_picks_config.json, 2026-11-04). Remove \"portfolio\" to trade the single \"ticker\" with the \"strategies\" below. META SCALP from a SCALP-only minute screen (2026-11-05): test Sharpe 2.90 (2.10 at 3x costs) vs 0.33 buy and hold.",
     "portfolio": [
         {
             "ticker": "TXN",
@@ -76,6 +76,19 @@
                 "name": "MEANREV",
                 "stop_loss": 5,
                 "take_profit": 1
+            }
+        },
+        {
+            "ticker": "META",
+            "strategy": {
+                "active": 1,
+                "name": "SCALP",
+                "entry_threshold": 2.5,
+                "exit_threshold": 0.0,
+                "max_hold_bars": 30,
+                "warmup_minutes": 15,
+                "stop_loss": 1.0,
+                "take_profit": 1.0
             }
         }
     ],
