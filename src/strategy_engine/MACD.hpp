@@ -42,7 +42,8 @@ class MACD : public StrategyBase {
 
         int barsNeeded() const override { return WARMUP_MULTIPLE * (_strategyAttribute.long_period + _strategyAttribute.signal_period); }
 
-        void execute() override
+    protected:
+        void decide() override
         {
             std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
@@ -58,17 +59,18 @@ class MACD : public StrategyBase {
             double lineThen = zeroCross ? 0.0 : v.previousSignal;
 
             if (v.previousMacd <= lineThen && v.macd > lineNow)
-                signal(OrderType::BUY);
+                propose(OrderType::BUY);
             else if (v.previousMacd >= lineThen && v.macd < lineNow)
-                signal(OrderType::SELL);
+                propose(OrderType::SELL);
             else
                 return;
 
-            Log::out() << "MACD " << order.getTypeAsString() << " | MACD " << std::fixed << std::setprecision(4) << v.macd
+            Log::out() << "MACD " << proposed().getTypeAsString() << " | MACD " << std::fixed << std::setprecision(4) << v.macd
                        << " signal " << v.signal << " histogram " << (v.macd - v.signal)
                        << " (" << _strategyAttribute.signal_type << ")" << std::endl;
         }
 
+    public:
         // MACD and signal line for the newest bar and the one before it
         static Values calculate(const std::vector<float>& closes, int shortPeriod, int longPeriod, int signalPeriod)
         {

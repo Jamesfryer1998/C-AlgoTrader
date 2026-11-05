@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "../data_access/BarFeed.hpp"
 #include "../data_access/MarketCondition.hpp"
 
 /**
@@ -18,11 +19,9 @@
  * (backtest_app, e.g. NVDA). Each replayed minute hands every stock's bar for that minute to the callback,
  * in portfolio order, then waits 1/speed seconds (speed = replayed minutes per real second; 0 = no waiting).
  */
-class ReplayStream
+class ReplayStream : public BarFeed
 {
     public:
-        using BarCallback = std::function<void(const MarketCondition&)>;
-
         // dataRoot: the project's data/ folder. date: first day to replay (YYYY-MM-DD; empty = the latest day
         // every ticker has saved). days: how many trading days to replay from there.
         ReplayStream(const std::string& dataRoot, const std::vector<std::string>& tickers, std::string date,
@@ -33,11 +32,11 @@ class ReplayStream
         bool load();
 
         // The `count` bars before the replay starts, for back-fill (oldest first; fewer if not saved)
-        std::vector<MarketCondition> history(const std::string& ticker, int count) const;
+        std::vector<MarketCondition> history(const std::string& ticker, int count) override;
 
         // Replay on a background thread; onFinished is called after the last minute (not after stop())
-        void start(BarCallback onBar, std::function<void()> onFinished);
-        void stop();
+        void start(BarHandler onBar, std::function<void()> onFinished) override;
+        void stop() override;
 
         const std::vector<std::string>& getDays() const { return days; }
         size_t minutes() const { return byMinute.size(); }

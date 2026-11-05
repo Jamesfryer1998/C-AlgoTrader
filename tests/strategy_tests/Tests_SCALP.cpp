@@ -34,15 +34,12 @@ namespace
         std::string bar(int minute, float close, int volume = 1000, const std::string& day = "2026-11-05")
         {
             data.addBar(MarketCondition(at(minute, day), "TEST", close, close, volume, "1m"), 500);
-            scalp.supplyData(data);
-            scalp.setCurrentPosition(position);
-            scalp.execute();
-            if (!scalp.onNewOrder())
+            std::optional<Order> order = scalp.onBar(data, position);
+            if (!order)
                 return "";
-            Order order = scalp.getOrder();
             if (followOrders)
-                position += order.isBuy() ? order.getQuantity() : -order.getQuantity();
-            return order.getTypeAsString();
+                position += order->isBuy() ? order->getQuantity() : -order->getQuantity();
+            return order->getTypeAsString();
         }
 
         // A quiet session from 09:30: alternating 100.1 / 99.9 for `minutes` minutes (VWAP 100, sigma 0.1)

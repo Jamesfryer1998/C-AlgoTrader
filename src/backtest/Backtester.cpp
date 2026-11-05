@@ -152,7 +152,10 @@ Backtester::runOn(const std::vector<MarketCondition>& bars)
     std::vector<MarketCondition> none;
     marketData.update(none);
 
-    stratEngine.setUp(algoConfig, stratFactory, marketData, &broker);
+    stratEngine.setUp(algoConfig, stratFactory, marketData);
+    oms = OrderManagement();
+    oms.setUp(algoConfig, &broker);
+    oms.setMarketData(marketData);
     initializeBacktest();
 
     // Warm-up bars only build the strategies' history
@@ -203,13 +206,15 @@ Backtester::executeTimeStep(const MarketCondition& bar)
     marketData.addBar(bar, windowBars);
     Log::out() << "Backtester time step: " << bar.DateTime << std::endl;
 
-    // 2. Strategies decide; any order goes to the simulated broker
-    stratEngine.run();
+    // 2. Strategies vote; an agreed order goes through the risk checks to the simulated broker
+    std::optional<Order> order = stratEngine.decide(oms.heldQuantity(bar.Ticker));
+    if (order)
+        oms.sendOrder(*order);
 
     // 3. The broker fills orders and checks stop losses / take profits on this bar,
     //    then the OMS catches up with the filled position (the live app does the same after each bar)
     broker.nextStep();
-    stratEngine.getOms()->syncPosition(bar.Ticker);
+    oms.syncPosition(bar.Ticker);
     logPerformance();
 
     // 4. Book-keeping

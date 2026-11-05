@@ -49,7 +49,7 @@ AlpacaStream::setSymbols(const std::vector<std::string>& tickers)
 }
 
 std::vector<MarketCondition>
-AlpacaStream::fetchRecentBars(const std::string& ticker, int count)
+AlpacaStream::history(const std::string& ticker, int count)
 {
     std::vector<MarketCondition> bars;
 
@@ -91,7 +91,7 @@ AlpacaStream::fetchRecentBars(const std::string& ticker, int count)
 }
 
 void
-AlpacaStream::start(BarCallback onBar)
+AlpacaStream::start(BarHandler onBar, std::function<void()>)
 {
     barCallback = onBar;
 

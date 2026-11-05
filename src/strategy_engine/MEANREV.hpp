@@ -33,7 +33,8 @@ class MEANREV : public StrategyBase {
             return std::max(_strategyAttribute.lookback_period, _strategyAttribute.moving_average_period);
         }
 
-        void execute() override
+    protected:
+        void decide() override
         {
             std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
@@ -47,17 +48,18 @@ class MEANREV : public StrategyBase {
             double entry = _strategyAttribute.entry_threshold;
             double exit = _strategyAttribute.exit_threshold;
 
-            if (state == 0 && z <= -entry)      { signal(OrderType::BUY);  state = +1; }
-            else if (state == 0 && z >= entry)  { signal(OrderType::SELL); state = -1; }
-            else if (state > 0 && z >= -exit)   { signal(OrderType::SELL); state = 0; }
-            else if (state < 0 && z <= exit)    { signal(OrderType::BUY);  state = 0; }
+            if (state == 0 && z <= -entry)      { propose(OrderType::BUY);  state = +1; }
+            else if (state == 0 && z >= entry)  { propose(OrderType::SELL); state = -1; }
+            else if (state > 0 && z >= -exit)   { propose(OrderType::SELL); state = 0; }
+            else if (state < 0 && z <= exit)    { propose(OrderType::BUY);  state = 0; }
             else
                 return;
 
-            Log::out() << "MEANREV " << order.getTypeAsString() << " | z-score " << std::fixed << std::setprecision(2) << z
+            Log::out() << "MEANREV " << proposed().getTypeAsString() << " | z-score " << std::fixed << std::setprecision(2) << z
                        << " (entry " << entry << ", exit " << exit << ")" << std::endl;
         }
 
+    public:
         // z-score of the newest close. closes must hold at least max(maPeriod, sdPeriod) values.
         static double zScore(const std::vector<float>& closes, int maPeriod, int sdPeriod,
                              double* meanOut = nullptr, double* sdOut = nullptr)

@@ -47,7 +47,8 @@ class SCALP : public StrategyBase {
         // A whole session, so the VWAP can be built from the open after a mid-day start
         int barsNeeded() const override { return MarketTime::MINUTES_PER_SESSION + 1; }
 
-        void execute() override
+    protected:
+        void decide() override
         {
             if (!marketData || marketData->getData().empty())
                 return;
@@ -80,8 +81,8 @@ class SCALP : public StrategyBase {
                 else if (minute >= FLAT_MINUTE) why = "end of day";
                 if (!why.empty())
                 {
-                    signal(state > 0 ? OrderType::SELL : OrderType::BUY);
-                    Log::out() << "SCALP " << order.getTypeAsString() << " to close (" << why << ") after "
+                    propose(state > 0 ? OrderType::SELL : OrderType::BUY);
+                    Log::out() << "SCALP " << proposed().getTypeAsString() << " to close (" << why << ") after "
                                << barsHeld << " bar(s)" << std::endl;
                     state = 0;
                 }
@@ -92,15 +93,16 @@ class SCALP : public StrategyBase {
             if (minute < MarketTime::OPEN_MINUTE + _strategyAttribute.warmup_minutes || minute >= LAST_ENTRY_MINUTE || sigma <= 0)
                 return;
             double band = _strategyAttribute.entry_threshold * sigma;
-            if (bar.Close < vwap - band)       { signal(OrderType::BUY);  state = +1; }
-            else if (bar.Close > vwap + band)  { signal(OrderType::SELL); state = -1; }
+            if (bar.Close < vwap - band)       { propose(OrderType::BUY);  state = +1; }
+            else if (bar.Close > vwap + band)  { propose(OrderType::SELL); state = -1; }
             else
                 return;
             barsHeld = 0;
-            Log::out() << "SCALP " << order.getTypeAsString() << " | " << std::fixed << std::setprecision(2)
+            Log::out() << "SCALP " << proposed().getTypeAsString() << " | " << std::fixed << std::setprecision(2)
                        << bar.Close << " vs VWAP " << vwap << " +/- " << band << std::endl;
         }
 
+    public:
         double vwap() const { return weight > 0 ? weightedPrice / weight : 0.0; }
         double sigma() const
         {

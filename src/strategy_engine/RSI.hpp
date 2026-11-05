@@ -24,7 +24,8 @@ class RSI : public StrategyBase {
 
         RSI(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
-        void execute() override
+    protected:
+        void decide() override
         {
             std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
@@ -34,15 +35,16 @@ class RSI : public StrategyBase {
             ready = true;
 
             if (rsi > _strategyAttribute.overbought_threshold)
-                signal(OrderType::SELL);
+                propose(OrderType::SELL);
             else if (rsi < _strategyAttribute.oversold_threshold)
-                signal(OrderType::BUY);
+                propose(OrderType::BUY);
             else
                 return;
 
             logDecision();
         }
 
+    public:
         void validate() override
         {
             if(!_strategyAttribute.period)
@@ -118,7 +120,7 @@ class RSI : public StrategyBase {
     private:
         void logDecision()
         {
-            Log::out() << "RSI " << order.getTypeAsString() << " | RSI " << std::fixed << std::setprecision(2) << rsi
+            Log::out() << "RSI " << proposed().getTypeAsString() << " | RSI " << std::fixed << std::setprecision(2) << rsi
                        << " (oversold " << _strategyAttribute.oversold_threshold << ", overbought "
                        << _strategyAttribute.overbought_threshold << ")" << std::endl;
         }

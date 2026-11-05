@@ -14,9 +14,8 @@ namespace
         for (size_t i = 0; i < closes.size(); i++)
         {
             data.addBar(MarketCondition("t" + std::to_string(i), "NVDA", closes[i], closes[i], 100, "1m"));
-            strategy.supplyData(data);
-            strategy.execute();
-            signals.push_back(strategy.onNewOrder() ? strategy.getOrder().getTypeAsString() : "");
+            std::optional<Order> order = strategy.onBar(data, 0);
+            signals.push_back(order ? order->getTypeAsString() : "");
         }
         return signals;
     }

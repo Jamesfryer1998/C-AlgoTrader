@@ -99,12 +99,3 @@ MinuteReport::print(std::ostream& out)
     rows.clear();
     events.clear();
 }
-
-void
-MinuteReport::printLegend(std::ostream& out)
-{
-    out << "\nEach minute: one row per stock. Lower / Upper are the levels that make a strategy trade (buy at or\n"
-        << "below Lower, sell at or above Upper); Current is what's compared with them: the price, or the RSI or\n"
-        << "MACD value. \"exit\" marks where an open trade will be closed. Orders and errors are listed underneath.\n"
-        << std::flush;
-}

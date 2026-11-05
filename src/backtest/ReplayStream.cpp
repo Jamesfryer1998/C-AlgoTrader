@@ -119,7 +119,7 @@ ReplayStream::load()
 }
 
 std::vector<MarketCondition>
-ReplayStream::history(const std::string& ticker, int count) const
+ReplayStream::history(const std::string& ticker, int count)
 {
     auto found = before.find(ticker);
     if (found == before.end() || count <= 0)
@@ -130,7 +130,7 @@ ReplayStream::history(const std::string& ticker, int count) const
 }
 
 void
-ReplayStream::start(BarCallback onBar, std::function<void()> onFinished)
+ReplayStream::start(BarHandler onBar, std::function<void()> onFinished)
 {
     stop();
     running = true;

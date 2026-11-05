@@ -151,13 +151,18 @@ TEST(RegressionTests, LiveDecisionPathUnchanged)
     StrategyFactory factory(config);
     StrategyEngine engine;
     RecordingBroker broker;
-    engine.setUp(config, factory, marketData, &broker);
+    OrderManagement oms;
+    oms.setUp(config, &broker);
+    oms.setMarketData(marketData);
+    engine.setUp(config, factory, marketData);
 
-    // Feed bars one at a time exactly like the live app does
+    // Feed bars one at a time exactly like the live app does: the engine decides, the OMS sends
     for (const auto& bar : market)
     {
         marketData.addBar(bar, 500);
-        engine.run();
+        std::optional<Order> order = engine.decide(oms.heldQuantity(bar.Ticker));
+        if (order)
+            oms.sendOrder(*order);
     }
 
     int buys = 0, sells = 0;

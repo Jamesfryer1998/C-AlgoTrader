@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "../../src/strategy_engine/StrategyEngine.hpp"
 #include "../../src/broker/SimulatedBroker.hpp"
+#include "../../src/oms/OrderManagement.hpp"
 
 
 class StrategyEngineTests : public ::testing::Test {
@@ -34,60 +35,47 @@ TEST_F(StrategyEngineTests, CanSetUpStrategyEngine)
     string stratFilePath = config.getTestPath("strategy_tests/test_data/strategies_consolidated.json");
     MarketData marketData;
     StrategyFactory stratFactory(stratFilePath);
-    SimulatedBroker broker(marketData);
-    cut.setUp(jsonConfig, stratFactory, marketData, &broker);
+    cut.setUp(jsonConfig, stratFactory, marketData);
 }
 
 
 // When it comes to testing strat engine correclty makes orders
 
-// TEST_F(StrategyEngineTests, CanGetOmsFromStrategyEngine)
-// {
-//     string stratFilePath = config.getTestPath("strategy_tests/test_data/strategies_consolidated.json");
-//     MarketData marketData;
-//     StrategyFactory stratFactory(stratFilePath);
-//     SimulatedBroker broker(marketData);
-//     cut.setUp(jsonConfig, stratFactory, marketData, &broker);
-//     auto oms = cut.getOms();
-// }
 
 // ---------- Strategies must agree before an order is sent ----------
 
 TEST(StrategyConsensusTests, NoProposalsMeansNoOrder)
 {
-    Order chosen;
-    EXPECT_FALSE(StrategyEngine::chooseOrder({}, chosen));
+    EXPECT_FALSE(StrategyEngine::agreedOrder({}));
 }
 
 TEST(StrategyConsensusTests, SingleStrategyOrderIsSent)
 {
-    Order chosen;
     std::vector<Order> proposals = {Order(OrderType::BUY, "NVDA", 1, 100)};
-    ASSERT_TRUE(StrategyEngine::chooseOrder(proposals, chosen));
-    EXPECT_EQ(chosen.getTypeAsString(), "BUY");
+    std::optional<Order> chosen = StrategyEngine::agreedOrder(proposals);
+    ASSERT_TRUE(chosen);
+    EXPECT_EQ(chosen->getTypeAsString(), "BUY");
 }
 
 TEST(StrategyConsensusTests, AgreeingStrategiesSendOneOrder)
 {
-    Order chosen;
     std::vector<Order> proposals = {Order(OrderType::SELL, "NVDA", 1, 100), Order(OrderType::SELL, "NVDA", 2, 101)};
-    ASSERT_TRUE(StrategyEngine::chooseOrder(proposals, chosen));
-    EXPECT_EQ(chosen.getTypeAsString(), "SELL");
-    EXPECT_FLOAT_EQ(chosen.getQuantity(), 1); // the first strategy's order, sent once
+    std::optional<Order> chosen = StrategyEngine::agreedOrder(proposals);
+    ASSERT_TRUE(chosen);
+    EXPECT_EQ(chosen->getTypeAsString(), "SELL");
+    EXPECT_FLOAT_EQ(chosen->getQuantity(), 1); // the first strategy's order, sent once
 }
 
 TEST(StrategyConsensusTests, DisagreeingStrategiesSendNothing)
 {
-    Order chosen;
     std::vector<Order> proposals = {Order(OrderType::BUY, "NVDA", 1, 100), Order(OrderType::SELL, "NVDA", 1, 100)};
-    EXPECT_FALSE(StrategyEngine::chooseOrder(proposals, chosen));
+    EXPECT_FALSE(StrategyEngine::agreedOrder(proposals));
 }
 
 TEST(StrategyConsensusTests, LimitBuyAgreesWithMarketBuy)
 {
-    Order chosen;
     std::vector<Order> proposals = {Order(OrderType::BUY, "NVDA", 1, 100), Order(OrderType::LIMIT_BUY, "NVDA", 1, 99)};
-    EXPECT_TRUE(StrategyEngine::chooseOrder(proposals, chosen));
+    EXPECT_TRUE(StrategyEngine::agreedOrder(proposals));
 }
 
 // ---------- Several strategies, one bar: at most one order reaches the broker ----------
@@ -117,6 +105,17 @@ namespace
         return config;
     }
 
+    // One bar the way the live app and the backtester handle it: the engine decides, the OMS sends
+    void decideAndSend(StrategyEngine& engine, MarketData& data, const MarketCondition& bar, OrderManagement& oms)
+    {
+        data.addBar(bar);
+        std::optional<Order> order = engine.decide(oms.heldQuantity(bar.Ticker));
+        if (!order)
+            return;
+        oms.setMarketData(data);
+        oms.sendOrder(*order);
+    }
+
     // Quiet market around 100, then one sharp dip on the last bar
     std::vector<MarketCondition> quietThenDip()
     {
@@ -137,14 +136,13 @@ TEST(StrategyEngineConsensusTests, TwoStrategiesAgreeingSendOneOrderNotTwo)
     StrategyFactory factory(config);
     StrategyEngine engine;
     CountingBroker broker;
+    OrderManagement oms;
+    oms.setUp(config, &broker);
     MarketData data;
-    engine.setUp(config, factory, data, &broker);
+    engine.setUp(config, factory, data);
 
     for (const auto& bar : quietThenDip())
-    {
-        data.addBar(bar);
-        engine.run();
-    }
+        decideAndSend(engine, data, bar, oms);
 
     // Both strategies wanted to BUY on the dip; the broker must see exactly one order
     ASSERT_EQ(broker.orders.size(), 1u);
@@ -168,13 +166,12 @@ TEST(StrategyEngineConsensusTests, EachStrategyAloneWouldHaveTraded)
         StrategyFactory factory(config);
         StrategyEngine engine;
         CountingBroker broker;
+        OrderManagement oms;
+        oms.setUp(config, &broker);
         MarketData data;
-        engine.setUp(config, factory, data, &broker);
+        engine.setUp(config, factory, data);
         for (const auto& bar : quietThenDip())
-        {
-            data.addBar(bar);
-            engine.run();
-        }
+            decideAndSend(engine, data, bar, oms);
         EXPECT_EQ(broker.orders.size(), 1u) << name;
     }
 }
@@ -213,13 +210,9 @@ TEST(SharedOmsTests, EachStockTradesOnItsOwnPricesThroughOneOms)
     StrategyFactory aaaFactory(aaaConfig), bbbFactory(bbbConfig), cccFactory(cccConfig);
     StrategyEngine aaa, bbb, ccc;
     MarketData aaaData, bbbData, cccData;
-    for (auto* engine : {&aaa, &bbb, &ccc})
-        engine->shareOrderManagement(&shared);
-    aaa.setUp(aaaConfig, aaaFactory, aaaData, &broker);
-    bbb.setUp(bbbConfig, bbbFactory, bbbData, &broker);
-    ccc.setUp(cccConfig, cccFactory, cccData, &broker);
-    EXPECT_EQ(aaa.getOms(), &shared);
-    EXPECT_EQ(ccc.getOms(), &shared);
+    aaa.setUp(aaaConfig, aaaFactory, aaaData);
+    bbb.setUp(bbbConfig, bbbFactory, bbbData);
+    ccc.setUp(cccConfig, cccFactory, cccData);
 
     // Bars interleave like the live stream: AAA dips, BBB dips, CCC stays quiet
     std::vector<MarketCondition> a = renamed(quietThenDip(), "AAA");
@@ -227,15 +220,10 @@ TEST(SharedOmsTests, EachStockTradesOnItsOwnPricesThroughOneOms)
     std::vector<MarketCondition> c = quiet("CCC");
     for (size_t i = 0; i < a.size(); i++)
     {
-        aaaData.addBar(a[i]);
-        aaa.run();
-        bbbData.addBar(b[i]);
-        bbb.run();
+        decideAndSend(aaa, aaaData, a[i], shared);
+        decideAndSend(bbb, bbbData, b[i], shared);
         if (i < c.size())
-        {
-            cccData.addBar(c[i]);
-            ccc.run();
-        }
+            decideAndSend(ccc, cccData, c[i], shared);
     }
 
     // One order per dipping stock, each for its own ticker at its own price; none for the quiet one
@@ -247,14 +235,22 @@ TEST(SharedOmsTests, EachStockTradesOnItsOwnPricesThroughOneOms)
     EXPECT_NE(shared.getOrders()[0].getId(), shared.getOrders()[1].getId());
 }
 
-TEST(SharedOmsTests, EngineUsesItsOwnOmsByDefault)
+TEST(StrategyEngineDecisionTests, EngineOnlyDecides)
 {
-    StrategyEngine one, two;
-    EXPECT_NE(one.getOms(), nullptr);
-    EXPECT_NE(one.getOms(), two.getOms());
-    OrderManagement shared;
-    one.shareOrderManagement(&shared);
-    EXPECT_EQ(one.getOms(), &shared);
-    one.shareOrderManagement(nullptr);   // back to its own
-    EXPECT_NE(one.getOms(), &shared);
+    // The engine returns the agreed order; nothing reaches a broker until the caller sends it
+    json config = twoStrategies();
+    StrategyFactory factory(config);
+    StrategyEngine engine;
+    MarketData data;
+    engine.setUp(config, factory, data);
+
+    std::optional<Order> last;
+    for (const auto& bar : quietThenDip())
+    {
+        data.addBar(bar);
+        last = engine.decide(0);
+    }
+    ASSERT_TRUE(last);
+    EXPECT_EQ(last->getTypeAsString(), "BUY");
+    EXPECT_EQ(last->getStrategy(), "RSI+MEANREV");
 }

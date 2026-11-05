@@ -6,6 +6,7 @@
 #include <ixwebsocket/IXWebSocket.h>
 #include <nlohmann/json.hpp>
 #include "AlpacaClient.hpp"
+#include "../data_access/BarFeed.hpp"
 #include "../data_access/MarketCondition.hpp"
 
 using json = nlohmann::json;
@@ -26,11 +27,9 @@ using json = nlohmann::json;
  * The callback runs on the WebSocket's background thread, one bar at a time.
  * If the connection drops, IXWebSocket reconnects automatically and we log in again.
  */
-class AlpacaStream
+class AlpacaStream : public BarFeed
 {
     public:
-        using BarCallback = std::function<void(const MarketCondition&)>;
-
         AlpacaStream(const json& config);
 
         // Trade several tickers: subscribe to all of these instead of config.json's "ticker".
@@ -40,12 +39,11 @@ class AlpacaStream
 
         // Download the most recent `count` 1-minute bars of one ticker over REST so strategies have history
         // straight away (oldest first). The live app asks for exactly what the active strategies need.
-        std::vector<MarketCondition> fetchRecentBars(const std::string& ticker, int count);
-        std::vector<MarketCondition> fetchRecentBars(int count) { return fetchRecentBars(symbol, count); }
+        std::vector<MarketCondition> history(const std::string& ticker, int count) override;
 
-        // Connect and start streaming. Returns immediately; bars arrive on onBar.
-        void start(BarCallback onBar);
-        void stop();
+        // Connect and start streaming. Returns immediately; bars arrive on onBar. A live stream never finishes.
+        void start(BarHandler onBar, std::function<void()> onFinished = nullptr) override;
+        void stop() override;
 
         std::string getSymbol() const { return symbol; }
         std::string getFeed() const { return feed; }
@@ -63,5 +61,5 @@ class AlpacaStream
 
         AlpacaClient client;
         ix::WebSocket socket;
-        BarCallback barCallback;
+        BarHandler barCallback;
 };

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <map>
 #include "../data_access/MarketData.hpp"
+#include "../oms/OrderManagement.hpp"
 #include "../strategy_engine/StrategyEngine.hpp"
 #include "../strategy_engine/StrategyFactory.hpp"
 #include "../broker/SimulatedBroker.hpp"
@@ -111,7 +112,8 @@ private:
     BacktestMarketDataAdapter marketDataAdapter;  // Adapter for backtest control
     SimulatedBroker broker;                   // Simulated broker for order execution
     StrategyFactory stratFactory;             // Factory for creating strategies
-    StrategyEngine stratEngine;               // Engine for running strategies
+    StrategyEngine stratEngine;               // The strategies and the vote between them
+    OrderManagement oms;                      // Risk checks, then the simulated broker
     
     // Configuration
     json algoConfig;

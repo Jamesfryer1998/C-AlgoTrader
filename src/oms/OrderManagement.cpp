@@ -55,6 +55,16 @@ void OrderManagement::removePosition(int id)
     std::erase_if(positions, [id](Position& position) { return position.getId() == id; });
 }
 
+float
+OrderManagement::heldQuantity(const string& ticker) const
+{
+    float held = 0;
+    for (const auto& position : positions)
+        if (position.getTicker() == ticker)
+            held += position.getQuantity();
+    return held;
+}
+
 // Wall-clock time now, e.g. 2026-10-29T18:31:00.123Z
 static std::string utcNowMillis()
 {
@@ -69,7 +79,7 @@ static std::string utcNowMillis()
     return text;
 }
 
-void OrderManagement::onNewOrder(Order& order)
+void OrderManagement::sendOrder(Order& order)
 {
     if (marketData == nullptr)
     {
@@ -96,11 +106,7 @@ void OrderManagement::onNewOrder(Order& order)
     }
 
     // What we hold before this order, so the broker can tell an exit from an entry
-    float held = 0;
-    for (const auto& position : positions)
-        if (position.getTicker() == order.getTicker())
-            held += position.getQuantity();
-    order.setPositionBefore(held);
+    order.setPositionBefore(heldQuantity(order.getTicker()));
 
     // Live: tell the broker our id so its order can be matched to ours (unique across restarts)
     if (store)

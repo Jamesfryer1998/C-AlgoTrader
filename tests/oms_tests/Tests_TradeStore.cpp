@@ -164,12 +164,12 @@ TEST_F(TradeStoreTests, EveryAttemptIsRecordedSentRejectedAndBlocked)
     oms.enablePersistence(&store, &tracker);
 
     Order first = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(first);                       // sent
+    oms.sendOrder(first);                       // sent
     broker.rejectNext = true;
     Order second = order(OrderType::SELL, 1, 100);
-    oms.onNewOrder(second);                      // rejected by the broker
+    oms.sendOrder(second);                      // rejected by the broker
     Order third = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(third);                       // blocked: 2 held + 2 > max 3
+    oms.sendOrder(third);                       // blocked: 2 held + 2 > max 3
     store.flush();
 
     std::vector<TradeRecord> trades = store.loadTrades();
@@ -210,10 +210,10 @@ TEST_F(TradeStoreTests, RestartContinuesIdsAndPositions)
         oms.setMarketData(data);
         oms.enablePersistence(&store, &tracker);
         Order o = order(OrderType::BUY, 2, 100);
-        oms.onNewOrder(o);
+        oms.sendOrder(o);
         broker.rejectNext = true;
         Order r = order(OrderType::BUY, 1, 100);
-        oms.onNewOrder(r);
+        oms.sendOrder(r);
     }
 
     TradeStore store(dir);
@@ -240,7 +240,7 @@ TEST_F(TradeStoreTests, BrokerSideExitIsRecordedAsAnAdjustment)
     oms.enablePersistence(&store, &tracker);
 
     Order o = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(o);
+    oms.sendOrder(o);
 
     // The broker's take profit sells everything without us sending an order
     broker.heldQuantity = 0;
@@ -297,7 +297,7 @@ TEST_F(TradeStoreTests, FailedPositionRequestIsNotMistakenForFlat)
     oms.enablePersistence(&store, &tracker);
 
     Order o = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(o);
+    oms.sendOrder(o);
     store.flush();
     size_t tradesBefore = store.loadTrades().size();
 
@@ -360,7 +360,7 @@ TEST_F(TradeStoreTests, NoFakeAdjustmentWhileAnOrderIsFilling)
     oms.enablePersistence(&store, &tracker);
 
     Order buy = order(OrderType::BUY, 1, 100);
-    oms.onNewOrder(buy);
+    oms.sendOrder(buy);
     EXPECT_FLOAT_EQ(broker.lastPositionBefore, 0);   // the broker was told we held nothing
 
     // Still filling: our book already counts it, and nothing was "adjusted"
@@ -380,7 +380,7 @@ TEST_F(TradeStoreTests, NoFakeAdjustmentWhileAnOrderIsFilling)
 
     // The next order sees the position, so a SELL is an exit
     Order sell = order(OrderType::SELL, 1, 101);
-    oms.onNewOrder(sell);
+    oms.sendOrder(sell);
     EXPECT_FLOAT_EQ(broker.lastPositionBefore, 1);
     EXPECT_TRUE(oms.getPositions().empty());   // closed in our book straight away
 }

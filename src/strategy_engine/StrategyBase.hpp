@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <vector>
 #include "../oms/Order.hpp"
@@ -10,6 +11,17 @@
 #include "../data_access/MarketCondition.hpp"
 
 
+/**
+ * StrategyBase
+ *
+ * A strategy looks at the bars after each new one and says whether it wants to trade:
+ *
+ *   std::optional<Order> order = strategy.onBar(marketData, heldQuantity);
+ *
+ * It never sends anything itself: the engine collects every strategy's proposal, checks they agree, and the
+ * caller sends the agreed order through the OMS. Each strategy writes its rule in decide(), calling
+ * propose(BUY / SELL) when it wants to trade.
+ */
 class StrategyBase
 {
     public:
@@ -19,7 +31,19 @@ class StrategyBase
         };
 
         virtual ~StrategyBase() = default;
-        virtual void execute() = 0;
+
+        // The newest bar has arrived: the order this strategy proposes, if any.
+        // heldQuantity: what we hold in the stock now (+ long, - short), so a strategy can notice the broker's
+        // stop loss / take profit closed its trade. data must outlive the call (strategies read it, no copy).
+        std::optional<Order> onBar(const MarketData& data, float heldQuantity)
+        {
+            marketData = &data;
+            position = heldQuantity;
+            knowsPosition = true;
+            proposal.reset();
+            decide();
+            return proposal;
+        }
 
         // Throws if a required setting is missing. Called once, when the factory creates the strategy.
         virtual void validate() = 0;
@@ -44,42 +68,19 @@ class StrategyBase
         // How many 1-minute bars the strategy needs before it can make a decision
         virtual int barsNeeded() const = 0;
 
-        virtual bool onNewOrder()
-        {
-            return (NewOrder == true);
-        };
-
-        virtual void reset()
-        {
-            NewOrder = false;
-        }
-
-        virtual Order getOrder()
-        {
-            NewOrder = false;
-            return order; 
-        };
-
-        // The position actually held in this strategy's ticker (+ long, - short), told by the engine before
-        // each run. Lets a strategy notice when the broker's stop loss / take profit closed its trade.
-        void setCurrentPosition(float quantity) { position = quantity; knowsPosition = true; }
-        float currentPosition() const { return position; }
-        bool positionKnown() const { return knowsPosition; }
-
-        // Strategies read the engine's MarketData directly (no copy). It must outlive the strategy run.
-        virtual void supplyData(const MarketData& marketdata)
-        {
-            marketData = &marketdata;
-        }
-
         // Base strats take in entire list of strat params
         // Specific strats pick and choose from this list
-        Order order;
-        const MarketData* marketData = nullptr;
-        bool NewOrder = false;
         StrategyAttribute _strategyAttribute;
 
     protected:
+        // Each strategy's rule: look at the bars (marketData) and call propose() to trade
+        virtual void decide() = 0;
+
+        // What we held when this bar arrived (+ long, - short)
+        float currentPosition() const { return position; }
+        bool positionKnown() const { return knowsPosition; }
+
+        const MarketData* marketData = nullptr;
         float position = 0;
         bool knowsPosition = false;
 
@@ -103,14 +104,20 @@ class StrategyBase
         // The newest bar
         const MarketCondition& currentBar() const { return marketData->getData().back(); }
 
-        // Raise a market order at the current bar's close, with this strategy's stop loss / take profit
-        void signal(OrderType type, float quantity = 1)
+        // Ask for a market order at the current bar's close, with this strategy's stop loss / take profit
+        void propose(OrderType type, float quantity = 1)
         {
             const MarketCondition& bar = currentBar();
-            Order newOrder(type, bar.Ticker, quantity, bar.Close);
-            newOrder.setStopLoss(_strategyAttribute.stop_loss);
-            newOrder.setTakeProfit(_strategyAttribute.take_profit);
-            order = newOrder;
-            NewOrder = true;
+            Order order(type, bar.Ticker, quantity, bar.Close);
+            order.setStopLoss(_strategyAttribute.stop_loss);
+            order.setTakeProfit(_strategyAttribute.take_profit);
+            order.setStrategy(_strategyAttribute.name);
+            proposal = order;
         }
+
+        // The order proposed on this bar so far (e.g. to describe it in a log line)
+        const Order& proposed() const { return *proposal; }
+
+    private:
+        std::optional<Order> proposal;
 };

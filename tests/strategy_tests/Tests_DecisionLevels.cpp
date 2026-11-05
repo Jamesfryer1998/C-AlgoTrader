@@ -24,22 +24,10 @@ namespace
         return data;
     }
 
-    class NoBroker : public BrokerBase
-    {
-        public:
-            int connect() override { return 1; }
-            int disconnect() override { return 1; }
-            float getLatestPrice(std::string) override { return 0; }
-            int placeOrder(Order) override { return 1; }
-            Position getLatestPosition(std::string ticker) override { return Position(ticker, 0, 0); }
-    };
-
     template <typename S>
     void run(S& strategy, const MarketData& data)
     {
-        strategy.supplyData(data);
-        strategy.execute();
-        strategy.reset();
+        strategy.onBar(data, 0);
     }
 }
 
@@ -120,8 +108,7 @@ TEST(LevelsTests, EngineReportsWarmingUp)
     StrategyFactory factory(config);
     StrategyEngine engine;
     MarketData data = bars({100, 101, 102});
-    NoBroker broker;
-    engine.setUp(config, factory, data, &broker);
+    engine.setUp(config, factory, data);
     engine.setPrintStatus(false);
     auto levels = engine.decisionLevels();
     ASSERT_EQ(levels.size(), 1u);

@@ -22,7 +22,12 @@ class OrderManagement
         void removeOrder(int id);
         void addOrder(Order &order);
         void removePosition(int id);
-        void onNewOrder(Order& order);
+        // Risk checks, then the broker. The order is recorded (trades.csv, P&L) whether sent, rejected or blocked.
+        // setMarketData must point at the order's stock first (the checks compare it with the last close).
+        void sendOrder(Order& order);
+
+        // What we hold in a stock now (+ long, - short), by our own records
+        float heldQuantity(const string& ticker) const;
         void syncPosition(const string& ticker);
         void addPosition(Position &position);
         vector<Order> getOrders(){ return orders; };

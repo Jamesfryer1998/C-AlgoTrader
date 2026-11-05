@@ -51,9 +51,6 @@ class MinuteReport
         // Print the minute's table and start afresh (nothing printed if no rows)
         void print(std::ostream& out);
 
-        // What the columns mean, printed once at start-up
-        static void printLegend(std::ostream& out);
-
     private:
         std::vector<std::string> tickers;   // portfolio order
         std::string minute;                 // the bars' time, e.g. "2026-11-05 15:57:00"
