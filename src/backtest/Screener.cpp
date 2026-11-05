@@ -391,6 +391,24 @@ Screener::writeCsv(const std::string& path, const std::vector<Row>& rows)
     return static_cast<bool>(file);
 }
 
+bool
+Screener::writeTopPicksCsv(const std::string& path, const std::vector<Row>& picks)
+{
+    std::ofstream file(path);
+    if (!file)
+        return false;
+    file << "rank,symbol,strategy,parameters,train_sharpe,test_sharpe,buy_hold_sharpe,test_return_on_max_position,"
+            "test_closed_trades\n";
+    for (size_t i = 0; i < picks.size(); i++)
+    {
+        const Row& r = picks[i];
+        file << i + 1 << "," << r.symbol << "," << r.strategy << "," << quoted(r.parameters.dump()) << ","
+             << r.train.sharpeRatio << "," << r.test.sharpeRatio << "," << r.buyHoldSharpe << ","
+             << r.testReturnOnMaxPosition << "," << r.test.closedTrades << "\n";
+    }
+    return true;
+}
+
 std::vector<Screener::Row>
 Screener::readCsv(const std::string& path)
 {

@@ -1,5 +1,6 @@
 #include "MarketTime.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <exception>
 #include <iomanip>
@@ -93,6 +94,22 @@ std::string
 MarketTime::datePart(const std::string& dateTime)
 {
     return dateTime.substr(0, DATE_LENGTH);
+}
+
+std::string
+MarketTime::monthsBefore(const std::string& date, int months)
+{
+    const int lastDayInEveryMonth = 28;
+    int year = std::stoi(date.substr(0, 4)), month = std::stoi(date.substr(5, 2)), day = std::stoi(date.substr(8, 2));
+    month -= months;
+    while (month <= 0)
+    {
+        month += 12;
+        year--;
+    }
+    char text[48];
+    std::snprintf(text, sizeof(text), "%04d-%02d-%02d", year, month, std::min(day, lastDayInEveryMonth));
+    return text;
 }
 
 int

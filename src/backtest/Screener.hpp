@@ -119,6 +119,8 @@ class Screener
 
         // Save / load results (so a long screen can be resumed)
         static bool writeCsv(const std::string& path, const std::vector<Row>& rows);
+        // The top picks, ranked: rank, symbol, strategy, parameters and their Sharpe ratios
+        static bool writeTopPicksCsv(const std::string& path, const std::vector<Row>& picks);
         static std::vector<Row> readCsv(const std::string& path);
 
         // "period 21, oversold_threshold 35, ..." from the searched parameters

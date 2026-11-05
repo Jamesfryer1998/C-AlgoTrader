@@ -13,6 +13,7 @@
 #include "../src/data_access/CSVParser.hpp"
 #include "../src/data_access/DataStitcher.hpp"
 #include "../src/util/Config.hpp"
+#include "../src/util/Format.hpp"
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/Log.hpp"
 #include "../src/util/MarketTime.hpp"
@@ -52,13 +53,6 @@ static std::string describe(const json& parameters)
         text += (text.empty() ? "" : " ") + key + "=" + v;
     }
     return text;
-}
-
-static std::string fmt(double value, int decimals = 2)
-{
-    std::ostringstream out;
-    out << std::fixed << std::setprecision(decimals) << value;
-    return out.str();
 }
 
 static void writeResultsCsv(const std::string& path, const Optimiser& optimiser,
@@ -207,7 +201,7 @@ int main(int argc, char* argv[])
                 {
                     lastShown = percent;
                     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-                    std::cout << "  " << done << "/" << total << " (" << percent << "%) " << fmt(seconds, 0) << "s" << std::endl;
+                    std::cout << "  " << done << "/" << total << " (" << percent << "%) " << Format::number(seconds, 0) << "s" << std::endl;
                 }
             });
         double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
@@ -227,15 +221,15 @@ int main(int argc, char* argv[])
             std::cout << "  (current config.json settings for " << name << " can't run: " << e.what() << ")" << std::endl;
         }
 
-        std::cout << "Done in " << fmt(seconds, 0) << "s\n\n"
+        std::cout << "Done in " << Format::number(seconds, 0) << "s\n\n"
                   << std::left << std::setw(5) << "Rank" << std::setw(16) << "Train Sharpe" << std::setw(15) << "Train return"
                   << std::setw(14) << "Train trades" << std::setw(15) << "Test Sharpe" << std::setw(14) << "Test return"
                   << "Settings" << std::endl;
         auto line = [&](const std::string& rank, const Optimiser::Result& r) {
-            std::cout << std::left << std::setw(5) << rank << std::setw(16) << fmt(r.train.sharpeRatio)
-                      << std::setw(15) << (fmt(r.train.roiPercent, 3) + "%") << std::setw(14) << r.train.closedTrades
-                      << std::setw(15) << (r.tested ? fmt(r.test.sharpeRatio) : "-")
-                      << std::setw(14) << (r.tested ? fmt(r.test.roiPercent, 3) + "%" : "-")
+            std::cout << std::left << std::setw(5) << rank << std::setw(16) << Format::number(r.train.sharpeRatio)
+                      << std::setw(15) << (Format::number(r.train.roiPercent, 3) + "%") << std::setw(14) << r.train.closedTrades
+                      << std::setw(15) << (r.tested ? Format::number(r.test.sharpeRatio) : "-")
+                      << std::setw(14) << (r.tested ? Format::number(r.test.roiPercent, 3) + "%" : "-")
                       << describe(optimiser.searchedParameters(r.settings)) << std::endl;
         };
         for (size_t i = 0; i < results.size() && i < 10; i++)
@@ -255,7 +249,7 @@ int main(int argc, char* argv[])
             };
             std::cout << "\nBest on training data: " << describe(optimiser.searchedParameters(top.settings)) << "\n";
             if (top.tested && top.test.sharpeRatio < 0)
-                std::cout << "WARNING: its Sharpe ratio on the test data was negative (" << fmt(top.test.sharpeRatio)
+                std::cout << "WARNING: its Sharpe ratio on the test data was negative (" << Format::number(top.test.sharpeRatio)
                           << "), so it probably fits the past rather than finding a real edge." << std::endl;
         }
         else

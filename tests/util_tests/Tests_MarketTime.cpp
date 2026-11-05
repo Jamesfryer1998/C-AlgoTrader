@@ -55,3 +55,18 @@ TEST(MarketTimeTests, DatePartAndParseDate)
     EXPECT_EQ(datePart("2026-10-29 09:30:00"), "2026-10-29");
     EXPECT_EQ(formatUtc(parseDate("2026-10-29")), "2026-10-29T00:00:00Z");
 }
+
+TEST(MarketTimeTests, MinuteOfDayAndClockAreOpposites)
+{
+    EXPECT_EQ(MarketTime::minuteOfDay("2026-10-29 09:30:00"), MarketTime::OPEN_MINUTE);
+    EXPECT_EQ(MarketTime::minuteOfDay("2026-10-29 16:00:00"), MarketTime::CLOSE_MINUTE);
+    EXPECT_EQ(MarketTime::minuteOfDay("2026-10-29"), -1);
+    EXPECT_EQ(MarketTime::clock(MarketTime::OPEN_MINUTE), "09:30");
+}
+
+TEST(MarketTimeTests, MonthsBeforeCrossesYearsAndShortMonths)
+{
+    EXPECT_EQ(MarketTime::monthsBefore("2026-11-05", 6), "2026-05-05");
+    EXPECT_EQ(MarketTime::monthsBefore("2026-02-10", 24), "2024-02-10");
+    EXPECT_EQ(MarketTime::monthsBefore("2026-03-31", 1), "2026-02-28");
+}

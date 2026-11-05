@@ -41,6 +41,9 @@ namespace MarketTime
     // "YYYY-MM-DD" of a "YYYY-MM-DD HH:MM:SS" string
     std::string datePart(const std::string& dateTime);
 
+    // "YYYY-MM-DD" moved back by whole months (day capped at 28 so it always exists)
+    std::string monthsBefore(const std::string& date, int months);
+
     // "HH:MM" of a "YYYY-MM-DD HH:MM:SS" as minutes since midnight (-1 if unreadable)
     int minuteOfDay(const std::string& dateTime);
 

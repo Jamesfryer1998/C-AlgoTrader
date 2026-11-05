@@ -42,11 +42,14 @@ void
 RiskReport::printLosses(std::ostream& out) const
 {
     double value = settings.portfolioValue;
+    auto loss = [&](const std::string& name, double fraction, const std::string& meaning) {
+        return std::vector<std::string>{name, percent(fraction), dollars(fraction * value, 0), meaning};
+    };
     TextTable losses({"", "Loss", "In $", ""}, {false, true, true, false});
-    losses.addRow({"VaR 95%", percent(result.at95.var), dollars(result.at95.var * value, 0), "1 in 20 periods loses at least this"});
-    losses.addRow({"Expected shortfall", percent(result.at95.es), dollars(result.at95.es * value, 0), "average loss in those worst 5%"});
-    losses.addRow({"VaR 99%", percent(result.at99.var), dollars(result.at99.var * value, 0), "1 in 100"});
-    losses.addRow({"ES 99%", percent(result.at99.es), dollars(result.at99.es * value, 0), ""});
+    losses.addRow(loss("VaR 95%", result.at95.var, "1 in 20 periods loses at least this"));
+    losses.addRow(loss("Expected shortfall", result.at95.es, "average loss in those worst 5%"));
+    losses.addRow(loss("VaR 99%", result.at99.var, "1 in 100"));
+    losses.addRow(loss("ES 99%", result.at99.es, ""));
 
     out << "\n" << settings.simulations << " simulated " << settings.horizonDays << "-day futures for "
         << dollars(value, 0) << ":\n"
