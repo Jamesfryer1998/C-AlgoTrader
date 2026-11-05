@@ -78,6 +78,7 @@ SimulatedBroker::process()
         currentCondition = data[step];
     }
     simulationTime = currentCondition.DateTime;
+    latestPrices[currentCondition.Ticker] = currentCondition.Close;
     
     // Log the current time step being processed
     Log::out() << "SimulatedBroker processing time step: " << simulationTime << std::endl;
@@ -117,6 +118,11 @@ SimulatedBroker::getLatestPrice(std::string ticker)
     if (ticker == currentCondition.Ticker) {
         return currentCondition.Close;
     }
+
+    // Several stocks (the live app's replay mode): each stock's last price
+    auto known = latestPrices.find(ticker);
+    if (known != latestPrices.end())
+        return known->second;
     
     // If we had multiple tickers, we'd need more complex logic here
     std::cerr << "Warning: Requested price for ticker " << ticker 
@@ -159,8 +165,10 @@ SimulatedBroker::processOrders()
     std::vector<Order> remainingOrders;
     
     for (auto& order : pendingOrders) {
-        // Keep orders that can't be filled yet (e.g. a limit price not reached) for the next bar
-        if (!checkOrderValidity(order) || !executeOrder(order)) {
+        // Keep orders that can't be filled yet (e.g. a limit price not reached, or another stock's order
+        // waiting for that stock's bar) for the next bar
+        if ((severalStocks && order.getTicker() != currentCondition.Ticker) || !checkOrderValidity(order)
+            || !executeOrder(order)) {
             remainingOrders.push_back(order);
         }
     }
@@ -491,7 +499,8 @@ SimulatedBroker::checkStopLosses()
     for (const auto& [ticker, position] : positionsCopy) {
         auto levels = exitLevels.find(ticker);
         double quantity = position.getQuantity();
-        if (quantity == 0 || levels == exitLevels.end() || levels->second.stopLoss <= 0)
+        if (quantity == 0 || levels == exitLevels.end() || levels->second.stopLoss <= 0
+            || (severalStocks && ticker != currentCondition.Ticker))   // several stocks: each on its own bar
             continue;
 
         double price = getLatestPrice(ticker);
@@ -510,7 +519,8 @@ SimulatedBroker::checkTakeProfits()
     for (const auto& [ticker, position] : positionsCopy) {
         auto levels = exitLevels.find(ticker);
         double quantity = position.getQuantity();
-        if (quantity == 0 || levels == exitLevels.end() || levels->second.takeProfit <= 0)
+        if (quantity == 0 || levels == exitLevels.end() || levels->second.takeProfit <= 0
+            || (severalStocks && ticker != currentCondition.Ticker))   // several stocks: each on its own bar
             continue;
 
         double price = getLatestPrice(ticker);

@@ -6,6 +6,7 @@ add_executable(screen_app screen.cpp)
 
 target_link_libraries(algo_trader_app 
     alpaca_lib
+    backtester_lib
     util_lib
     data_access_lib
     oms_lib

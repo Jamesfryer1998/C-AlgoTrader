@@ -3,6 +3,7 @@
 #include <chrono>
 #include <csignal>
 #include <cmath>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -12,6 +13,8 @@
 #include <thread>
 #include "../src/alpaca/AlpacaBroker.hpp"
 #include "../src/alpaca/AlpacaStream.hpp"
+#include "../src/backtest/ReplayStream.hpp"
+#include "../src/broker/SimulatedBroker.hpp"
 #include "../src/data_access/MarketData.hpp"
 #include "../src/strategy_engine/StrategyEngine.hpp"
 #include "../src/strategy_engine/StrategyFactory.hpp"
@@ -20,6 +23,7 @@
 #include "../src/oms/TradeStore.hpp"
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/TextTable.hpp"
+#include "../src/util/Log.hpp"
 
 /*
  * Live trading, all in one process:
@@ -33,6 +37,10 @@
  * strategies; one OMS, one trade log and one P&L book cover them all.
  *
  * Nothing runs on a timer: each new bar triggers that stock's decision as soon as it arrives.
+ *
+ * Replay mode (--replay): the same process on saved 1-minute bars instead of Alpaca's stream, with a simulated
+ * broker filling the orders, so it can be watched end to end without the market being open or real orders.
+ * No Alpaca keys needed. Records go to data/replay/<day>/.
  *
  * Alpaca keys are read from .env in the project root (copy .env.example to .env and fill it in).
  *
@@ -116,6 +124,18 @@ static json alpacaPosition(AlpacaBroker& broker, const std::string& ticker, Minu
             {"unrealized_pl", unrealised}, {"unrealized_intraday_pl", field(position, "unrealized_intraday_pl")}};
 }
 
+// The simulated broker's step-by-step notes (replay). Its fills ("Order executed") and stop loss / take profit
+// hits are kept; this is the rest.
+static bool simulatorBookkeeping(const std::string& line)
+{
+    for (const char* prefix : {"SimulatedBroker", "Order placed for order", "Established new", "Increased long",
+                               "Increased short", "Closed long", "Covered short", "Completely closed", "Completely covered",
+                               "Partially closed", "Partially covered", "Cash", "Total "})
+        if (line.rfind(prefix, 0) == 0)
+            return true;
+    return false;
+}
+
 // Print the minute as one table, then clear it
 static void printMinute(MinuteView& view, const std::vector<std::string>& tickers, const std::map<std::string, double>& lastPrice)
 {
@@ -191,18 +211,71 @@ struct Lane
     size_t maxBars = 1;
 };
 
-int main()
+static void printUsage()
+{
+    std::cout << R"(Live trading on Alpaca (stocks and strategies from src/config/config.json)
+
+Usage: algo_trader_app [options]
+  (no options)              trade live on Alpaca's stream (paper or live account, from config.json)
+  --replay [YYYY-MM-DD]     replay saved 1-minute bars with a simulated broker instead: no orders reach
+                            Alpaca and no keys are needed (default day: the latest saved for every stock)
+  --days 3                  replay this many trading days from that day (default 1)
+  --speed 10                replayed minutes per second (default 10; 0 = as fast as possible)
+)";
+}
+
+int main(int argc, char* argv[])
 {
     std::signal(SIGINT, onStopSignal);   // Ctrl+C
     std::signal(SIGTERM, onStopSignal);  // systemctl stop / kill
 
+    bool replay = false;
+    std::string replayDay;
+    int replayDays = 1;
+    double replaySpeed = 10;
+    for (int i = 1; i < argc; i++)
+    {
+        std::string arg = argv[i];
+        bool hasValue = i + 1 < argc && argv[i + 1][0] != '-';
+        try
+        {
+            if (arg == "--help") { printUsage(); return 0; }
+            else if (arg == "--replay") { replay = true; if (hasValue) replayDay = argv[++i]; }
+            else if (arg == "--days" && hasValue) replayDays = std::max(1, std::stoi(argv[++i]));
+            else if (arg == "--speed" && hasValue) replaySpeed = std::max(0.0, std::stod(argv[++i]));
+            else { std::cerr << "Unknown argument: " << arg << "\n\n"; printUsage(); return 1; }
+        }
+        catch (const std::exception&)
+        {
+            std::cerr << "Bad value for " << arg << "\n";
+            return 1;
+        }
+    }
+
     Config config;
     DotEnv::load(config.getProjectRoot() + "/.env"); // API keys, kept out of git
     json algoConfig = config.loadConfig();
+    std::string dataRoot = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/");
 
-    // 1. Broker: check our keys work and the account is reachable
-    AlpacaBroker broker(algoConfig);
-    if (!broker.connect())
+    // 1. Broker. Live: Alpaca (check our keys work and the account is reachable). Replay: a simulated broker
+    //    that fills orders at each bar's close (plus slippage) and runs stop losses / take profits itself.
+    AlpacaBroker alpaca(algoConfig);
+    MarketData simulatedFeed;   // replay: the bar being processed, for the simulated broker's prices
+    SimulatedBroker simulated(simulatedFeed);
+    BrokerBase& broker = replay ? static_cast<BrokerBase&>(simulated) : static_cast<BrokerBase&>(alpaca);
+    bool dryRun = !replay && alpaca.isDryRun();
+    if (replay)
+    {
+        Log::verbose = false;   // the simulated broker's set-up notes
+        simulated.followLatestBar(true);
+        simulated.tradeSeveralStocks(true);
+        simulated.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
+        simulated.setSlippage(0.0001);   // 0.01% against us on every fill, as in the backtests
+        simulated.setCommission(0.0);
+        simulated.setStartingCapital(algoConfig.value("starting_capital", 100000.0));
+        Log::verbose = true;
+    }
+    else if (!alpaca.connect())
         return 1;
 
     // 2. What to trade: one lane per stock, each with its own strategies
@@ -218,13 +291,13 @@ int main()
     }
 
     AlpacaStream stream(algoConfig);
-    if (stream.getFeed() == "test" && portfolio.size() > 1)
+    if (!replay && stream.getFeed() == "test" && portfolio.size() > 1)
     {
         std::cout << "Test feed: only FAKEPACA streams, so trading it alone with " << portfolio.front().ticker
                   << "'s strategies" << std::endl;
         portfolio.resize(1);
     }
-    if (stream.getFeed() == "test")
+    if (!replay && stream.getFeed() == "test")
         portfolio.front().ticker = stream.getSymbol();
 
     OrderManagement oms;   // shared by every lane
@@ -247,6 +320,20 @@ int main()
     }
     stream.setSymbols(tickers);
 
+    std::unique_ptr<ReplayStream> replayStream;
+    if (replay)
+    {
+        replayStream = std::make_unique<ReplayStream>(dataRoot, tickers, replayDay, replayDays, replaySpeed);
+        if (!replayStream->load())
+            return 1;
+        const auto& days = replayStream->getDays();
+        std::cout << "\nREPLAY of " << days.front() << (days.size() > 1 ? " to " + days.back() : std::string())
+                  << " (" << replayStream->minutes() << " minutes) with a simulated broker, "
+                  << (replaySpeed > 0 ? std::to_string(static_cast<int>(replaySpeed)) + " minutes per second"
+                                      : std::string("as fast as possible"))
+                  << ". Nothing is sent to Alpaca." << std::endl;
+    }
+
     // 3. Market data: back-fill exactly the bars each stock's strategies need (e.g. MEANREV lookback 120
     //    needs 120, MACD 16/50/5 needs 275) so they decide from the first live bar, and keep that many in memory
     std::cout << "Trading " << lanes.size() << " stock(s):" << std::endl;
@@ -260,13 +347,17 @@ int main()
 
         int needed = lane->engine.barsNeeded();
         lane->maxBars = static_cast<size_t>(std::max(needed, 1));
-        std::vector<MarketCondition> history = stream.fetchRecentBars(lane->ticker, needed);
+        std::vector<MarketCondition> history = replay ? replayStream->history(lane->ticker, needed)
+                                                      : stream.fetchRecentBars(lane->ticker, needed);
         lane->marketData.update(history);
     }
 
     // 4. Saved state: reload trades/positions from the last run, then check each stock against what Alpaca holds
-    std::string stateDir = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", "data/")
-                         + (broker.isDryRun() ? "live_dry_run" : "live");
+    std::string stateDir = dataRoot + (replay ? "replay/" + replayStream->getDays().front()
+                                              : (dryRun ? "live_dry_run" : "live"));
+    if (replay)
+        for (const char* file : {"trades.csv", "positions.csv", "performance.json"})
+            std::filesystem::remove(std::filesystem::path(stateDir) / file);   // each replay starts fresh
     TradeStore store(stateDir);
     PerformanceTracker tracker(algoConfig.value("starting_capital", 100000.0));
     oms.setMarketData(lanes.front()->marketData);
@@ -294,7 +385,11 @@ int main()
     std::map<std::string, double> lastPrice;
     const auto waitForStragglers = std::chrono::seconds(8);
 
-    stream.start([&](const MarketCondition& bar)
+    std::atomic<bool> replayFinished{false};
+    std::string replayDayShown;
+    double dayStartEquity = simulated.getCurrentEquity();
+
+    auto onBar = [&](const MarketCondition& bar)
     {
         auto found = laneByTicker.find(bar.Ticker);
         if (found == laneByTicker.end())
@@ -305,16 +400,27 @@ int main()
         CaptureStdout decisionOutput;
         auto started = std::chrono::steady_clock::now();
 
+        if (replay)
+        {
+            if (bar.DateTime.substr(0, 10) != replayDayShown)
+            {
+                replayDayShown = bar.DateTime.substr(0, 10);
+                dayStartEquity = simulated.getCurrentEquity();   // "today" starts here
+            }
+            simulatedFeed.addBar(bar, 5);   // the simulated broker prices orders off this bar
+        }
         lane.marketData.addBar(bar, lane.maxBars);
         lane.engine.run();   // points the shared OMS at this stock's prices, then decides
 
         double decisionMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
-        std::string decisionLines = decisionOutput.release();
+        if (replay)
+            simulated.nextStep();   // fill this bar's orders, run stop losses / take profits for this stock
 
-        // After the decision (not timed): catch up with fills Alpaca made itself (stop loss / take profit),
+        // After the decision (not timed): catch up with fills the broker made itself (stop loss / take profit),
         // update our records and fetch P&L
         oms.setMarketData(lane.marketData);
         oms.syncPosition(bar.Ticker);
+        std::string decisionLines = decisionOutput.release();
         tracker.markPrice(bar.Ticker, bar.Close);
         if (bar.DateTime != lastEquityMinute)
         {
@@ -330,7 +436,25 @@ int main()
         row.decisionMs = decisionMs;
         json performance = {{"estimate", PerformanceTracker::toJson(summary)}};
         AlpacaBroker::AccountSnapshot account;
-        if (broker.isDryRun())
+        if (replay)
+        {
+            account.ok = true;
+            account.equity = simulated.getCurrentEquity();
+            account.lastEquity = dayStartEquity;
+            account.cash = simulated.getCurrentCash();
+            Position held = simulated.getLatestPosition(bar.Ticker);
+            if (held.getQuantity() != 0)
+            {
+                std::ostringstream cell;
+                cell << held.getQuantity() << " @ " << fixed2(held.getAvgPrice());
+                row.position = cell.str();
+                double unrealised = (bar.Close - held.getAvgPrice()) * held.getQuantity();
+                row.unrealised = money(unrealised) + " (" + (unrealised >= 0 ? "+" : "") +
+                                 fixed2(unrealised / std::fabs(held.getAvgPrice() * held.getQuantity()) * 100.0) + "%)";
+            }
+            performance["simulated"] = {{"equity", account.equity}, {"cash", account.cash}};
+        }
+        else if (dryRun)
         {
             for (const auto& position : oms.getPositions())
                 if (position.getTicker() == bar.Ticker && position.getQuantity() != 0)
@@ -343,8 +467,8 @@ int main()
         }
         else
         {
-            account = broker.getAccount();
-            alpacaSnapshots[bar.Ticker] = alpacaPosition(broker, bar.Ticker, row);
+            account = alpaca.getAccount();
+            alpacaSnapshots[bar.Ticker] = alpacaPosition(alpaca, bar.Ticker, row);
             performance["alpaca"] = {{"equity", account.equity}, {"today_pnl", account.equity - account.lastEquity},
                                      {"cash", account.cash}, {"positions", alpacaSnapshots}};
         }
@@ -363,11 +487,13 @@ int main()
         lastPrice[bar.Ticker] = bar.Close;
         if (account.ok)
             view.account = account;
-        if (broker.isDryRun())
+        if (dryRun)
             view.estimate = "dry run estimate " + money(summary.totalPnL);
+        if (replay)
+            view.estimate = "REPLAY";
         std::istringstream lines(decisionLines);
         for (std::string line; std::getline(lines, line);)
-            if (!line.empty())
+            if (!line.empty() && !simulatorBookkeeping(line))
                 view.events.push_back(bar.Ticker + ": " + line);
 
         bool everyStock = true;
@@ -375,7 +501,12 @@ int main()
             everyStock = everyStock && view.rows[ticker].seen;
         if (everyStock)
             printMinute(view, tickers, lastPrice);
-    });
+    };
+
+    if (replay)
+        replayStream->start(onBar, [&] { replayFinished = true; running = false; });
+    else
+        stream.start(onBar);
 
     // 6. Bars arrive on the stream's own thread; this thread waits for Ctrl+C, and prints a minute's table
     //    if some stock still hasn't reported a few seconds after the first one did
@@ -387,28 +518,54 @@ int main()
             printMinute(view, tickers, lastPrice);
     }
 
-    std::cout << "\nStopping..." << std::endl;
-    stream.stop();
+    std::cout << (replayFinished ? "\nReplay finished." : "\nStopping...") << std::endl;
+    if (replay)
+        replayStream->stop();
+    else
+        stream.stop();
     {
         std::lock_guard<std::mutex> guard(viewLock);
         printMinute(view, tickers, lastPrice);
     }
-    if (broker.isDryRun())
+    if (replay)
+    {
+        double start = simulated.getStartingCapital(), equity = simulated.getCurrentEquity();
+        std::cout << "Simulated equity " << dollars(equity) << " (" << money(equity - start) << ", "
+                  << fixed2((equity / start - 1.0) * 100.0) << "%) from " << dollars(start) << ", "
+                  << simulated.getFilledOrders().size() << " fills" << std::endl;
+        for (const auto& lane : lanes)
+        {
+            Position held = simulated.getLatestPosition(lane->ticker);
+            int fills = 0;
+            for (const auto& order : simulated.getFilledOrders())
+                if (order.getTicker() == lane->ticker)
+                    fills++;
+            std::ostringstream line;
+            line << "  " << lane->ticker << ": " << fills << " fills, ";
+            if (held.getQuantity() != 0)
+                line << "holding " << held.getQuantity() << " @ " << fixed2(held.getAvgPrice());
+            else
+                line << "flat";
+            std::cout << line.str() << std::endl;
+        }
+    }
+    else if (dryRun)
         std::cout << "Dry run estimate: " << money(tracker.summary().totalPnL) << std::endl;
     else
     {
-        AlpacaBroker::AccountSnapshot account = broker.getAccount();
+        AlpacaBroker::AccountSnapshot account = alpaca.getAccount();
         if (account.ok)
             std::cout << "Equity " << dollars(account.equity) << " (today "
                       << money(account.equity - account.lastEquity) << ")" << std::endl;
         for (const auto& lane : lanes)
         {
             MinuteRow row;
-            alpacaPosition(broker, lane->ticker, row);
+            alpacaPosition(alpaca, lane->ticker, row);
             std::cout << "  " << lane->ticker << ": " << (row.position == "-" ? "no position"
                          : row.position + ", unrealised " + row.unrealised) << std::endl;
         }
     }
     std::cout << "State saved in " << stateDir << std::endl;
+    Log::verbose = false;   // no goodbye notes from the simulated broker
     return 0;
 }

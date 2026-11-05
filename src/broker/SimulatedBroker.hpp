@@ -22,6 +22,15 @@ class SimulatedBroker : public BrokerBase {
         int disconnect() override;
         int placeOrder(Order order) override;
         float getLatestPrice(std::string ticker) override;
+
+        // An order placed for this ticker that hasn't been filled yet (fills happen in nextStep)
+        bool hasPendingOrder(const std::string& ticker) override
+        {
+            for (const auto& order : pendingOrders)
+                if (order.getTicker() == ticker)
+                    return true;
+            return false;
+        }
         Position getLatestPosition(std::string ticker) override;
         
         // Simulation specific methods
@@ -52,6 +61,11 @@ class SimulatedBroker : public BrokerBase {
         // true: each step uses the newest bar in MarketData (for a rolling window of bars, as the
         // Backtester and live trading use). false: step N uses bar N (the original behaviour).
         void followLatestBar(bool follow) { useLatestBar = follow; }
+
+        // Several stocks in one simulation, their bars arriving one after another (the live app's replay
+        // mode): an order fills, and a position's stop loss / take profit is checked, only on its own
+        // stock's bar, and each stock is valued at its own last price.
+        void tradeSeveralStocks(bool several) { severalStocks = several; }
 
         // Custom order handling
         void setSlippage(double slippagePerc);
@@ -91,6 +105,8 @@ class SimulatedBroker : public BrokerBase {
         void exitPosition(const std::string& ticker, double quantity, const char* reason, double level);
         SlippageMode slippageMode = SlippageMode::Random;
         bool useLatestBar = false;
+        bool severalStocks = false;
+        std::map<std::string, float> latestPrices;   // each stock's last close (several stocks in one simulation)
 
         // Positions and portfolio
         std::vector<Position> positionHistory;

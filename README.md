@@ -52,6 +52,22 @@ At start-up the app back-fills exactly the bars the active strategies need (the 
 
 Outside US market hours, set `"data_feed": "test"` to see bars flowing.
 
+#### Replay mode: watch it work on saved data
+Run the same app, with the same portfolio, strategies, OMS and per-minute table, on saved 1-minute bars
+instead of Alpaca's stream, with a simulated broker filling the orders and running stop losses / take profits:
+
+```sh
+./build/app/algo_trader_app --replay                     # the latest day saved for every portfolio stock
+./build/app/algo_trader_app --replay 2026-10-15 --days 3 # three trading days from 15 Oct
+./build/app/algo_trader_app --replay --speed 60          # 60 replayed minutes per second (default 10; 0 = flat out)
+```
+
+Nothing is sent to Alpaca and no keys are needed. Bars come from `data/minute/<TICKER>/` (saved by
+`screen_app --download-only`) or `data/` (saved by `backtest_app --download`); each strategy is back-filled from
+the days before. Fills are at each bar's close with 0.01% slippage against us, as in the backtests. Records go
+to `data/replay/<day>/` (fresh each run), so `data/live/` and the paper account are untouched. At the end it
+prints the simulated equity, P&L and fills per stock.
+
 #### Trading several stocks (`"portfolio"`)
 Add a `"portfolio"` list to `src/config/config.json` and the app trades every stock in it at once, each with
 its own strategy and settings, from a single Alpaca stream:

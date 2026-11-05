@@ -730,3 +730,54 @@ TEST_F(SimulatedBrokerTests, IntegrationWithMultipleOrdersAndMarketMovements)
     EXPECT_GE(actualPnL, expectedMinPnL);
     EXPECT_LE(actualPnL, expectedMaxPnL);
 }
+// The live app's replay: several stocks' bars arrive one after another through one feed
+TEST(SimulatedBrokerSeveralStocksTests, EachStockUsesItsOwnPrice)
+{
+    MarketData feed;
+    SimulatedBroker broker(feed);
+    broker.followLatestBar(true);
+    broker.tradeSeveralStocks(true);
+    broker.setSlippage(0);
+    broker.setCommission(0);
+
+    auto bar = [&](const std::string& ticker, float price, const std::string& time) {
+        feed.addBar(MarketCondition(time, ticker, price, price, 100, "1m"), 5);
+    };
+
+    // AAA at 100: buy with a 10% stop loss (90)
+    bar("AAA", 100, "2026-03-02 09:30:00");
+    Order buy(OrderType::BUY, "AAA", 1, 100);
+    buy.setStopLoss(10);
+    buy.setTakeProfit(10);
+    broker.placeOrder(buy);
+    EXPECT_TRUE(broker.hasPendingOrder("AAA"));
+    EXPECT_FALSE(broker.hasPendingOrder("BBB"));
+    broker.nextStep();
+    EXPECT_FALSE(broker.hasPendingOrder("AAA"));
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("AAA").getQuantity(), 1);
+
+    // BBB's bar at 50 must not trip AAA's stop at 90, and AAA keeps its own price
+    bar("BBB", 50, "2026-03-02 09:30:00");
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("AAA").getQuantity(), 1);
+    EXPECT_FLOAT_EQ(broker.getLatestPrice("AAA"), 100);
+    EXPECT_FLOAT_EQ(broker.getLatestPrice("BBB"), 50);
+
+    // A BBB order placed on AAA's bar waits for BBB's own bar
+    bar("AAA", 99, "2026-03-02 09:31:00");
+    broker.placeOrder(Order(OrderType::BUY, "BBB", 2, 50));
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("BBB").getQuantity(), 0);
+    bar("BBB", 51, "2026-03-02 09:31:00");
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("BBB").getQuantity(), 2);
+    EXPECT_NEAR(broker.getLatestPosition("BBB").getAvgPrice(), 51, 1e-4);
+
+    // AAA's own bar below 90: its stop loss fires
+    bar("AAA", 85, "2026-03-02 09:32:00");
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("AAA").getQuantity(), 0);
+
+    // Equity values each stock at its own last price: cash + 2 x 51
+    EXPECT_NEAR(broker.getCurrentEquity(), broker.getCurrentCash() + 2 * 51, 1e-3);
+}
