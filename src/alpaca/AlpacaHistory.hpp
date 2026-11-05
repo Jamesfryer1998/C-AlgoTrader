@@ -52,10 +52,6 @@ class AlpacaHistory
         static bool writeCsv(const std::string& path, const std::vector<MarketCondition>& bars);
 
     private:
-        // Retry when rate limited or the connection drops: waits 5 s, 10 s, ... between six attempts
-        static constexpr int MAX_ATTEMPTS = 6;
-        static constexpr std::chrono::seconds FIRST_RETRY_WAIT{5};
-
         std::string symbol;
         std::string feed;
         std::string dataUrl;

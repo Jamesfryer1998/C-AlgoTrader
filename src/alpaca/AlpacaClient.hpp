@@ -32,12 +32,6 @@ struct HttpResult
 class AlpacaClient
 {
     public:
-        // The most bars Alpaca returns for one request (more come in pages)
-        static constexpr int MAX_BARS_PER_REQUEST = 10000;
-
-        // The free plan can't query the most recent 15 minutes of SIP (all-exchange) data: keep clear of it
-        static constexpr std::time_t SIP_DELAY_SECONDS = 16 * 60;
-
         AlpacaClient();
 
         bool hasKeys() const { return !keyId.empty() && !secretKey.empty(); }

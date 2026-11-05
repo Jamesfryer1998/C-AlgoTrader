@@ -5,6 +5,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include "../util/MarketTime.hpp"
 
 /**
  * Small statistics toolkit for the quant projects (Monte Carlo risk, pairs trading, MA crossover).
@@ -15,7 +16,7 @@ namespace quant
     using Vector = std::vector<double>;
     using Matrix = std::vector<Vector>;   // Matrix[row][column]
 
-    constexpr double TRADING_DAYS = 252.0;
+    constexpr double TRADING_DAYS = MarketTime::TRADING_DAYS_PER_YEAR;
 
     // Standard normal random numbers that are the same on every platform for a given seed.
     // (std::normal_distribution is implemented differently by libstdc++ and libc++, so a seeded

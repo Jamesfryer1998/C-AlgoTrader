@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "alpaca/AlpacaDailyBars.hpp"
 #include "alpaca/AlpacaBroker.hpp"
+#include "alpaca/AlpacaApi.hpp"
 #include "alpaca/AlpacaStream.hpp"
 #include "data_access/MarketData.hpp"
 
@@ -151,7 +152,7 @@ TEST(AlpacaStreamTests, ParseStreamBar)
     json bar = json::parse(R"({"T":"b","S":"NVDA","o":181.5,"h":182.0,"l":181.1,"c":181.9,"v":12345,
                                "t":"2026-10-28T14:31:00Z","n":120,"vw":181.6})");
 
-    MarketCondition condition = AlpacaStream::parseBar(bar, "NVDA");
+    MarketCondition condition = AlpacaApi::parseMinuteBar(bar, "NVDA");
 
     EXPECT_EQ(condition.DateTime, "2026-10-28 10:31:00"); // 14:31 UTC = 10:31 New York (EDT)
     EXPECT_EQ(condition.Ticker, "NVDA");
@@ -167,7 +168,7 @@ TEST(AlpacaStreamTests, ParseRestBarWithoutSymbolUsesOurSymbol)
     // Bars from the REST history endpoint don't include "S"
     json bar = json::parse(R"({"o":10,"c":11,"v":5,"t":"2026-10-27T19:59:00Z"})");
 
-    MarketCondition condition = AlpacaStream::parseBar(bar, "NVDA");
+    MarketCondition condition = AlpacaApi::parseMinuteBar(bar, "NVDA");
 
     EXPECT_EQ(condition.Ticker, "NVDA");
     EXPECT_EQ(condition.DateTime, "2026-10-27 15:59:00"); // 19:59 UTC = 15:59 New York (EDT)
@@ -200,7 +201,7 @@ TEST(AlpacaStreamTests, SubscribesToEveryPortfolioTicker)
 TEST(AlpacaStreamTests, BarsKeepTheirOwnTicker)
 {
     json bar = json::parse(R"({"T":"b","S":"WMT","o":10,"c":11,"v":5,"t":"2026-10-27T19:59:00Z"})");
-    EXPECT_EQ(AlpacaStream::parseBar(bar, "TXN").Ticker, "WMT");
+    EXPECT_EQ(AlpacaApi::parseMinuteBar(bar, "TXN").Ticker, "WMT");
 }
 
 // ---------- Rolling window of live bars ----------

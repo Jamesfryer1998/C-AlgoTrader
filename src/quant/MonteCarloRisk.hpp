@@ -4,6 +4,7 @@
 #include <vector>
 #include "DailyBars.hpp"
 #include "Stats.hpp"
+#include "../util/Defaults.hpp"
 
 /**
  * Project 1: Monte Carlo portfolio risk
@@ -30,7 +31,7 @@ namespace quant
         int horizonDays = 21;
         int simulations = 10000;
         unsigned seed = 42;
-        double portfolioValue = 100000;
+        double portfolioValue = Defaults::STARTING_CAPITAL;
     };
 
     struct TailRisk

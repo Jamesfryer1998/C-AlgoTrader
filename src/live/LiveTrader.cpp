@@ -4,10 +4,12 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include "../alpaca/AlpacaApi.hpp"
 #include "../backtest/BacktestCosts.hpp"
 #include "../util/Format.hpp"
 #include "../util/MarketTime.hpp"
 #include "../util/OutputCapture.hpp"
+#include "../util/Defaults.hpp"
 
 std::atomic<bool> LiveTrader::stopRequested{false};
 
@@ -18,7 +20,7 @@ LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std
       alpaca(config),
       simulated(simulatedFeed),
       stream(config),
-      tracker(config.value("starting_capital", BacktestCosts::DEFAULT_STARTING_CAPITAL))
+      tracker(config.value("starting_capital", Defaults::STARTING_CAPITAL))
 {
 }
 
@@ -53,7 +55,7 @@ LiveTrader::connectBroker()
         simulated.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
         simulated.setSlippage(config.value("replay_slippage_percent", DEFAULT_REPLAY_SLIPPAGE_PERCENT) / 100.0);
         simulated.setCommission(0.0);
-        simulated.setStartingCapital(config.value("starting_capital", BacktestCosts::DEFAULT_STARTING_CAPITAL));
+        simulated.setStartingCapital(config.value("starting_capital", Defaults::STARTING_CAPITAL));
 
         broker = &simulated;
         auto replayAccount = std::make_unique<SimulatedAccountMonitor>(simulated);
@@ -86,7 +88,7 @@ LiveTrader::loadPortfolio()
     }
 
     // Alpaca's test feed only streams its fake symbol
-    if (!options.replay && stream.getFeed() == "test")
+    if (!options.replay && stream.getFeed() == AlpacaApi::TEST_FEED)
     {
         if (portfolio.size() > 1)
             std::cout << "Test feed: only " << stream.getSymbol() << " streams, so trading it alone with "

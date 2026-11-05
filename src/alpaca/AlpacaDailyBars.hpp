@@ -42,9 +42,6 @@ class AlpacaDailyBars
         std::string csvPath(const std::string& symbol) const;
 
     private:
-        static constexpr int MAX_ATTEMPTS = 5;
-        static constexpr std::chrono::seconds FIRST_RETRY_WAIT{3};
-
         bool download(const std::string& symbol, const std::string& startDate, const std::string& endDate,
                       std::vector<quant::DailyBar>& bars);
 

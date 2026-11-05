@@ -3,6 +3,12 @@
 #include "OrderValidator.hpp"
 #include "../util/Log.hpp"
 
+namespace
+{
+    // slippage_tolerance in config.json is a percentage
+    const double PERCENT = 100.0;
+}
+
 void 
 OrderValidator::setParams(json configData)
 {
@@ -69,7 +75,7 @@ bool OrderValidator::isValidPrice(const Order& order, const MarketData& marketDa
     double lastClose = marketData.getLastClosePrice();
 
     // Calculate allowed price range based on slippage tolerance
-    double allowedSlippage = (slippageTolerance / 100.0) * lastClose;
+    double allowedSlippage = (slippageTolerance / PERCENT) * lastClose;
     
     if (order.isBuy()) {
         return orderPrice <= lastClose + allowedSlippage;
@@ -156,7 +162,7 @@ bool OrderValidator::checkSlippage(const Order& order, const MarketData& marketD
     double orderPrice = order.getPrice();
     double lastClose = marketData.getLastClosePrice();
     
-    double slippage = std::abs(orderPrice - lastClose) / ((orderPrice + lastClose) / 2) * 100.0;
+    double slippage = std::abs(orderPrice - lastClose) / ((orderPrice + lastClose) / 2) * PERCENT;
 
     return slippage <= slippageTolerance;
 }

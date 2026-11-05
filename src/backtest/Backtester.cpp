@@ -4,6 +4,18 @@
 #include <cmath>
 #include <numeric>
 #include <iomanip>
+#include "../util/Defaults.hpp"
+
+namespace
+{
+    // Costs until set otherwise (setCommissionPerTrade / setSlippagePercentage / useCosts)
+    const double DEFAULT_COMMISSION = 1.0;     // $ per trade
+    const double DEFAULT_SLIPPAGE = 0.0005;    // 0.05% of the price
+
+    const double PERCENT = 100.0;
+    const double CENT = 0.01;                  // P&L figures closer than this agree
+    const char* const TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S";
+}
 
 Backtester::Backtester(const json& algoConfig)
         : marketData(), 
@@ -24,15 +36,15 @@ Backtester::Backtester(const json& algoConfig)
     marketDataAdapter.initialize(marketData);
     
     // Configure the broker with default settings
-    broker.setStartingCapital(100000.0);
-    broker.setCommission(1.0);
-    broker.setSlippage(0.0005);
+    broker.setStartingCapital(Defaults::STARTING_CAPITAL);
+    broker.setCommission(DEFAULT_COMMISSION);
+    broker.setSlippage(DEFAULT_SLIPPAGE);
     broker.followLatestBar(true);   // the broker trades on the newest bar of the rolling window
 
-    // Default date range: the last 7 days (thread-safe; many Backtesters may be created at once)
+    // Default date range: the last few days (thread-safe; many Backtesters may be created at once)
     std::time_t now = std::time(nullptr);
     endDate = MarketTime::datePart(MarketTime::toNewYorkTime(now));
-    startDate = MarketTime::datePart(MarketTime::toNewYorkTime(now - 7 * 24 * 3600));
+    startDate = MarketTime::datePart(MarketTime::toNewYorkTime(now - Defaults::BACKTEST_DAYS * MarketTime::SECONDS_PER_DAY));
     
     Log::out() << "Default date range: " << startDate << " to " << endDate << std::endl;
 }
@@ -241,7 +253,7 @@ Backtester::calculateMetrics()
 
     metrics.finalEquity = broker.getCurrentEquity();
     metrics.totalPnL = broker.getPnL();
-    metrics.totalPnLPercent = (metrics.finalEquity - metrics.startingCapital) / metrics.startingCapital * 100.0;
+    metrics.totalPnLPercent = (metrics.finalEquity - metrics.startingCapital) / metrics.startingCapital * PERCENT;
     metrics.numTrades = broker.getNumTrades();
 
     metrics.realisedPnL = summary.realisedPnL;
@@ -258,7 +270,7 @@ Backtester::calculateMetrics()
     metrics.annualizedReturn = summary.annualisedReturnPercent;
 
     // The tracker and the broker keep separate books; they should always agree on equity
-    if (std::fabs(summary.equity - metrics.finalEquity) > 0.01)
+    if (std::fabs(summary.equity - metrics.finalEquity) > CENT)
         std::cerr << "WARNING: performance tracker equity " << summary.equity
                   << " differs from broker equity " << metrics.finalEquity << std::endl;
 }
@@ -363,7 +375,7 @@ Backtester::getCurrentTimestamp() const
     auto in_time_t = std::chrono::system_clock::to_time_t(now);
     
     std::stringstream ss;
-    ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+    ss << std::put_time(std::localtime(&in_time_t), TIMESTAMP_FORMAT);
     return ss.str();
 }
 

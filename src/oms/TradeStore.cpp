@@ -11,6 +11,10 @@ static const char* TRADES_FILE = "trades.csv";
 static const char* POSITIONS_FILE = "positions.csv";
 static const char* PERFORMANCE_FILE = "performance.json";
 
+// Upgrading a trades.csv from before the extra columns: the original is kept as trades.csv.old
+static const char* OLD_FILE_SUFFIX = ".old";
+static const char* UPGRADED_NOTE = "from older trades.csv format";
+
 const std::vector<std::string> TradeStore::TRADE_COLUMNS = {
     "our_id", "time", "sent_at_utc", "strategy", "ticker", "side", "type", "order_class",
     "quantity", "price", "stop_loss", "take_profit", "status", "broker_status",
@@ -103,7 +107,7 @@ namespace
             t.type = get("type");
             t.side = get("side");
             if (t.side.empty())   // older files had no side column
-                t.side = (t.type == "BUY" || t.type == "LIMIT_BUY" || t.type == "STOP_BUY") ? "buy" : "sell";
+                t.side = (t.type == "BUY" || t.type == "LIMIT_BUY" || t.type == "STOP_BUY") ? BUY_SIDE : SELL_SIDE;
             t.orderClass = get("order_class");
             t.quantity = toDouble(get("quantity"));
             t.price = toDouble(get("price"));
@@ -274,12 +278,12 @@ TradeStore::upgradeOldTradesFile()
         if (t.status.empty())
         {
             // Old files only held trades that changed the position. No stop loss/take profit = broker adjustment.
-            t.status = (t.stopLoss == 0 && t.takeProfit == 0) ? "adjustment" : "sent";
-            t.note = "from older trades.csv format";
+            t.status = (t.stopLoss == 0 && t.takeProfit == 0) ? TradeStatus::ADJUSTMENT : TradeStatus::SENT;
+            t.note = UPGRADED_NOTE;
         }
         out << formatTrade(t);
     }
-    std::filesystem::copy_file(filePath, filePath + ".old", std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file(filePath, filePath + OLD_FILE_SUFFIX, std::filesystem::copy_options::overwrite_existing);
     writeAtomically(TRADES_FILE, out.str());
     std::cout << "Upgraded " << filePath << " to the new column layout (" << trades.size()
               << " trade(s) kept, original saved as trades.csv.old)" << std::endl;

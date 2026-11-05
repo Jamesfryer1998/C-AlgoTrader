@@ -1,5 +1,10 @@
 #pragma once
 #include <iostream>
+#include <string>
+
+// The market data CSV files: one bar per line, in this column order
+inline const std::string MARKET_DATA_CSV_HEADER = "Datetime,Ticker,Open,Close,Volume,TimeInterval";
+constexpr size_t MARKET_DATA_CSV_COLUMNS = 6;
 
 
 class MarketCondition

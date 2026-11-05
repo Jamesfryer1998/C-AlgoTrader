@@ -1,18 +1,52 @@
 #include "AlpacaBroker.hpp"
+#include "AlpacaApi.hpp"
 
 #include <chrono>
 #include <cmath>
 #include <iomanip>
 #include <cstdio>
 #include <iostream>
+#include <set>
 #include <thread>
+
+namespace
+{
+    // <data url>/v2/stocks/<SYMBOL>/trades/latest
+    const std::string LATEST_TRADE_PATH = "/trades/latest";
+    const int HTTP_FORBIDDEN = 403;
+    const int HTTP_NOT_FOUND = 404;   // what Alpaca answers for a position we don't hold
+
+    // How long orders stay working
+    const std::string DAY_ORDER = "day";
+    const std::string GOOD_TILL_CANCELLED = "gtc";   // stop losses must outlive the day to protect overnight
+
+    // Order statuses that mean the order is still working (not filled, cancelled, rejected or expired)
+    const std::set<std::string> WORKING_STATUSES = {"new", "accepted", "pending_new", "partially_filled",
+                                                    "accepted_for_bidding", "pending_replace", "pending_cancel",
+                                                    "calculated", "replaced"};
+
+    // After cancelling orders, check this many times, this far apart, for Alpaca to confirm
+    const int CANCEL_CHECKS = 10;
+    const std::chrono::milliseconds CANCEL_CHECK_INTERVAL{200};
+
+    // Shares can stay reserved for a moment after a cancel: Alpaca then rejects the exit with this message,
+    // so try again shortly
+    const std::string SHARES_STILL_RESERVED = "insufficient qty";
+    const int EXIT_ATTEMPTS = 3;
+    const std::chrono::milliseconds EXIT_RETRY_WAIT{300};
+
+    // Less than this left after an exit counts as nothing (float rounding)
+    const float NOTHING_LEFT = 1e-6f;
+
+    const double CENTS_PER_DOLLAR = 100.0;
+}
 
 // Alpaca wants prices in cents (2 decimal places) for stocks over $1. Send them as text to avoid
 // float noise like 181.2000045.
 static std::string toPriceText(float price)
 {
     char text[32];
-    std::snprintf(text, sizeof(text), "%.2f", std::round(price * 100.0) / 100.0);
+    std::snprintf(text, sizeof(text), "%.2f", std::round(price * CENTS_PER_DOLLAR) / CENTS_PER_DOLLAR);
     return text;
 }
 
@@ -28,10 +62,10 @@ AlpacaBroker::AlpacaBroker(const json& config)
     brokerName = "Alpaca";
 
     json alpaca = config.value("alpaca", json::object());
-    tradingUrl = alpaca.value("trading_url", "https://paper-api.alpaca.markets");
-    dataUrl = alpaca.value("data_url", "https://data.alpaca.markets");
-    feed = alpaca.value("data_feed", "iex");
-    dryRun = alpaca.value("dry_run", false) || feed == "test";
+    tradingUrl = alpaca.value("trading_url", AlpacaApi::PAPER_TRADING_URL);
+    dataUrl = alpaca.value("data_url", AlpacaApi::DATA_URL);
+    feed = alpaca.value("data_feed", AlpacaApi::IEX_FEED);
+    dryRun = alpaca.value("dry_run", false) || feed == AlpacaApi::TEST_FEED;
 }
 
 int
@@ -46,7 +80,7 @@ AlpacaBroker::connect()
         return 0;
     }
 
-    HttpResult result = client.get(tradingUrl + "/v2/account");
+    HttpResult result = client.get(tradingUrl + AlpacaApi::ACCOUNT_PATH);
     if (!result.ok())
     {
         std::cerr << "ERROR - Could not reach Alpaca account at " << tradingUrl
@@ -72,7 +106,7 @@ AlpacaBroker::disconnect()
 float
 AlpacaBroker::getLatestPrice(std::string ticker)
 {
-    std::string url = dataUrl + "/v2/stocks/" + ticker + "/trades/latest?feed=" + (feed == "sip" ? "sip" : "iex");
+    std::string url = dataUrl + AlpacaApi::STOCKS_PATH + ticker + LATEST_TRADE_PATH + "?feed=" + (feed == AlpacaApi::SIP_FEED ? AlpacaApi::SIP_FEED : AlpacaApi::IEX_FEED);
     HttpResult result = client.get(url);
 
     if (!result.ok() || !result.body.contains("trade"))
@@ -90,7 +124,7 @@ AlpacaBroker::buildOrderJson(const Order& order)
         {"symbol", order.getTicker()},
         {"qty", toQuantityText(order.getQuantity())},
         {"side", order.isBuy() ? "buy" : "sell"},
-        {"time_in_force", "day"}
+        {"time_in_force", DAY_ORDER}
     };
     bool entry = !order.reducesPosition();
 
@@ -120,7 +154,7 @@ AlpacaBroker::buildOrderJson(const Order& order)
     if (entry && order.getStopLossPrice() > 0 && order.getTakeProfitPrice() > 0)
     {
         body["order_class"] = "bracket";
-        body["time_in_force"] = "gtc";
+        body["time_in_force"] = GOOD_TILL_CANCELLED;
         body["take_profit"] = {{"limit_price", toPriceText(order.getTakeProfitPrice())}};
         body["stop_loss"] = {{"stop_price", toPriceText(order.getStopLossPrice())}};
     }
@@ -132,7 +166,7 @@ json
 AlpacaBroker::buildProtectionJson(const Order& exitOrder)
 {
     float remaining = std::fabs(exitOrder.getPositionBefore()) - exitOrder.getQuantity();
-    if (!exitOrder.reducesPosition() || remaining <= 1e-6 || exitOrder.getStopLossPrice() <= 0
+    if (!exitOrder.reducesPosition() || remaining <= NOTHING_LEFT || exitOrder.getStopLossPrice() <= 0
         || exitOrder.getTakeProfitPrice() <= 0)
         return json();
 
@@ -147,7 +181,7 @@ AlpacaBroker::buildProtectionJson(const Order& exitOrder)
         {"qty", toQuantityText(remaining)},
         {"side", exitOrder.isBuy() ? "buy" : "sell"},   // same side as the exit: it closes the rest
         {"type", "limit"},
-        {"time_in_force", "gtc"},
+        {"time_in_force", GOOD_TILL_CANCELLED},
         {"order_class", "oco"},
         {"take_profit", {{"limit_price", toPriceText(target)}}},
         {"stop_loss", {{"stop_price", toPriceText(stop)}}}
@@ -157,9 +191,7 @@ AlpacaBroker::buildProtectionJson(const Order& exitOrder)
 bool
 AlpacaBroker::isWorkingStatus(const std::string& status)
 {
-    return status == "new" || status == "accepted" || status == "pending_new" || status == "partially_filled"
-        || status == "accepted_for_bidding" || status == "pending_replace" || status == "pending_cancel"
-        || status == "calculated" || status == "replaced";
+    return WORKING_STATUSES.count(status) > 0;
 }
 
 bool
@@ -169,7 +201,7 @@ AlpacaBroker::hasPendingOrder(const std::string& ticker)
     if (found == pendingOrderIds.end() || dryRun)
         return false;
 
-    HttpResult result = client.get(tradingUrl + "/v2/orders/" + found->second);
+    HttpResult result = client.get(tradingUrl + AlpacaApi::ORDERS_PATH + "/" + found->second);
     if (!result.ok() || !result.body.is_object())
         return true;   // can't tell: safer to wait than to "correct" a position that's about to change
 
@@ -182,7 +214,7 @@ AlpacaBroker::hasPendingOrder(const std::string& ticker)
 bool
 AlpacaBroker::cancelOpenOrders(const std::string& ticker)
 {
-    std::string listUrl = tradingUrl + "/v2/orders?status=open&symbols=" + ticker;
+    std::string listUrl = tradingUrl + AlpacaApi::ORDERS_PATH + "?status=open&symbols=" + ticker;
     HttpResult open = client.get(listUrl);
     if (!open.ok() || !open.body.is_array())
         return false;
@@ -190,7 +222,7 @@ AlpacaBroker::cancelOpenOrders(const std::string& ticker)
         return true;
 
     for (const auto& item : open.body)
-        client.del(tradingUrl + "/v2/orders/" + item.value("id", ""));
+        client.del(tradingUrl + AlpacaApi::ORDERS_PATH + "/" + item.value("id", ""));
     std::cout << "Cancelled " << open.body.size() << " open " << ticker
               << " order(s) (earlier stop loss / take profit) so the exit can go through" << std::endl;
 
@@ -217,9 +249,9 @@ AlpacaBroker::sendExit(Order& order, json body)
     HttpResult result;
     for (int attempt = 1; attempt <= EXIT_ATTEMPTS; attempt++)
     {
-        result = client.post(tradingUrl + "/v2/orders", body);
+        result = client.post(tradingUrl + AlpacaApi::ORDERS_PATH, body);
         // Shares can stay reserved for a moment after a cancel: try again shortly
-        bool reserved = result.status == HTTP_FORBIDDEN && result.error.find("insufficient qty") != std::string::npos;
+        bool reserved = result.status == HTTP_FORBIDDEN && result.error.find(SHARES_STILL_RESERVED) != std::string::npos;
         if (!reserved)
             break;
         std::this_thread::sleep_for(EXIT_RETRY_WAIT);
@@ -228,7 +260,7 @@ AlpacaBroker::sendExit(Order& order, json body)
 
     if (!result.ok())
     {
-        lastReceipt.brokerStatus = "rejected";
+        lastReceipt.brokerStatus = REJECTED;
         lastReceipt.error = "HTTP " + std::to_string(result.status) + ": " + result.error;
         std::cerr << "ERROR - Alpaca rejected exit order (" << result.status << "): " << result.error
                   << "\n  Order sent: " << body.dump() << std::endl;
@@ -245,7 +277,7 @@ AlpacaBroker::sendExit(Order& order, json body)
     json protection = buildProtectionJson(order);
     if (!protection.is_null())
     {
-        HttpResult protect = client.post(tradingUrl + "/v2/orders", protection);
+        HttpResult protect = client.post(tradingUrl + AlpacaApi::ORDERS_PATH, protection);
         if (protect.ok())
             std::cout << "Re-protected the remaining " << protection.value("qty", "") << " " << order.getTicker()
                       << ": stop " << protection["stop_loss"].value("stop_price", "") << ", target "
@@ -267,7 +299,7 @@ AlpacaBroker::placeOrder(Order order)
     if (dryRun)
     {
         std::cout << "DRY RUN - would send order: " << body.dump() << std::endl;
-        lastReceipt.brokerStatus = "dry_run";
+        lastReceipt.brokerStatus = DRY_RUN;
         return 1;
     }
 
@@ -275,12 +307,12 @@ AlpacaBroker::placeOrder(Order order)
         return sendExit(order, body);
 
     auto started = std::chrono::steady_clock::now();
-    HttpResult result = client.post(tradingUrl + "/v2/orders", body);
+    HttpResult result = client.post(tradingUrl + AlpacaApi::ORDERS_PATH, body);
     lastReceipt.roundTripMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
 
     if (!result.ok())
     {
-        lastReceipt.brokerStatus = "rejected";
+        lastReceipt.brokerStatus = REJECTED;
         lastReceipt.error = "HTTP " + std::to_string(result.status) + ": " + result.error;
         std::cerr << "ERROR - Alpaca rejected order (" << result.status << "): " << result.error
                   << "\n  Order sent: " << body.dump() << std::endl;
@@ -308,9 +340,9 @@ AlpacaBroker::getLatestPosition(std::string ticker)
     if (dryRun)
         return Position(ticker, 0, 0);
 
-    HttpResult result = client.get(tradingUrl + "/v2/positions/" + ticker);
+    HttpResult result = client.get(tradingUrl + AlpacaApi::POSITIONS_PATH + "/" + ticker);
 
-    if (result.status == 404) // Alpaca returns 404 when we hold none of this ticker
+    if (result.status == HTTP_NOT_FOUND)
         return Position(ticker, 0, 0);
 
     if (!result.ok())
@@ -344,7 +376,7 @@ AlpacaBroker::getAccount()
     if (dryRun)
         return snapshot;
 
-    HttpResult result = client.get(tradingUrl + "/v2/account");
+    HttpResult result = client.get(tradingUrl + AlpacaApi::ACCOUNT_PATH);
     if (!result.ok())
         return snapshot;
 

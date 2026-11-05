@@ -27,6 +27,10 @@ class BrokerBase
 
         // What happened to the most recent placeOrder() call. Each broker fills this in so the OMS
         // can save it alongside the trade without changing placeOrder's signature.
+        // brokerStatus values every broker uses (others are the broker's own words)
+        static inline const std::string REJECTED = "rejected";
+        static inline const std::string DRY_RUN = "dry_run";
+
         struct OrderReceipt
         {
             std::string brokerOrderId;   // the broker's own id for the order

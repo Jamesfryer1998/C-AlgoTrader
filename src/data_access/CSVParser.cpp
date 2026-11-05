@@ -48,7 +48,7 @@ CSVParser::ParseToMarketCondition(std::string line)
     // We are using comma separated values in CSV
     std::vector<std::string> tokens = tokenise(line, ',');
 
-    if (tokens.size() != 6) {
+    if (tokens.size() != MARKET_DATA_CSV_COLUMNS) {
         throw std::runtime_error("Not enough CSV Tokens");
     }
 

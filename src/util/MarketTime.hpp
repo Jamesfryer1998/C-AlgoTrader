@@ -20,6 +20,8 @@ namespace MarketTime
     // Regular trading hours in New York, as minutes since midnight
     constexpr int OPEN_MINUTE = 9 * 60 + 30;   // 09:30
     constexpr int CLOSE_MINUTE = 16 * 60;      // 16:00
+    constexpr int MINUTES_PER_SESSION = CLOSE_MINUTE - OPEN_MINUTE;   // 390
+    constexpr int TRADING_DAYS_PER_YEAR = 252;
 
     constexpr size_t DATE_LENGTH = 10;         // "YYYY-MM-DD"
 

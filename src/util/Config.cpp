@@ -1,6 +1,16 @@
 #include "Config.hpp"
 #include "Log.hpp"
 #include <fstream>
+#include <vector>
+
+namespace
+{
+    // Folders the apps and tests are run from, one below the project root
+    const std::vector<std::string> FOLDERS_BELOW_ROOT = {"build", "tests", "bin"};
+
+    const std::string TESTS_FOLDER = "tests";
+    const std::string TEST_DATA_FOLDER = "test_data";   // where the tests' build copies their data
+}
 
 Config::Config() 
 {
@@ -61,8 +71,10 @@ Config::getProjectRoot()
     // If we're in a subdirectory like build/, tests/, etc., go up to find the project root
     // This is a simple approach; for a more robust solution, you might want to look for
     // specific files that indicate the project root (e.g., CMakeLists.txt, .git/, etc.)
-    if (exePath.filename() == "build" || exePath.filename() == "tests" || exePath.filename() == "bin") {
-        return exePath.parent_path().string();
+    for (const auto& folder : FOLDERS_BELOW_ROOT) {
+        if (exePath.filename() == folder) {
+            return exePath.parent_path().string();
+        }
     }
     
     return exePath.string();
@@ -81,32 +93,32 @@ Config::getTestPath(const std::string& relativeTestPath)
     }
     
     // Check for file in test_data subdirectory (common pattern)
-    std::filesystem::path localTestDataPath = currentPath / "test_data" / relativeTestPath;
+    std::filesystem::path localTestDataPath = currentPath / TEST_DATA_FOLDER / relativeTestPath;
     if (std::filesystem::exists(localTestDataPath)) {
         return localTestDataPath.string();
     }
     
     // Next, try a direct path from the current directory to the tests folder
     // This handles the case when tests are run from the build directory
-    std::filesystem::path directPath = currentPath / "../../tests" / relativeTestPath;
+    std::filesystem::path directPath = currentPath / ".." / ".." / TESTS_FOLDER / relativeTestPath;
     if (std::filesystem::exists(directPath)) {
         return directPath.string();
     }
     
     // Try from the project root (for when running outside the build directory)
     std::filesystem::path projectRoot = getProjectRoot();
-    std::filesystem::path rootPath = projectRoot / "tests" / relativeTestPath;
+    std::filesystem::path rootPath = projectRoot / TESTS_FOLDER / relativeTestPath;
     if (std::filesystem::exists(rootPath)) {
         return rootPath.string();
     }
     
     // Try various relative paths that might work in different build configurations
     const std::vector<std::string> relativeOptions = {
-        "../tests",           // If in build dir
-        "tests",              // If in project root
-        "../../../tests",     // If deeply nested in build
-        "../../..",           // Try project root
-        "../../../../tests"   // More nesting
+        "../" + TESTS_FOLDER,       // If in build dir
+        TESTS_FOLDER,               // If in project root
+        "../../../" + TESTS_FOLDER, // If deeply nested in build
+        "../../..",                 // Try project root
+        "../../../../" + TESTS_FOLDER  // More nesting
     };
     
     for (const auto& option : relativeOptions) {
@@ -124,7 +136,7 @@ Config::getTestPath(const std::string& relativeTestPath)
     debugPaths(relativeTestPath);
     
     // Return a path relative to the current directory as a last resort
-    return (currentPath / "test_data" / relativeTestPath).string();
+    return (currentPath / TEST_DATA_FOLDER / relativeTestPath).string();
 }
 
 void
@@ -141,11 +153,11 @@ Config::debugPaths(const std::string& testPath)
     // Check if various combinations exist
     std::vector<std::filesystem::path> possiblePaths = {
         currentPath / testPath,
-        currentPath / "test_data" / testPath,
-        projectRoot / "tests" / testPath,
-        currentPath / "../../tests" / testPath,
-        currentPath / "../tests" / testPath,
-        currentPath / "../../../tests" / testPath
+        currentPath / TEST_DATA_FOLDER / testPath,
+        projectRoot / TESTS_FOLDER / testPath,
+        currentPath / ".." / ".." / TESTS_FOLDER / testPath,
+        currentPath / ".." / TESTS_FOLDER / testPath,
+        currentPath / ".." / ".." / ".." / TESTS_FOLDER / testPath
     };
     
     std::cout << "  Checking possible paths:" << std::endl;
@@ -155,7 +167,7 @@ Config::debugPaths(const std::string& testPath)
     }
     
     // Check if the test_data directory exists
-    std::filesystem::path testDataDir = currentPath / "test_data";
+    std::filesystem::path testDataDir = currentPath / TEST_DATA_FOLDER;
     std::cout << "  test_data directory: " << testDataDir.string() << ": "
               << (std::filesystem::exists(testDataDir) ? "EXISTS" : "NOT FOUND") << std::endl;
     

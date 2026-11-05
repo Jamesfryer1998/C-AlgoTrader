@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
+#include "../util/Defaults.hpp"
 
 using json = nlohmann::json;
 
@@ -14,17 +15,16 @@ using json = nlohmann::json;
  */
 struct BacktestCosts
 {
-    static constexpr double DEFAULT_STARTING_CAPITAL = 100000.0;
     static constexpr double DEFAULT_SLIPPAGE_PERCENT = 0.01;
 
-    double startingCapital = DEFAULT_STARTING_CAPITAL;
+    double startingCapital = Defaults::STARTING_CAPITAL;
     double commissionPerTrade = 0.0;
     double slippagePercent = DEFAULT_SLIPPAGE_PERCENT;
 
     BacktestCosts() = default;
 
     explicit BacktestCosts(const json& settings)
-        : startingCapital(settings.value("starting_capital", DEFAULT_STARTING_CAPITAL)),
+        : startingCapital(settings.value("starting_capital", Defaults::STARTING_CAPITAL)),
           commissionPerTrade(settings.value("commission_per_trade", 0.0)),
           slippagePercent(settings.value("slippage_percent", DEFAULT_SLIPPAGE_PERCENT))
     {

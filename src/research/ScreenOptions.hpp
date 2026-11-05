@@ -3,6 +3,7 @@
 #include <ostream>
 #include <string>
 #include <vector>
+#include "../util/Defaults.hpp"
 
 /**
  * ScreenOptions
@@ -12,7 +13,7 @@
 struct ScreenOptions
 {
     static constexpr size_t DEFAULT_TOP_PICKS = 5;
-    static constexpr double DEFAULT_PORTFOLIO_VALUE = 100000;   // $ split across the top picks for the risk check
+    static constexpr double DEFAULT_PORTFOLIO_VALUE = Defaults::STARTING_CAPITAL;   // $ split across the top picks for the risk check
     static constexpr int MIN_HISTORY_MONTHS = 2;                // at least a month to train on and one to test
     static constexpr int NOT_GIVEN = -1;
 

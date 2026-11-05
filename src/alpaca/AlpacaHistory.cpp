@@ -8,16 +8,47 @@
 #include <set>
 #include <chrono>
 #include <thread>
+#include "AlpacaApi.hpp"
 #include "../util/MarketTime.hpp"
+
+namespace
+{
+    // Used when config.json doesn't say
+    const std::string DEFAULT_FEED = AlpacaApi::SIP_FEED;   // all exchanges: real volumes
+    const std::string DEFAULT_ADJUSTMENT = "split";          // prices adjusted for stock splits
+    const std::string DEFAULT_FILE_BASE_NAME = "marketData";
+
+    // Retry when rate limited or the connection drops: waits 5 s, 10 s, ... between six attempts
+    const int MAX_ATTEMPTS = 6;
+    const std::chrono::seconds FIRST_RETRY_WAIT{5};
+
+    // A New York day runs 04:00/05:00 UTC to 04:00/05:00 UTC the next day, so each month's request
+    // reaches this far past its last day; bars outside the month are dropped afterwards
+    const std::time_t REQUEST_OVERLAP_SECONDS = 32 * MarketTime::SECONDS_PER_HOUR;
+
+    // Today's file counts as complete once it reaches the last bar of the session
+    const std::string LAST_BAR_TIME = "15:59";
+    const size_t TIME_START = MarketTime::DATE_LENGTH + 1;   // "YYYY-MM-DD HH:MM"
+    const size_t HOURS_AND_MINUTES = 5;
+
+    const int PRICE_DECIMALS = 4;
+
+    // data/.alpaca_history_<TICKER>.json remembers which months are finished
+    const std::string PROGRESS_FILE_PREFIX = ".alpaca_history_";
+    const char* const MONTH_FORMAT = "%04d-%02d";   // "2026-10"
+    const std::string FIRST_OF_MONTH = "-01";
+    const int DECEMBER = 12;
+    const size_t MONTH_LENGTH = 7;                  // "2026-10"
+}
 
 AlpacaHistory::AlpacaHistory(const json& config)
 {
     json alpaca = config.value("alpaca", json::object());
     symbol = config.at("ticker").get<std::string>();
-    feed = alpaca.value("history_feed", "sip");
-    dataUrl = alpaca.value("data_url", "https://data.alpaca.markets");
-    fileBaseName = config.value("baseDataFileName", "marketData");
-    adjustment = alpaca.value("history_adjustment", "split");
+    feed = alpaca.value("history_feed", DEFAULT_FEED);
+    dataUrl = alpaca.value("data_url", AlpacaApi::DATA_URL);
+    fileBaseName = config.value("baseDataFileName", DEFAULT_FILE_BASE_NAME);
+    adjustment = alpaca.value("history_adjustment", DEFAULT_ADJUSTMENT);
     regularHoursOnly = alpaca.value("history_regular_hours_only", true);
 }
 
@@ -43,9 +74,9 @@ static bool isCompleteDay(const std::string& path, const std::string& day, const
             first = line;
         last = line;
     }
-    if (first.size() < 16 || first.substr(0, 10) != day)
+    if (first.size() < TIME_START + HOURS_AND_MINUTES || MarketTime::datePart(first) != day)
         return false;
-    return day < today || last.substr(11, 5) >= "15:59";
+    return day < today || last.substr(TIME_START, HOURS_AND_MINUTES) >= LAST_BAR_TIME;
 }
 
 std::vector<MarketCondition>
@@ -57,9 +88,9 @@ AlpacaHistory::fetchBars(const std::string& startUtc, const std::string& endUtc,
 
     do
     {
-        std::string url = dataUrl + "/v2/stocks/" + symbol + "/bars"
-                        + "?timeframe=1Min&adjustment=" + adjustment + "&limit=" + std::to_string(AlpacaClient::MAX_BARS_PER_REQUEST) + "&sort=asc"
-                        + "&feed=" + feed + "&start=" + startUtc + "&end=" + endUtc;
+        std::string url = AlpacaApi::barsUrl(dataUrl, symbol, AlpacaApi::ONE_MINUTE)
+                        + "&adjustment=" + adjustment + "&limit=" + std::to_string(AlpacaApi::MAX_BARS_PER_REQUEST)
+                        + "&sort=asc&feed=" + feed + "&start=" + startUtc + "&end=" + endUtc;
         if (!pageToken.empty())
             url += "&page_token=" + pageToken;
 
@@ -76,16 +107,13 @@ AlpacaHistory::fetchBars(const std::string& startUtc, const std::string& endUtc,
         {
             for (const auto& bar : result.body["bars"])
             {
-                std::time_t utc = MarketTime::parseUtc(bar.value("t", ""));
-                if (utc < 0)
-                    continue;
-                bars.emplace_back(MarketTime::toNewYorkTime(utc), symbol,
-                                  bar.value("o", 0.0f), bar.value("c", 0.0f), bar.value("v", 0), "1m");
+                MarketCondition parsed = AlpacaApi::parseMinuteBar(bar, symbol);
+                if (!parsed.DateTime.empty())
+                    bars.push_back(parsed);
             }
         }
 
-        pageToken = result.body.value("next_page_token", json()).is_string()
-                  ? result.body["next_page_token"].get<std::string>() : "";
+        pageToken = AlpacaApi::nextPageToken(result.body);
     } while (!pageToken.empty());
 
     return bars;
@@ -98,8 +126,8 @@ AlpacaHistory::writeCsv(const std::string& path, const std::vector<MarketConditi
     if (!file)
         return false;
 
-    file << "Datetime,Ticker,Open,Close,Volume,TimeInterval\n";
-    file << std::fixed << std::setprecision(4);
+    file << MARKET_DATA_CSV_HEADER << "\n";
+    file << std::fixed << std::setprecision(PRICE_DECIMALS);
     for (const auto& bar : bars)
         file << bar.DateTime << "," << bar.Ticker << "," << bar.Open << "," << bar.Close << ","
              << bar.Volume << "," << bar.TimeInterval << "\n";
@@ -122,7 +150,7 @@ AlpacaHistory::downloadToCsv(const std::string& startDate, const std::string& en
     std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(std::time(nullptr)));
 
     // Months already downloaded in full (only months that have completely ended get recorded)
-    std::string progressPath = (std::filesystem::path(dataDir) / (".alpaca_history_" + symbol + ".json")).string();
+    std::string progressPath = (std::filesystem::path(dataDir) / (PROGRESS_FILE_PREFIX + symbol + ".json")).string();
     std::set<std::string> doneMonths;
     {
         std::ifstream progressFile(progressPath);
@@ -145,14 +173,14 @@ AlpacaHistory::downloadToCsv(const std::string& startDate, const std::string& en
     while (true)
     {
         char monthKey[32];
-        std::snprintf(monthKey, sizeof(monthKey), "%04d-%02d", year, month);
-        std::time_t monthStart = MarketTime::parseDate(std::string(monthKey) + "-01");
+        std::snprintf(monthKey, sizeof(monthKey), MONTH_FORMAT, year, month);
+        std::time_t monthStart = MarketTime::parseDate(std::string(monthKey) + FIRST_OF_MONTH);
         if (monthStart > endDay)
             break;
-        int nextYear = month == 12 ? year + 1 : year, nextMonth = month == 12 ? 1 : month + 1;
+        int nextYear = month == DECEMBER ? year + 1 : year, nextMonth = month == DECEMBER ? 1 : month + 1;
         char nextKey[32];
-        std::snprintf(nextKey, sizeof(nextKey), "%04d-%02d", nextYear, nextMonth);
-        std::time_t monthEnd = MarketTime::parseDate(std::string(nextKey) + "-01") - 24 * 3600; // last day
+        std::snprintf(nextKey, sizeof(nextKey), MONTH_FORMAT, nextYear, nextMonth);
+        std::time_t monthEnd = MarketTime::parseDate(std::string(nextKey) + FIRST_OF_MONTH) - MarketTime::SECONDS_PER_DAY;
 
         if (!overwrite && doneMonths.count(monthKey))
         {
@@ -192,12 +220,10 @@ AlpacaHistory::downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const
 {
     std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(std::time(nullptr)));
 
-    // A New York day runs 04:00/05:00 UTC to 04:00/05:00 UTC the next day, so ask for a little extra
-    // either side and keep only bars whose New York date is in range.
     std::time_t requestStart = chunkStart;
-    std::time_t requestEnd = chunkEnd + 32 * MarketTime::SECONDS_PER_HOUR;
+    std::time_t requestEnd = chunkEnd + REQUEST_OVERLAP_SECONDS;
 
-    std::time_t latestAllowed = std::time(nullptr) - AlpacaClient::SIP_DELAY_SECONDS;
+    std::time_t latestAllowed = std::time(nullptr) - AlpacaApi::SIP_DELAY_SECONDS;
     if (requestEnd > latestAllowed)
         requestEnd = latestAllowed;
     if (requestEnd <= requestStart)
@@ -242,7 +268,7 @@ AlpacaHistory::downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const
     }
 
     if (!quiet)
-        std::cout << "  " << firstDay.substr(0, 7) << ": " << byDay.size() << " trading days, "
+        std::cout << "  " << firstDay.substr(0, MONTH_LENGTH) << ": " << byDay.size() << " trading days, "
               << written << " bars written" << (skipped ? ", " + std::to_string(skipped) + " days already saved" : "")
               << std::endl;
     return written;

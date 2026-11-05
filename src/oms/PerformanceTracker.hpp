@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "../util/Defaults.hpp"
+#include "../util/MarketTime.hpp"
 
 using json = nlohmann::json;
 
@@ -54,9 +56,9 @@ struct PerformanceSummary
 class PerformanceTracker
 {
     public:
-        static constexpr double MINUTE_BARS_PER_YEAR = 252.0 * 390.0;
+        static constexpr double MINUTE_BARS_PER_YEAR = MarketTime::TRADING_DAYS_PER_YEAR * MarketTime::MINUTES_PER_SESSION;
 
-        PerformanceTracker(double startingCapital = 100000.0, double periodsPerYear = MINUTE_BARS_PER_YEAR);
+        PerformanceTracker(double startingCapital = Defaults::STARTING_CAPITAL, double periodsPerYear = MINUTE_BARS_PER_YEAR);
 
         void recordFill(const std::string& ticker, bool isBuy, double quantity, double price, double commission = 0.0);
         void markPrice(const std::string& ticker, double price);

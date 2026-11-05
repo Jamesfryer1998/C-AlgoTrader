@@ -3,32 +3,53 @@
 #include <algorithm>
 #include <random>
 #include <cmath>
+#include "../util/Defaults.hpp"
+
+namespace
+{
+    const std::string BROKER_NAME = "Simulated";
+
+    // Defaults until the backtester or the replay sets its own
+    const double DEFAULT_SLIPPAGE = 0.0005;     // 0.05% of the price
+    const double DEFAULT_COMMISSION = 1.0;      // $ per trade
+    const unsigned DEFAULT_RANDOM_SEED = 42;    // for repeatable random slippage in tests
+
+    // What a simulated order looks like to the rest of the app
+    const std::string ORDER_ID_PREFIX = "sim-";
+    const std::string ACCEPTED = "accepted";
+    const std::string SIMPLE_ORDER = "simple";
+
+    const char* const STOP_LOSS = "stop loss";
+    const char* const TAKE_PROFIT = "take profit";
+
+    const double PERCENT = 100.0;
+}
 
 SimulatedBroker::SimulatedBroker(MarketData& marketdata)
 : marketData(marketdata)
 {
-    brokerName = "Simulated";
+    brokerName = BROKER_NAME;
     
     // Default values
-    startingCapital = 100000.0;
+    startingCapital = Defaults::STARTING_CAPITAL;
     currentCash = startingCapital;
     currentEquity = startingCapital;
     highestEquity = startingCapital;
-    slippagePercentage = 0.0005; // 0.05% default slippage
-    commissionPerTrade = 1.0;    // $1 per trade default commission
+    slippagePercentage = DEFAULT_SLIPPAGE;
+    commissionPerTrade = DEFAULT_COMMISSION;
     totalTrades = 0;
     step = 0;
     detailedLogging = false; // Detailed logging disabled by default
     
     // Random seed initialization
     useFixedSeed = false;
-    randomSeed = 42; // Default seed
+    randomSeed = DEFAULT_RANDOM_SEED;
     
     // Log the default settings
     detailLog() << "SimulatedBroker initialized with:"
               << "\n  - Starting capital: $" << startingCapital
               << "\n  - Commission: $" << commissionPerTrade << " per trade"
-              << "\n  - Slippage: ±" << (slippagePercentage * 100.0) << "% (random variation)"
+              << "\n  - Slippage: ±" << (slippagePercentage * PERCENT) << "% (random variation)"
               << std::endl;
     
     connect();
@@ -136,9 +157,9 @@ SimulatedBroker::placeOrder(Order order)
     // Add order to pending orders queue
     pendingOrders.push_back(order);
     lastReceipt = OrderReceipt();
-    lastReceipt.brokerOrderId = "sim-" + std::to_string(pendingOrders.size() + filledOrders.size());
-    lastReceipt.brokerStatus = "accepted";
-    lastReceipt.orderClass = "simple";
+    lastReceipt.brokerOrderId = ORDER_ID_PREFIX + std::to_string(pendingOrders.size() + filledOrders.size());
+    lastReceipt.brokerStatus = ACCEPTED;
+    lastReceipt.orderClass = SIMPLE_ORDER;
     
     // Update to ensure we're using the most current timestamp from MarketData
     // Get fresh current data from MarketData to ensure timestamp consistency
@@ -251,7 +272,7 @@ SimulatedBroker::executeOrder(Order& order)
     if (slippagePercentage > 0.0) {
         Log::out() << " (Order price: $" << std::fixed << std::setprecision(2) << originalOrderPrice
                   << ", Slippage: " << (actualSlippagePercent >= 0 ? "+" : "")
-                  << std::fixed << std::setprecision(3) << (actualSlippagePercent * 100.0) << "%)";
+                  << std::fixed << std::setprecision(3) << (actualSlippagePercent * PERCENT) << "%)";
     }
     
     Log::out() << std::endl;
@@ -420,7 +441,7 @@ SimulatedBroker::updatePortfolioValue()
         if (detailedLogging) {
             // Calculate unrealized P&L
             double unrealizedPnL = quantity * (currentPrice - avgPrice);
-            double unrealizedPnLPercent = ((currentPrice / avgPrice) - 1.0) * 100.0;
+            double unrealizedPnLPercent = ((currentPrice / avgPrice) - 1.0) * PERCENT;
             if (quantity < 0) {
                 // For shorts, profit/loss is reversed
                 unrealizedPnL = -unrealizedPnL;
@@ -508,7 +529,7 @@ SimulatedBroker::checkStopLosses()
         bool hit = quantity > 0 ? price <= stop    // long: price fell to the stop
                                 : price >= stop;   // short: price rose to the stop
         if (hit)
-            exitPosition(ticker, quantity, "stop loss", stop);
+            exitPosition(ticker, quantity, STOP_LOSS, stop);
     }
 }
 
@@ -528,7 +549,7 @@ SimulatedBroker::checkTakeProfits()
         bool hit = quantity > 0 ? price >= target    // long: price rose to the target
                                 : price <= target;   // short: price fell to the target
         if (hit)
-            exitPosition(ticker, quantity, "take profit", target);
+            exitPosition(ticker, quantity, TAKE_PROFIT, target);
     }
 }
 
@@ -567,7 +588,7 @@ double
 SimulatedBroker::getDrawdown() const 
 {
     if (highestEquity == 0) return 0;
-    return (highestEquity - currentEquity) / highestEquity * 100.0;
+    return (highestEquity - currentEquity) / highestEquity * PERCENT;
 }
 
 int 
@@ -590,8 +611,8 @@ SimulatedBroker::setSlippage(double slippagePerc)
     slippagePercentage = slippagePerc;
     
     detailLog() << "SimulatedBroker: Slippage changed from ±" 
-              << std::fixed << std::setprecision(3) << (oldSlippage * 100.0) 
-              << "% to ±" << (slippagePercentage * 100.0) << "%" << std::endl;
+              << std::fixed << std::setprecision(3) << (oldSlippage * PERCENT) 
+              << "% to ±" << (slippagePercentage * PERCENT) << "%" << std::endl;
 }
 
 void 

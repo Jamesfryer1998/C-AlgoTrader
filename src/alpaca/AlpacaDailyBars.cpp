@@ -5,13 +5,25 @@
 #include <filesystem>
 #include <iostream>
 #include <thread>
+#include "AlpacaApi.hpp"
 #include "../util/MarketTime.hpp"
+
+namespace
+{
+    const std::string DEFAULT_FEED = AlpacaApi::SIP_FEED;   // all exchanges
+    const std::string ADJUSTMENT = "all";                    // prices adjusted for splits and dividends
+    const std::string START_OF_DAY_UTC = "T00:00:00Z";
+
+    // Retry when rate limited or the connection drops: waits 3 s, 6 s, ... between five attempts
+    const int MAX_ATTEMPTS = 5;
+    const std::chrono::seconds FIRST_RETRY_WAIT{3};
+}
 
 AlpacaDailyBars::AlpacaDailyBars(const json& config, const std::string& dataDir) : dataDir(dataDir)
 {
     json alpaca = config.value("alpaca", json::object());
-    dataUrl = alpaca.value("data_url", "https://data.alpaca.markets");
-    feed = alpaca.value("history_feed", "sip");
+    dataUrl = alpaca.value("data_url", AlpacaApi::DATA_URL);
+    feed = alpaca.value("history_feed", DEFAULT_FEED);
 }
 
 std::string
@@ -59,11 +71,11 @@ AlpacaDailyBars::download(const std::string& symbol, const std::string& startDat
     }
 
     std::time_t now = std::time(nullptr);
-    std::string end = MarketTime::formatUtc(now - AlpacaClient::SIP_DELAY_SECONDS);
+    std::string end = MarketTime::formatUtc(now - AlpacaApi::SIP_DELAY_SECONDS);
     if (!endDate.empty())
     {
         std::time_t requested = MarketTime::parseDate(endDate) + MarketTime::SECONDS_PER_DAY;   // include that whole day
-        if (requested > 0 && requested < now - AlpacaClient::SIP_DELAY_SECONDS)
+        if (requested > 0 && requested < now - AlpacaApi::SIP_DELAY_SECONDS)
             end = MarketTime::formatUtc(requested);
     }
     std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(now));
@@ -72,9 +84,9 @@ AlpacaDailyBars::download(const std::string& symbol, const std::string& startDat
     bars.clear();
     do
     {
-        std::string url = dataUrl + "/v2/stocks/" + symbol + "/bars?timeframe=1Day&adjustment=all&limit="
-                        + std::to_string(AlpacaClient::MAX_BARS_PER_REQUEST)
-                        + "&sort=asc&feed=" + feed + "&start=" + startDate + "T00:00:00Z&end=" + end;
+        std::string url = AlpacaApi::barsUrl(dataUrl, symbol, AlpacaApi::ONE_DAY) + "&adjustment=" + ADJUSTMENT
+                        + "&limit=" + std::to_string(AlpacaApi::MAX_BARS_PER_REQUEST) + "&sort=asc&feed=" + feed
+                        + "&start=" + startDate + START_OF_DAY_UTC + "&end=" + end;
         if (!pageToken.empty())
             url += "&page_token=" + pageToken;
 
@@ -88,8 +100,7 @@ AlpacaDailyBars::download(const std::string& symbol, const std::string& startDat
 
         std::vector<quant::DailyBar> page = parseBars(result.body, today);
         bars.insert(bars.end(), page.begin(), page.end());
-        pageToken = result.body.value("next_page_token", json()).is_string()
-                  ? result.body["next_page_token"].get<std::string>() : "";
+        pageToken = AlpacaApi::nextPageToken(result.body);
     } while (!pageToken.empty());
 
     return !bars.empty();
