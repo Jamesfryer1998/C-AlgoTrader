@@ -4,6 +4,7 @@
 #include "RSI.hpp"
 #include "MACD.hpp"
 #include "MEANREV.hpp"
+#include "SCALP.hpp"
 
 // Parse Strategies into StratFactory
 // StartBase will be the base for each strat
@@ -65,6 +66,8 @@ StrategyFactory::generateStrategies()
             strategy = std::make_unique<MACD>(attributes);
         else if (name == "MEANREV")
             strategy = std::make_unique<MEANREV>(attributes);
+        else if (name == "SCALP")
+            strategy = std::make_unique<SCALP>(attributes);
         else
             throw std::runtime_error("Unknown strategy in config: " + name);
 

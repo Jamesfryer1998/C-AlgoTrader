@@ -38,7 +38,7 @@ Optimiser::isValid(const json& s)
         return s.value("short_period", 0) < s.value("long_period", 0);
     if (name == "RSI")
         return s.value("oversold_threshold", 0.0) < s.value("overbought_threshold", 0.0);
-    if (name == "MEANREV")
+    if (name == "MEANREV" || name == "SCALP")
         return s.value("exit_threshold", 0.0) < s.value("entry_threshold", 0.0);
     return true;
 }

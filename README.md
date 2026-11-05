@@ -345,9 +345,25 @@ The **Order Management System (OMS)** handles:
 
 The **Strategy Engine** is the core of trade decision-making:  
 - Receives **market data** and analyzes trading conditions  
-- Runs **trading strategies** (e.g., Moving Average Crossover, RSI)  
+- Runs **trading strategies**: RSI, MACD, MEANREV (mean reversion to a moving average) and SCALP (below)  
 - Generates **trade signals** (buy/sell orders)  
 - Sends orders to the OMS for execution  
+
+**SCALP** is a VWAP fade scalper for 1-minute bars. It tracks today's volume-weighted average price (VWAP, from
+the 09:30 open) and bands `entry_threshold` standard deviations either side of it. When the price stretches
+outside a band it trades back towards the VWAP (sell above, buy below), and closes when the price is back
+within `exit_threshold` standard deviations of the VWAP, after `max_hold_bars` bars at most, or at 15:55,
+whichever comes first, so it is always flat overnight. No new trades for `warmup_minutes` after the open or
+after 15:45. Each entry has a tight `stop_loss` / `take_profit` in % (e.g. 0.3 / 1) that the broker manages;
+SCALP follows the real position, so a trade the broker's stop closed isn't "exited" again.
+
+```json
+{"name": "SCALP", "active": 1, "entry_threshold": 2.0, "exit_threshold": 0.0, "max_hold_bars": 10,
+ "warmup_minutes": 15, "stop_loss": 0.3, "take_profit": 1.0}
+```
+
+It is in the optimiser's and the minute screen's grids. Trade it on its own for a stock in the portfolio
+(not alongside another strategy on the same ticker), and expect costs to matter: it trades often for small moves.
 
 ---
 

@@ -25,7 +25,7 @@
 /*
  * Strategy screen: which stock / strategy combinations look worth trading?
  *
- * Every stock in src/config/screen.json (the S&P 100 by default) x every strategy (RSI, MACD, MEANREV).
+ * Every stock in src/config/screen.json (the S&P 100 by default) x every strategy (RSI, MACD, MEANREV, SCALP).
  * Each strategy is tuned per stock on a training period, then only that pick is run on a test period it
  * never saw, and compared with buying and holding the stock. Ends with the top picks and the Monte Carlo
  * risk of trading them together.
@@ -44,7 +44,7 @@ using BarLoader = std::function<std::vector<MarketCondition>(const std::string& 
 static void printUsage()
 {
     std::cout <<
-R"(Strategy screen: tune RSI / MACD / MEANREV per stock on a training period, judge on a later test period
+R"(Strategy screen: tune RSI / MACD / MEANREV / SCALP per stock on a training period, judge on a later test period
 
 Usage: screen_app [options]
   --daily                   daily bars since 2016 instead of 1-minute bars (settings then mean days)

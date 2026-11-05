@@ -28,6 +28,10 @@ class StrategyAttribute
 
             if (stratJson.contains("signal_type")) signal_type = stratJson["signal_type"];
 
+            // SCALP
+            if (stratJson.contains("max_hold_bars")) max_hold_bars = stratJson["max_hold_bars"].get<int>();
+            if (stratJson.contains("warmup_minutes")) warmup_minutes = stratJson["warmup_minutes"].get<int>();
+
             if (stratJson.contains("name")) name = stratJson["name"];
             if (stratJson.contains("price_type")) price_type = stratJson["price_type"];
             if (stratJson.contains("trade_size")) trade_size = stratJson["trade_size"];
@@ -51,6 +55,10 @@ class StrategyAttribute
         double exit_threshold = 0;
         double entry_threshold = 0;
         int moving_average_period = 0;
+
+        // SCALP (also uses entry_threshold / exit_threshold, in VWAP standard deviations)
+        int max_hold_bars = 15;    // close a trade after this many bars
+        int warmup_minutes = 15;   // no new trades for this long after the 09:30 open
 
         // Common
         string name;

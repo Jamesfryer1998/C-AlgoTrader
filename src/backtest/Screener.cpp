@@ -312,7 +312,8 @@ Screener::describe(const json& parameters)
         {"period", "period"}, {"oversold_threshold", "oversold"}, {"overbought_threshold", "overbought"},
         {"short_period", "short"}, {"long_period", "long"}, {"signal_period", "signal"}, {"signal_type", ""},
         {"lookback_period", "lookback"}, {"moving_average_period", "MA"}, {"entry_threshold", "entry"},
-        {"exit_threshold", "exit"}, {"stop_loss", "SL"}, {"take_profit", "TP"}};
+        {"exit_threshold", "exit"}, {"stop_loss", "SL"}, {"take_profit", "TP"},
+        {"max_hold_bars", "hold"}, {"warmup_minutes", "warmup"}};
 
     std::ostringstream out;
     bool first = true;

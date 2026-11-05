@@ -46,6 +46,12 @@ class StrategyBase
             return order; 
         };
 
+        // The position actually held in this strategy's ticker (+ long, - short), told by the engine before
+        // each run. Lets a strategy notice when the broker's stop loss / take profit closed its trade.
+        void setCurrentPosition(float quantity) { position = quantity; knowsPosition = true; }
+        float currentPosition() const { return position; }
+        bool positionKnown() const { return knowsPosition; }
+
         // Strategies read the engine's MarketData directly (no copy). It must outlive the strategy run.
         virtual void supplyData(const MarketData& marketdata)
         {
@@ -60,6 +66,9 @@ class StrategyBase
         StrategyAttribute _strategyAttribute;
 
     protected:
+        float position = 0;
+        bool knowsPosition = false;
+
         // ---- Helpers shared by every strategy ----
 
         // The last `count` closing prices, oldest first. Empty if there aren't that many bars yet.

@@ -33,7 +33,7 @@ static void printUsage()
 {
     std::cout << "optimise_app - backtest every combination of strategy settings and rank them\n\n"
               << "Options:\n"
-              << "  --strategy <RSI|MACD|MEANREV|all>  Which strategy to optimise (default: all)\n"
+              << "  --strategy <RSI|MACD|MEANREV|SCALP|all>  Which strategy to optimise (default: all)\n"
               << "  --start-date <YYYY-MM-DD>          First day of data (default: 2016-01-01)\n"
               << "  --end-date <YYYY-MM-DD>            Last day of data (default: yesterday)\n"
               << "  --test-months <n>                  Months at the end kept back for testing (default: from optimisation.json)\n"

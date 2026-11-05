@@ -59,11 +59,22 @@ StrategyEngine::executeStrategies()
         return;
     }
 
+    // What we hold in this ticker, so strategies can see trades the broker closed (stop loss / take profit)
+    float held = 0;
+    if (!marketData->getData().empty())
+    {
+        const std::string& ticker = marketData->getData().back().Ticker;
+        for (const auto& position : oms->positions)
+            if (position.getTicker() == ticker)
+                held += position.getQuantity();
+    }
+
     // 1. Ask every strategy for its view of this bar
     std::vector<Order> proposals;
     for (auto& strat : strategyList) 
     {
         strat->supplyData(*marketData);
+        strat->setCurrentPosition(held);
         strat->execute();
 
         if (Log::verbose)
