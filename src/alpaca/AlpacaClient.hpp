@@ -35,6 +35,7 @@ class AlpacaClient
 
         HttpResult get(const std::string& url);
         HttpResult post(const std::string& url, const json& body);
+        HttpResult del(const std::string& url);   // HTTP DELETE, e.g. cancel an order
 
     private:
         HttpResult toResult(const ix::HttpResponsePtr& response);

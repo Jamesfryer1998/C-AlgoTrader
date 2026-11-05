@@ -72,6 +72,7 @@ static double field(const json& j, const char* key)
 static json printAlpaca(AlpacaBroker& broker, const std::string& ticker)
 {
     AlpacaBroker::AccountSnapshot account = broker.getAccount();
+    broker.getLatestPosition(ticker);   // fresh: the OMS skips its check while an order is filling
     const json& position = broker.lastPositionDetails();
     json snapshot = json::object();
     std::cout << std::fixed << std::setprecision(2);
@@ -288,7 +289,6 @@ int main()
     {
         for (const auto& lane : lanes)
         {
-            broker.getLatestPosition(lane->ticker);   // refresh Alpaca's position for the final line
             std::cout << lane->ticker << ": ";
             printAlpaca(broker, lane->ticker);
         }

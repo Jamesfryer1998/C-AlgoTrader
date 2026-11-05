@@ -21,6 +21,10 @@ class BrokerBase
         // can't be compared with the orders we sent
         virtual bool reportsRealPositions() const { return true; }
 
+        // True while an order we sent for this ticker hasn't finished filling. Until then the broker's
+        // position doesn't include it yet, so it mustn't be "corrected" against our records.
+        virtual bool hasPendingOrder(const std::string& ticker) { return false; }
+
         // What happened to the most recent placeOrder() call. Each broker fills this in so the OMS
         // can save it alongside the trade without changing placeOrder's signature.
         struct OrderReceipt

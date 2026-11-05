@@ -80,6 +80,13 @@ void OrderManagement::onNewOrder(Order& order)
         return;
     }
 
+    // What we hold before this order, so the broker can tell an exit from an entry
+    float held = 0;
+    for (const auto& position : positions)
+        if (position.getTicker() == order.getTicker())
+            held += position.getQuantity();
+    order.setPositionBefore(held);
+
     // Live: tell the broker our id so its order can be matched to ours (unique across restarts)
     if (store)
         order.setClientOrderId("algo-" + std::to_string(ourId) + "-" + std::to_string(std::time(nullptr)));
@@ -103,13 +110,47 @@ void OrderManagement::onNewOrder(Order& order)
     saveTrade(trade);
 
     if (accepted)
-        syncPosition(order.getTicker());
+    {
+        applyToPositions(order);          // count it now; the broker confirms it once filled
+        syncPosition(order.getTicker());  // (skipped while the order is still filling)
+    }
+}
+
+// Our own book: add an accepted order to the position for its ticker
+void OrderManagement::applyToPositions(const Order& order)
+{
+    float change = order.isBuy() ? order.getQuantity() : -order.getQuantity();
+    for (auto& position : positions)
+    {
+        if (position.getTicker() != order.getTicker())
+            continue;
+        float before = position.getQuantity(), after = before + change;
+        if (before * after < 0 || before == 0)
+            position.setAvgPrice(order.getPrice());   // flipped sides: a fresh position
+        else if (std::fabs(after) > std::fabs(before))
+            position.setAvgPrice((position.getAvgPrice() * std::fabs(before) + order.getPrice() * std::fabs(change))
+                                 / std::fabs(after));   // added to it: average the cost
+        position.setQuantity(after);
+        std::erase_if(positions, [](Position& p) { return std::fabs(p.getQuantity()) < 1e-6; });
+        return;
+    }
+    Position fresh(order.getTicker(), change, order.getPrice());
+    addPosition(fresh);
 }
 
 // Ask the broker what we actually hold for this ticker and make that our one position for it.
 // Called after each order, and at start-up so positions from a previous run are not forgotten.
 void OrderManagement::syncPosition(const string& ticker)
 {
+    // An order we sent hasn't filled yet: the broker's position doesn't include it, so don't "correct"
+    // ours to match. Check again next bar.
+    if (broker->hasPendingOrder(ticker))
+    {
+        if (store)
+            store->savePositions(positions);
+        return;
+    }
+
     Position latest = broker->getLatestPosition(ticker);
     if (!broker->lastPositionReliable)
         return;   // the broker couldn't be asked; keep what we have and try again next bar

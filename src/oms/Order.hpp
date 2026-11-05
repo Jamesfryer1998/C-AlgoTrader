@@ -65,6 +65,16 @@ class Order {
         void setType(string _typeStr){type = stringToOrderType(_typeStr);}
         void setStrategy(const string& name) { strategy = name; }
         void setClientOrderId(const string& id) { clientOrderId = id; } // our id as the broker sees it
+
+        // Set by the OMS: the position held before this order (+ long, - short). An order on the other
+        // side of it reduces or closes the position, which some brokers handle differently from an entry
+        // (Alpaca won't take a bracket order for it).
+        void setPositionBefore(float quantity) { positionBefore = quantity; }
+        float getPositionBefore() const { return positionBefore; }
+        bool reducesPosition() const
+        {
+            return (positionBefore > 0 && isSell()) || (positionBefore < 0 && isBuy());
+        }
         
         // Helper methods
         bool isMarket() const { return type == OrderType::BUY || type == OrderType::SELL; }
@@ -76,6 +86,7 @@ class Order {
     private:
         int id;
         OrderType type;
+        float positionBefore = 0;
         string ticker;
         float quantity;
         float price;

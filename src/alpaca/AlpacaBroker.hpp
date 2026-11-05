@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <nlohmann/json.hpp>
 #include "AlpacaClient.hpp"
@@ -33,6 +34,9 @@ class AlpacaBroker : public BrokerBase
 
         bool isDryRun() const { return dryRun; }
 
+        // Asks Alpaca whether our last order for this ticker is still waiting to fill
+        bool hasPendingOrder(const std::string& ticker) override;
+
         // Alpaca's own figures, for display. These come from Alpaca's real fills and latest prices,
         // so they are the true numbers (our PerformanceTracker is an estimate from bar closes).
         struct AccountSnapshot
@@ -50,8 +54,20 @@ class AlpacaBroker : public BrokerBase
         const json& lastPositionDetails() const { return lastPosition; }
         bool reportsRealPositions() const override { return !dryRun; }
 
-        // The JSON body we POST to /v2/orders (public so it can be unit tested)
+        // The JSON body we POST to /v2/orders (public so it can be unit tested).
+        // An entry with a stop loss and take profit becomes a "bracket" order (Alpaca manages the exits on its
+        // servers). An order that reduces or closes a position is sent as a plain order: Alpaca only accepts
+        // brackets for entries.
         static json buildOrderJson(const Order& order);   // includes client_order_id if the order has one
+
+        // Protection for what's left after a partial exit: a stop loss and take profit on the remaining shares
+        // as one "oco" order (one cancels the other). The levels keep the same distances from the price as the
+        // exit order's own stop loss / take profit, mirrored to the side of the position that remains.
+        // Empty if nothing remains.
+        static json buildProtectionJson(const Order& exitOrder);
+
+        // Alpaca statuses that mean an order is still working (not filled, cancelled, rejected or expired)
+        static bool isWorkingStatus(const std::string& status);
 
     private:
         AlpacaClient client;
@@ -60,4 +76,10 @@ class AlpacaBroker : public BrokerBase
         std::string feed;
         bool dryRun;
         json lastPosition = json::object();
+        std::map<std::string, std::string> pendingOrderIds;   // ticker -> our latest order's Alpaca id
+
+        // Cancel every open order for a ticker (e.g. the stop loss / take profit legs of earlier brackets) and
+        // wait briefly until Alpaca confirms. Returns false if some are still open.
+        bool cancelOpenOrders(const std::string& ticker);
+        int sendExit(Order& order, json body);
 };

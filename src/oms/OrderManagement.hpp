@@ -51,6 +51,7 @@ class OrderManagement
         TradeRecord makeRecord(const Order& order, int ourId) const;
         void saveTrade(const TradeRecord& trade);
         void reconcileWithBroker(const string& ticker, const Position& brokerPosition);
+        void applyToPositions(const Order& order);
 
         TradeStore* store = nullptr;
         PerformanceTracker* tracker = nullptr;

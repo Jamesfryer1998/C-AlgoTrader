@@ -32,6 +32,88 @@ TEST(AlpacaBrokerTests, BracketOrderWhenStopLossAndTakeProfitSet)
     EXPECT_EQ(body["take_profit"]["limit_price"], "110.00");
 }
 
+TEST(AlpacaBrokerTests, BracketEntriesAreGoodTillCancelled)
+{
+    // A "day" bracket's stop loss expires at the close, leaving an overnight position unprotected
+    Order order(OrderType::BUY, "NVDA", 1, 100.0f);
+    order.setStopLoss(5);
+    order.setTakeProfit(5);
+    EXPECT_EQ(AlpacaBroker::buildOrderJson(order)["time_in_force"], "gtc");
+}
+
+TEST(AlpacaBrokerTests, ExitsArePlainOrdersNotBrackets)
+{
+    // Holding 2 short: a BUY reduces the position. Alpaca rejects brackets for that
+    // ("bracket orders must be entry orders"), so it goes as a plain market order.
+    Order exit(OrderType::BUY, "MDT", 1, 105.48f);
+    exit.setStopLoss(5);
+    exit.setTakeProfit(1);
+    exit.setPositionBefore(-2);
+    ASSERT_TRUE(exit.reducesPosition());
+
+    json body = AlpacaBroker::buildOrderJson(exit);
+    EXPECT_FALSE(body.contains("order_class"));
+    EXPECT_FALSE(body.contains("stop_loss"));
+    EXPECT_FALSE(body.contains("take_profit"));
+    EXPECT_EQ(body["type"], "market");
+    EXPECT_EQ(body["side"], "buy");
+    EXPECT_EQ(body["time_in_force"], "day");
+
+    // Adding to a position (or opening one) is still an entry: bracket
+    Order add(OrderType::SELL, "MDT", 1, 105.48f);
+    add.setStopLoss(5);
+    add.setTakeProfit(1);
+    add.setPositionBefore(-2);
+    EXPECT_FALSE(add.reducesPosition());
+    EXPECT_EQ(AlpacaBroker::buildOrderJson(add)["order_class"], "bracket");
+}
+
+TEST(AlpacaBrokerTests, RemainingSharesGetAStopAndTargetAfterAPartialExit)
+{
+    // Short 3, buy 1 back at 100 (its own levels: stop 95, target 110, as if it were a long entry).
+    // The 2 still short need a stop ABOVE (105) and a target BELOW (90): same distances, mirrored.
+    Order exit(OrderType::BUY, "MDT", 1, 100.0f);
+    exit.setStopLoss(5);
+    exit.setTakeProfit(10);
+    exit.setPositionBefore(-3);
+
+    json protect = AlpacaBroker::buildProtectionJson(exit);
+    ASSERT_FALSE(protect.is_null());
+    EXPECT_EQ(protect["order_class"], "oco");
+    EXPECT_EQ(protect["side"], "buy");          // closes the rest of the short
+    EXPECT_EQ(protect["qty"], "2");
+    EXPECT_EQ(protect["type"], "limit");
+    EXPECT_EQ(protect["time_in_force"], "gtc");
+    EXPECT_EQ(protect["stop_loss"]["stop_price"], "105.00");
+    EXPECT_EQ(protect["take_profit"]["limit_price"], "90.00");
+
+    // Long 2, sell 1 at 200 (its levels: stop 210, target 190) -> the 1 left: stop 190, target 210
+    Order sell(OrderType::SELL, "TXN", 1, 200.0f);
+    sell.setStopLoss(5);
+    sell.setTakeProfit(5);
+    sell.setPositionBefore(2);
+    json longProtect = AlpacaBroker::buildProtectionJson(sell);
+    EXPECT_EQ(longProtect["side"], "sell");
+    EXPECT_EQ(longProtect["stop_loss"]["stop_price"], "190.00");
+    EXPECT_EQ(longProtect["take_profit"]["limit_price"], "210.00");
+
+    // Closing the whole position (or an entry) leaves nothing to protect
+    exit.setPositionBefore(-1);
+    EXPECT_TRUE(AlpacaBroker::buildProtectionJson(exit).is_null());
+    Order entry(OrderType::BUY, "TXN", 1, 100.0f);
+    entry.setStopLoss(5);
+    entry.setTakeProfit(5);
+    EXPECT_TRUE(AlpacaBroker::buildProtectionJson(entry).is_null());
+}
+
+TEST(AlpacaBrokerTests, WorkingOrderStatuses)
+{
+    for (const char* s : {"new", "accepted", "pending_new", "partially_filled"})
+        EXPECT_TRUE(AlpacaBroker::isWorkingStatus(s)) << s;
+    for (const char* s : {"filled", "canceled", "rejected", "expired"})
+        EXPECT_FALSE(AlpacaBroker::isWorkingStatus(s)) << s;
+}
+
 TEST(AlpacaBrokerTests, SellBracketHasStopAboveAndTargetBelow)
 {
     Order order(OrderType::SELL, "NVDA", 1, 200.0f);

@@ -57,3 +57,9 @@ AlpacaClient::post(const std::string& url, const json& body)
 {
     return toResult(http.post(url, body.dump(), makeArgs()));
 }
+
+HttpResult
+AlpacaClient::del(const std::string& url)
+{
+    return toResult(http.Delete(url, makeArgs()));
+}
