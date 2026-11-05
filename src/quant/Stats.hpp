@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cmath>
+#include <cstdint>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -13,6 +16,40 @@ namespace quant
     using Matrix = std::vector<Vector>;   // Matrix[row][column]
 
     constexpr double TRADING_DAYS = 252.0;
+
+    // Standard normal random numbers that are the same on every platform for a given seed.
+    // (std::normal_distribution is implemented differently by libstdc++ and libc++, so a seeded
+    // simulation or test gave different numbers on Linux and macOS.) mt19937_64 is fully specified by the
+    // C++ standard; the normals come from it by the Box-Muller method.
+    class NormalRandom
+    {
+        public:
+            explicit NormalRandom(std::uint64_t seed) : engine(seed) {}
+
+            double operator()()
+            {
+                if (haveSpare)
+                {
+                    haveSpare = false;
+                    return spare;
+                }
+                double u1 = uniform(), u2 = uniform();
+                while (u1 <= 0.0)
+                    u1 = uniform();
+                double radius = std::sqrt(-2.0 * std::log(u1));
+                double angle = 2.0 * 3.14159265358979323846 * u2;
+                spare = radius * std::sin(angle);
+                haveSpare = true;
+                return radius * std::cos(angle);
+            }
+
+        private:
+            double uniform() { return static_cast<double>(engine() >> 11) * 0x1.0p-53; }   // [0, 1)
+
+            std::mt19937_64 engine;
+            double spare = 0;
+            bool haveSpare = false;
+    };
 
     double mean(const Vector& values);
     double variance(const Vector& values);   // sample variance (divides by n - 1)

@@ -32,22 +32,20 @@ namespace synthetic
     // Prices of a random walk in log space
     inline quant::Vector randomWalk(size_t days, double dailyVol, unsigned seed, double start = 100.0, double drift = 0.0)
     {
-        std::mt19937_64 random(seed);
-        std::normal_distribution<double> normal(0.0, 1.0);
+        quant::NormalRandom normal(seed);
         quant::Vector prices = {start};
         for (size_t i = 1; i < days; i++)
-            prices.push_back(prices.back() * std::exp(drift + dailyVol * normal(random)));
+            prices.push_back(prices.back() * std::exp(drift + dailyVol * normal()));
         return prices;
     }
 
     // Mean-reverting AR(1) series: s[t] = phi * s[t-1] + noise
     inline quant::Vector ar1(size_t days, double phi, double noiseVol, unsigned seed)
     {
-        std::mt19937_64 random(seed);
-        std::normal_distribution<double> normal(0.0, 1.0);
+        quant::NormalRandom normal(seed);
         quant::Vector s = {0.0};
         for (size_t i = 1; i < days; i++)
-            s.push_back(phi * s.back() + noiseVol * normal(random));
+            s.push_back(phi * s.back() + noiseVol * normal());
         return s;
     }
 }

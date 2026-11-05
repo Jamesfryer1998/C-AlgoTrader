@@ -12,15 +12,14 @@ namespace
     // Two stocks with a chosen correlation of daily returns
     PriceTable correlatedPair(double rho, size_t days = 1500, double vol = 0.015)
     {
-        std::mt19937_64 random(5);
-        std::normal_distribution<double> normal(0.0, 1.0);
+        NormalRandom normal(5);   // same path on every platform
         PriceTable table;
         table.symbols = {"AAA", "BBB"};
         table.dates = synthetic::weekdays(days);
         table.closes = {{100.0}, {50.0}};
         for (size_t t = 1; t < days; t++)
         {
-            double z1 = normal(random), z2 = normal(random);
+            double z1 = normal(), z2 = normal();
             table.closes[0].push_back(table.closes[0].back() * std::exp(vol * z1));
             table.closes[1].push_back(table.closes[1].back() * std::exp(vol * (rho * z1 + std::sqrt(1 - rho * rho) * z2)));
         }

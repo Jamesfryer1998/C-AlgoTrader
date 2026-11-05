@@ -24,15 +24,14 @@ namespace quant
         }
         Matrix l = cholesky(horizonCovariance);
 
-        std::mt19937_64 random(seed);
-        std::normal_distribution<double> normal(0.0, 1.0);
+        NormalRandom normal(seed);   // same numbers on every platform
 
         Vector results(simulations);
         Vector z(k);
         for (int s = 0; s < simulations; s++)
         {
             for (size_t i = 0; i < k; i++)
-                z[i] = normal(random);
+                z[i] = normal();
 
             double portfolioReturn = 0;
             for (size_t i = 0; i < k; i++)
