@@ -1,55 +1,29 @@
 #include "LiveOptions.hpp"
 
 #include <algorithm>
-#include <stdexcept>
-
-namespace
-{
-    // The value after an option, as a number; a readable error if it isn't one
-    double numberAfter(const std::string& option, const std::string& value)
-    {
-        try
-        {
-            size_t used = 0;
-            double number = std::stod(value, &used);
-            if (used == value.size())
-                return number;
-        }
-        catch (const std::exception&)
-        {
-        }
-        throw std::invalid_argument("Bad value for " + option + ": " + value);
-    }
-}
+#include "../util/CommandLine.hpp"
 
 LiveOptions
 LiveOptions::parse(int argc, char* argv[])
 {
     LiveOptions options;
-    for (int i = 1; i < argc; i++)
+    CommandLine args(argc, argv);
+    while (args.next())
     {
-        std::string option = argv[i];
-        bool valueFollows = i + 1 < argc && argv[i + 1][0] != '-';
-        auto nextValue = [&]() -> std::string {
-            if (!valueFollows)
-                throw std::invalid_argument("Missing value for " + option);
-            return argv[++i];
-        };
-
-        if (option == "--help")
+        if (args.is("--help"))
             options.showHelp = true;
-        else if (option == "--replay")
+        else if (args.is("--replay"))
         {
             options.replay = true;
-            if (valueFollows)
-                options.replayDay = argv[++i];
+            if (args.hasValue())
+                options.replayDay = args.text();
         }
-        else if (option == "--days")
-            options.replayDays = std::max(1, static_cast<int>(numberAfter(option, nextValue())));
-        else if (option == "--speed")
-            options.replaySpeed = std::max(0.0, numberAfter(option, nextValue()));
+        else if (args.is("--days"))
+            options.replayDays = std::max(1, args.whole());
+        else if (args.is("--speed"))
+            options.replaySpeed = std::max(0.0, args.number());
         else
-            throw std::invalid_argument("Unknown option: " + option);
+            args.rejectOption();
     }
     return options;
 }

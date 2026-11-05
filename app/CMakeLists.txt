@@ -28,8 +28,7 @@ target_link_libraries(optimise_app
     nlohmann_json)
 
 target_link_libraries(quant_app
-    alpaca_lib
-    quant_lib
+    research_lib
     util_lib
     nlohmann_json)
 
