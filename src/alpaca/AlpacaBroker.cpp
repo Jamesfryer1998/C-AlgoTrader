@@ -337,7 +337,7 @@ static double numberField(const json& body, const char* key)
     catch (const std::exception&) { return 0.0; }
 }
 
-AlpacaBroker::AccountSnapshot
+AccountSnapshot
 AlpacaBroker::getAccount()
 {
     AccountSnapshot snapshot;
@@ -348,7 +348,7 @@ AlpacaBroker::getAccount()
     if (!result.ok())
         return snapshot;
 
-    snapshot.ok = true;
+    snapshot.available = true;
     snapshot.equity = numberField(result.body, "equity");
     snapshot.lastEquity = numberField(result.body, "last_equity");
     snapshot.cash = numberField(result.body, "cash");

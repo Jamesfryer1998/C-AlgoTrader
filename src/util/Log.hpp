@@ -17,9 +17,15 @@ namespace Log
 {
     inline bool verbose = true;
 
+    // A stream that ignores everything
+    inline std::ostream& silent()
+    {
+        thread_local std::ostream nowhere(nullptr);
+        return nowhere;
+    }
+
     inline std::ostream& out()
     {
-        thread_local std::ostream silent(nullptr);
-        return verbose ? std::cout : silent;
+        return verbose ? std::cout : silent();
     }
 }

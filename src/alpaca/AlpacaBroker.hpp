@@ -4,6 +4,7 @@
 #include <string>
 #include <nlohmann/json.hpp>
 #include "AlpacaClient.hpp"
+#include "../broker/AccountSnapshot.hpp"
 #include "../broker/BrokerBase.hpp"
 
 using json = nlohmann::json;
@@ -37,15 +38,8 @@ class AlpacaBroker : public BrokerBase
         // Asks Alpaca whether our last order for this ticker is still waiting to fill
         bool hasPendingOrder(const std::string& ticker) override;
 
-        // Alpaca's own figures, for display. These come from Alpaca's real fills and latest prices,
-        // so they are the true numbers (our PerformanceTracker is an estimate from bar closes).
-        struct AccountSnapshot
-        {
-            bool ok = false;
-            double equity = 0;          // cash + market value of everything held
-            double lastEquity = 0;      // equity at the previous close
-            double cash = 0;
-        };
+        // Alpaca's own figures, for display: real fills and latest prices (our PerformanceTracker is an
+        // estimate from bar closes)
         AccountSnapshot getAccount();
 
         // Alpaca's position details from the last getLatestPosition() call

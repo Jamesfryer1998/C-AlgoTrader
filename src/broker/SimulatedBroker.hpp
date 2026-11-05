@@ -2,6 +2,7 @@
 
 #include "BrokerBase.hpp"
 #include "../data_access/MarketData.hpp"
+#include "../util/Log.hpp"
 #include <map>
 #include <memory>
 #include <string>
@@ -105,6 +106,10 @@ class SimulatedBroker : public BrokerBase {
         void exitPosition(const std::string& ticker, double quantity, const char* reason, double level);
         SlippageMode slippageMode = SlippageMode::Random;
         bool useLatestBar = false;
+
+        // Step-by-step notes (set-up, each step, position changes): only with enableDetailedLogging.
+        // Fills, and stop loss / take profit hits, always go to Log::out().
+        std::ostream& bookkeeping() const { return detailedLogging ? Log::out() : Log::silent(); }
         bool severalStocks = false;
         std::map<std::string, float> latestPrices;   // each stock's last close (several stocks in one simulation)
 
