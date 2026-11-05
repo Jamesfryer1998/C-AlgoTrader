@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdio>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -26,6 +27,19 @@ class StrategyBase
         // One line showing where the strategy stands against the levels that would make it trade,
         // e.g. "MEANREV  L: 205.10 | C: 206.52 | U: 209.80 ...". Empty until it has enough bars.
         virtual std::string status() const { return ""; }
+
+        // The same as columns for the live app's per-minute table. lower / upper are the levels that would make
+        // the strategy trade (or close its trade); current is the value compared with them. Empty until ready.
+        struct Levels
+        {
+            std::string label;     // e.g. "MEANREV(60/60)"
+            std::string lower;
+            std::string current;
+            std::string upper;
+            std::string state;     // e.g. "flat, z +0.56" or "long 3/30 bars"
+            bool ready = false;
+        };
+        virtual Levels levels() const { return Levels(); }
 
         // How many 1-minute bars the strategy needs before it can make a decision
         virtual int barsNeeded() const = 0;
@@ -64,6 +78,14 @@ class StrategyBase
         const MarketData* marketData = nullptr;
         bool NewOrder = false;
         StrategyAttribute _strategyAttribute;
+
+        // A number with fixed decimals, for status lines and table cells
+        static std::string number(double value, int decimals = 2, bool sign = false)
+        {
+            char text[64];
+            std::snprintf(text, sizeof(text), sign ? "%+.*f" : "%.*f", decimals, value);
+            return text;
+        }
 
     protected:
         float position = 0;

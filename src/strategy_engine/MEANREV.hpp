@@ -92,6 +92,36 @@ class MEANREV : public StrategyBase {
 
         int getState() const { return state; }
 
+        Levels levels() const override
+        {
+            Levels l;
+            l.label = "MEANREV(" + std::to_string(_strategyAttribute.moving_average_period) + "/" +
+                      std::to_string(_strategyAttribute.lookback_period) + ")";
+            if (!ready)
+                return l;
+            l.ready = true;
+            l.current = number(lastClose);
+            double entry = _strategyAttribute.entry_threshold, exit = _strategyAttribute.exit_threshold;
+            std::string z = "z " + number(lastZ, 2, true);
+            if (state == 0)
+            {
+                l.lower = number(lastMean - entry * lastSd);
+                l.upper = number(lastMean + entry * lastSd);
+                l.state = "flat, " + z;
+            }
+            else if (state > 0)
+            {
+                l.upper = "exit " + number(lastMean - exit * lastSd);   // long: sells once the price is back up here
+                l.state = "long, " + z;
+            }
+            else
+            {
+                l.lower = "exit " + number(lastMean + exit * lastSd);   // short: buys back once down here
+                l.state = "short, " + z;
+            }
+            return l;
+        }
+
         // Price levels that would trigger the next trade:
         //   flat:  "MEANREV(20/120)   L: 205.10 | C: 206.52 | U: 209.80   (z -0.42, BUY below L, SELL above U)"
         //   long:  "MEANREV(20/120)   long, C: 204.00 | exit at >= 207.45   (z -1.80)"

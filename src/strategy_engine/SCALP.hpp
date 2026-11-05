@@ -155,6 +155,39 @@ class SCALP : public StrategyBase {
             return out.str();
         }
 
+        Levels levels() const override
+        {
+            Levels l;
+            l.label = "SCALP";
+            if (weight <= 0)
+                return l;
+            l.ready = true;
+            double vwap = this->vwap(), sigma = this->sigma();
+            l.current = number(lastClose);
+            std::string atVwap = "VWAP " + number(vwap);
+            if (state > 0)
+            {
+                l.upper = "exit " + number(vwap - _strategyAttribute.exit_threshold * sigma);
+                l.state = "long " + std::to_string(barsHeld) + "/" + std::to_string(_strategyAttribute.max_hold_bars) + " bars, " + atVwap;
+            }
+            else if (state < 0)
+            {
+                l.lower = "exit " + number(vwap + _strategyAttribute.exit_threshold * sigma);
+                l.state = "short " + std::to_string(barsHeld) + "/" + std::to_string(_strategyAttribute.max_hold_bars) + " bars, " + atVwap;
+            }
+            else
+            {
+                double band = _strategyAttribute.entry_threshold * sigma;
+                l.lower = number(vwap - band);
+                l.upper = number(vwap + band);
+                int minute = minuteOfDay(lastTime), first = OPEN_MINUTE + _strategyAttribute.warmup_minutes;
+                l.state = "flat, " + atVwap;
+                if (minute < first || minute >= LAST_ENTRY_MINUTE)
+                    l.state += " (entries " + clock(first) + "-" + clock(LAST_ENTRY_MINUTE) + ")";
+            }
+            return l;
+        }
+
         void validate() override
         {
             if (_strategyAttribute.entry_threshold <= 0)

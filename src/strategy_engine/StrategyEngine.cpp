@@ -77,7 +77,7 @@ StrategyEngine::executeStrategies()
         strat->setCurrentPosition(held);
         strat->execute();
 
-        if (Log::verbose)
+        if (Log::verbose && printStatus)
         {
             std::string line = strat->status();
             if (line.empty())
@@ -150,4 +150,21 @@ StrategyEngine::barsNeeded() const
     for (const auto& strat : strategyList)
         most = std::max(most, strat->barsNeeded());
     return most;
+}
+
+std::vector<StrategyBase::Levels>
+StrategyEngine::levels() const
+{
+    std::vector<StrategyBase::Levels> out;
+    for (const auto& strat : strategyList)
+    {
+        StrategyBase::Levels l = strat->levels();
+        if (l.label.empty())
+            l.label = strat->_strategyAttribute.name;
+        if (!l.ready && marketData)
+            l.state = "warming up: " + std::to_string(marketData->getData().size()) + "/" +
+                      std::to_string(strat->barsNeeded()) + " bars";
+        out.push_back(l);
+    }
+    return out;
 }

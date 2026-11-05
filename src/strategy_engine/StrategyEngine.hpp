@@ -24,6 +24,12 @@ class StrategyEngine
         // The most bars any active strategy needs before it can decide (size the warm-up with this)
         int barsNeeded() const;
 
+        // Each strategy's levels after the last run (for the live app's per-minute table)
+        std::vector<StrategyBase::Levels> levels() const;
+
+        // Print each strategy's status line after it runs (default on; the live app shows a table instead)
+        void setPrintStatus(bool value) { printStatus = value; }
+
         // Get the order management system
         OrderManagement* getOms() { return oms; }
 
@@ -48,5 +54,6 @@ class StrategyEngine
         MarketData* marketData; // Use a pointer to the MarketData object
         std::unique_ptr<OrderManagement> ownOms = std::make_unique<OrderManagement>(); // one per engine, so backtests don't share orders/positions
         OrderManagement* oms = ownOms.get();   // ownOms, or one shared with other engines
+        bool printStatus = true;
         std::vector<std::unique_ptr<StrategyBase>> strategyList;
 };  

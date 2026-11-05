@@ -103,6 +103,24 @@ class MACD : public StrategyBase {
             return out.str();
         }
 
+        // MACD against the line it must cross (the signal line, or 0 for zero_cross): the line sits in the
+        // column it would be crossed from, Upper while MACD is below it (BUY on crossing up), Lower while above
+        Levels levels() const override
+        {
+            Levels l;
+            l.label = "MACD(" + std::to_string(_strategyAttribute.short_period) + "/" +
+                      std::to_string(_strategyAttribute.long_period) + "/" + std::to_string(_strategyAttribute.signal_period) + ")";
+            if (!ready)
+                return l;
+            bool zeroCross = _strategyAttribute.signal_type == "zero_cross";
+            double line = zeroCross ? 0.0 : last.signal;
+            l.ready = true;
+            l.current = number(last.macd, 4);
+            (last.macd >= line ? l.lower : l.upper) = number(line, 4);
+            l.state = std::string(last.macd >= line ? "above " : "below ") + (zeroCross ? "0" : "signal line");
+            return l;
+        }
+
         void validate() override
         {
             if(_strategyAttribute.short_period <= 0)

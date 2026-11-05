@@ -94,18 +94,27 @@ class RSI : public StrategyBase {
             return out.str();
         }
 
+        Levels levels() const override
+        {
+            Levels l;
+            l.label = "RSI(" + std::to_string(_strategyAttribute.period) + ")";
+            if (!ready)
+                return l;
+            l.ready = true;
+            l.lower = number(_strategyAttribute.oversold_threshold);
+            l.current = number(rsi);
+            l.upper = number(_strategyAttribute.overbought_threshold);
+            l.state = rsi < _strategyAttribute.oversold_threshold ? "in BUY zone"
+                    : rsi > _strategyAttribute.overbought_threshold ? "in SELL zone" : "";
+            return l;
+        }
+
     private:
         void logDecision()
         {
-            const MarketCondition& bar = currentBar();
-            Log::out() << "\n==== RSI SIGNAL ====" << std::endl
-                       << "Date: " << bar.DateTime << std::endl
-                       << "Ticker: " << bar.Ticker << std::endl
-                       << "Price:  $" << std::fixed << std::setprecision(2) << bar.Close << std::endl
-                       << "Quantity:  " << std::fixed << std::setprecision(2) << order.getQuantity() << std::endl
-                       << "RSI:    " << std::fixed << std::setprecision(2) << rsi << std::endl
-                       << "Action: " << order.getTypeAsString() << std::endl
-                       << "===================\n" << std::endl;
+            Log::out() << "RSI " << order.getTypeAsString() << " | RSI " << std::fixed << std::setprecision(2) << rsi
+                       << " (oversold " << _strategyAttribute.oversold_threshold << ", overbought "
+                       << _strategyAttribute.overbought_threshold << ")" << std::endl;
         }
 
         float rsi = 50.0f;
