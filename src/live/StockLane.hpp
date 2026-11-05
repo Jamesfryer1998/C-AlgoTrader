@@ -37,7 +37,7 @@ class StockLane
         double decide(const MarketCondition& bar);
 
         // Each strategy's trigger levels after the last decision, for the table
-        std::vector<StrategyBase::Levels> strategyLevels() const { return engine.levels(); }
+        std::vector<StrategyBase::DecisionLevels> decisionLevels() const { return engine.decisionLevels(); }
 
     private:
         std::string ticker;

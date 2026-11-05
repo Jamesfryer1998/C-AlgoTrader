@@ -80,7 +80,7 @@ MinuteReport::print(std::ostream& out)
         const StockRow& row = found->second;
         for (size_t i = 0; i < row.strategies.size(); i++)
         {
-            const StrategyBase::Levels& levels = row.strategies[i];
+            const StrategyBase::DecisionLevels& levels = row.strategies[i];
             bool firstLine = i == 0;   // stock-wide columns only on a stock's first line
             table.addRow({firstLine ? ticker : "", levels.label, firstLine ? Format::number(row.price) : "",
                           orDash(levels.lower), orDash(levels.current), orDash(levels.upper), levels.state,

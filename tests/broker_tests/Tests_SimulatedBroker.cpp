@@ -736,7 +736,7 @@ TEST(SimulatedBrokerSeveralStocksTests, EachStockUsesItsOwnPrice)
     MarketData feed;
     SimulatedBroker broker(feed);
     broker.followLatestBar(true);
-    broker.tradeSeveralStocks(true);
+    broker.allowSeveralStocks(true);
     broker.setSlippage(0);
     broker.setCommission(0);
 

@@ -8,7 +8,7 @@ StockLane::StockLane(const PortfolioEntry& entry, OrderManagement& sharedOms, Br
       config(entry.config),
       factory(std::make_unique<StrategyFactory>(config))
 {
-    engine.useSharedOms(&sharedOms);
+    engine.shareOrderManagement(&sharedOms);
     engine.setUp(config, *factory, marketData, &broker);
     engine.setPrintStatus(false);   // the live app shows each strategy's levels in its table instead
     barsToKeep = static_cast<size_t>(std::max(engine.barsNeeded(), 1));

@@ -16,7 +16,7 @@ TopPicksReport::TopPicksReport(const std::vector<Screener::Row>& rows, const Scr
     : screener(screener), count(count), portfolioValue(portfolioValue), picks(Screener::topPicks(rows, count))
 {
     if (picks.size() >= 2)
-        pickValues = screener.pickValues(picks, bars);
+        pickValues = screener.dailyValues(picks, bars);
 }
 
 void

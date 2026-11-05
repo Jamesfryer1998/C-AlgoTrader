@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StrategyBase.hpp"
+#include "../util/Format.hpp"
 #include "../util/Log.hpp"
 #include "../util/MarketTime.hpp"
 #include <cmath>
@@ -136,37 +137,37 @@ class SCALP : public StrategyBase {
             return out.str();
         }
 
-        Levels levels() const override
+        DecisionLevels decisionLevels() const override
         {
-            Levels l;
-            l.label = "SCALP";
+            DecisionLevels levels;
+            levels.label = "SCALP";
             if (weight <= 0)
-                return l;
-            l.ready = true;
+                return levels;
+            levels.ready = true;
             double vwap = this->vwap(), sigma = this->sigma();
-            l.current = number(lastClose);
-            std::string atVwap = "VWAP " + number(vwap);
+            levels.current = Format::number(lastClose);
+            std::string atVwap = "VWAP " + Format::number(vwap);
             if (state > 0)
             {
-                l.upper = "exit " + number(vwap - _strategyAttribute.exit_threshold * sigma);
-                l.state = "long " + std::to_string(barsHeld) + "/" + std::to_string(_strategyAttribute.max_hold_bars) + " bars, " + atVwap;
+                levels.upper = "exit " + Format::number(vwap - _strategyAttribute.exit_threshold * sigma);
+                levels.state = "long " + std::to_string(barsHeld) + "/" + std::to_string(_strategyAttribute.max_hold_bars) + " bars, " + atVwap;
             }
             else if (state < 0)
             {
-                l.lower = "exit " + number(vwap + _strategyAttribute.exit_threshold * sigma);
-                l.state = "short " + std::to_string(barsHeld) + "/" + std::to_string(_strategyAttribute.max_hold_bars) + " bars, " + atVwap;
+                levels.lower = "exit " + Format::number(vwap + _strategyAttribute.exit_threshold * sigma);
+                levels.state = "short " + std::to_string(barsHeld) + "/" + std::to_string(_strategyAttribute.max_hold_bars) + " bars, " + atVwap;
             }
             else
             {
                 double band = _strategyAttribute.entry_threshold * sigma;
-                l.lower = number(vwap - band);
-                l.upper = number(vwap + band);
+                levels.lower = Format::number(vwap - band);
+                levels.upper = Format::number(vwap + band);
                 int minute = MarketTime::minuteOfDay(lastTime), first = MarketTime::OPEN_MINUTE + _strategyAttribute.warmup_minutes;
-                l.state = "flat, " + atVwap;
+                levels.state = "flat, " + atVwap;
                 if (minute < first || minute >= LAST_ENTRY_MINUTE)
-                    l.state += " (entries " + MarketTime::clock(first) + "-" + MarketTime::clock(LAST_ENTRY_MINUTE) + ")";
+                    levels.state += " (entries " + MarketTime::clock(first) + "-" + MarketTime::clock(LAST_ENTRY_MINUTE) + ")";
             }
-            return l;
+            return levels;
         }
 
         void validate() override

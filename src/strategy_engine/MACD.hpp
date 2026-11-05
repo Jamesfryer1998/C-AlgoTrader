@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StrategyBase.hpp"
+#include "../util/Format.hpp"
 #include "../util/Log.hpp"
 #include <iomanip>
 #include <sstream>
@@ -105,20 +106,20 @@ class MACD : public StrategyBase {
 
         // MACD against the line it must cross (the signal line, or 0 for zero_cross): the line sits in the
         // column it would be crossed from, Upper while MACD is below it (BUY on crossing up), Lower while above
-        Levels levels() const override
+        DecisionLevels decisionLevels() const override
         {
-            Levels l;
-            l.label = "MACD(" + std::to_string(_strategyAttribute.short_period) + "/" +
+            DecisionLevels levels;
+            levels.label = "MACD(" + std::to_string(_strategyAttribute.short_period) + "/" +
                       std::to_string(_strategyAttribute.long_period) + "/" + std::to_string(_strategyAttribute.signal_period) + ")";
             if (!ready)
-                return l;
+                return levels;
             bool zeroCross = _strategyAttribute.signal_type == "zero_cross";
             double line = zeroCross ? 0.0 : last.signal;
-            l.ready = true;
-            l.current = number(last.macd, 4);
-            (last.macd >= line ? l.lower : l.upper) = number(line, 4);
-            l.state = std::string(last.macd >= line ? "above " : "below ") + (zeroCross ? "0" : "signal line");
-            return l;
+            levels.ready = true;
+            levels.current = Format::number(last.macd, 4);
+            (last.macd >= line ? levels.lower : levels.upper) = Format::number(line, 4);
+            levels.state = std::string(last.macd >= line ? "above " : "below ") + (zeroCross ? "0" : "signal line");
+            return levels;
         }
 
         void validate() override

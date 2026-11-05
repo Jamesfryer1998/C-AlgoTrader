@@ -19,7 +19,7 @@ LiveOptions::parse(int argc, char* argv[])
                 options.replayDay = args.text();
         }
         else if (args.is("--days"))
-            options.replayDays = std::max(1, args.whole());
+            options.replayDays = std::max(1, args.integer());
         else if (args.is("--speed"))
             options.replaySpeed = std::max(0.0, args.number());
         else

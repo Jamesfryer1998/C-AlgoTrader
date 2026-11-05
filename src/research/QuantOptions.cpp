@@ -64,16 +64,16 @@ QuantOptions::parse(int argc, char* argv[])
         else if (args.is("--weights"))
             options.risk.weights = args.numbers();
         else if (args.is("--horizon"))
-            options.risk.horizonDays = args.whole();
+            options.risk.horizonDays = args.integer();
         else if (args.is("--sims"))
-            options.risk.simulations = args.whole();
+            options.risk.simulations = args.integer();
         else if (args.is("--value"))
             options.risk.portfolioValue = args.number();
         else if (args.is("--seed"))
-            options.risk.seed = static_cast<unsigned>(args.whole());
+            options.risk.seed = static_cast<unsigned>(args.integer());
         // pairs
         else if (args.is("--lookback"))
-            options.pairs.lookbackDays = args.whole();
+            options.pairs.lookbackDays = args.integer();
         else if (args.is("--entry"))
             options.pairs.entryZ = args.number();
         else if (args.is("--exit"))
@@ -82,14 +82,14 @@ QuantOptions::parse(int argc, char* argv[])
             options.pairs.stopZ = args.number();
         // macross
         else if (args.is("--fast"))
-            options.crossover.fastDays = args.whole();
+            options.crossover.fastDays = args.integer();
         else if (args.is("--slow"))
-            options.crossover.slowDays = args.whole();
+            options.crossover.slowDays = args.integer();
         // pairs and macross
         else if (args.is("--cost-bps"))
             options.pairs.costBps = options.crossover.costBps = args.number();
         else if (args.is("--delay"))
-            options.pairs.signalDelayDays = options.crossover.signalDelayDays = args.whole();
+            options.pairs.signalDelayDays = options.crossover.signalDelayDays = args.integer();
         else
             args.rejectOption();
     }

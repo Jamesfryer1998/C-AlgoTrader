@@ -30,7 +30,7 @@ class StrategyBase
 
         // The same as columns for the live app's per-minute table. lower / upper are the levels that would make
         // the strategy trade (or close its trade); current is the value compared with them. Empty until ready.
-        struct Levels
+        struct DecisionLevels
         {
             std::string label;     // e.g. "MEANREV(60/60)"
             std::string lower;
@@ -39,7 +39,7 @@ class StrategyBase
             std::string state;     // e.g. "flat, z +0.56" or "long 3/30 bars"
             bool ready = false;
         };
-        virtual Levels levels() const { return Levels(); }
+        virtual DecisionLevels decisionLevels() const { return DecisionLevels(); }
 
         // How many 1-minute bars the strategy needs before it can make a decision
         virtual int barsNeeded() const = 0;
@@ -78,14 +78,6 @@ class StrategyBase
         const MarketData* marketData = nullptr;
         bool NewOrder = false;
         StrategyAttribute _strategyAttribute;
-
-        // A number with fixed decimals, for status lines and table cells
-        static std::string number(double value, int decimals = 2, bool sign = false)
-        {
-            char text[64];
-            std::snprintf(text, sizeof(text), sign ? "%+.*f" : "%.*f", decimals, value);
-            return text;
-        }
 
     protected:
         float position = 0;

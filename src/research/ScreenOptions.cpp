@@ -20,16 +20,16 @@ ScreenOptions::parse(int argc, char* argv[])
         else if (args.is("--daily"))            options.daily = true;
         else if (args.is("--symbols"))          options.symbols = args.list();
         else if (args.is("--strategies"))       options.strategies = args.list();
-        else if (args.is("--months"))           options.months = std::max(MIN_HISTORY_MONTHS, args.whole());
-        else if (args.is("--test-months"))      options.testMonths = std::max(1, args.whole());
+        else if (args.is("--months"))           options.months = std::max(MIN_HISTORY_MONTHS, args.integer());
+        else if (args.is("--test-months"))      options.testMonths = std::max(1, args.integer());
         else if (args.is("--test-start"))       options.testStart = args.text();
-        else if (args.is("--max-combinations")) options.maxCombinations = args.whole();
-        else if (args.is("--threads"))          options.threads = std::max(1, args.whole());
+        else if (args.is("--max-combinations")) options.maxCombinations = args.integer();
+        else if (args.is("--threads"))          options.threads = std::max(1, args.integer());
         else if (args.is("--download-only"))    options.downloadOnly = true;
         else if (args.is("--offline"))          options.offline = true;
         else if (args.is("--resume"))           options.resume = true;
         else if (args.is("--report"))           options.reportOnly = true;
-        else if (args.is("--top"))              options.topPicks = static_cast<size_t>(std::max(1, args.whole()));
+        else if (args.is("--top"))              options.topPicks = static_cast<size_t>(std::max(1, args.integer()));
         else if (args.is("--value"))            options.portfolioValue = args.number();
         else                                    args.rejectOption();
     }

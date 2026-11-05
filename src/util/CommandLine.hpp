@@ -12,7 +12,7 @@
  *   while (args.next())
  *   {
  *       if (args.is("--daily"))        daily = true;
- *       else if (args.is("--top"))     top = args.whole();
+ *       else if (args.is("--top"))     top = args.integer();
  *       else if (args.is("--symbols")) symbols = args.list();
  *       else                           args.rejectOption();
  *   }
@@ -36,7 +36,7 @@ class CommandLine
         // The value after the current option
         std::string text();
         double number();
-        int whole();
+        int integer();
         std::vector<std::string> list();   // "AAPL,MSFT,NVDA" -> {"AAPL", "MSFT", "NVDA"}
         std::vector<double> numbers();     // "0.5,0.3,0.2"
 

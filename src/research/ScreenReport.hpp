@@ -29,7 +29,7 @@ class ScreenReport
     private:
         void printByStrategy(std::ostream& out) const;
         void printBestOnTraining(std::ostream& out) const;
-        void printHeldUp(std::ostream& out) const;
+        void printGoodInBothPeriods(std::ostream& out) const;
 
         const std::vector<Screener::Row>& rows;
         const std::vector<std::string>& strategies;

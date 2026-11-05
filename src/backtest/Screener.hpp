@@ -91,7 +91,7 @@ class Screener
         static std::vector<StrategySummary> summarise(const std::vector<Row>& rows, const std::vector<std::string>& strategies);
 
         // The n combinations with the best training Sharpe (what you'd pick knowing only the past)
-        static std::vector<Row> topByTraining(const std::vector<Row>& rows, size_t n);
+        static std::vector<Row> bestOnTraining(const std::vector<Row>& rows, size_t n);
 
         // A combination "held up" if its Sharpe was at least this in training and test, it beat buy and hold
         // on the test years and made enough test trades to mean something
@@ -99,7 +99,7 @@ class Screener
         static constexpr int HELD_UP_TEST_TRADES = 3;
         static constexpr int PICK_TEST_TRADES = 5;   // picks to trade need a few more
 
-        static std::vector<Row> heldUp(const std::vector<Row>& rows, int minTestTrades = HELD_UP_TEST_TRADES);
+        static std::vector<Row> goodInBothPeriods(const std::vector<Row>& rows, int minTestTrades = HELD_UP_TEST_TRADES);
 
         // The n to take forward: held up with at least minTestTrades test trades, ranked by the weaker of the
         // two Sharpe ratios so both periods must be good, and at most one strategy per stock. May return fewer than n.
@@ -109,9 +109,9 @@ class Screener
         // setting, as if max_position_size shares at the first price were the capital: value = that capital + P&L
         // so far. These act like daily prices, so MonteCarloRisk can measure the risk of trading the picks together.
         // Names are "STOCK STRATEGY". bars: each stock's bars (any size) by symbol.
-        quant::PriceTable pickValues(const std::vector<Row>& picks,
+        quant::PriceTable dailyValues(const std::vector<Row>& picks,
                                      const std::map<std::string, std::vector<MarketCondition>>& bars) const;
-        quant::PriceTable pickValues(const std::vector<Row>& picks,
+        quant::PriceTable dailyValues(const std::vector<Row>& picks,
                                      const std::map<std::string, std::vector<quant::DailyBar>>& daily) const;
 
         // The full strategy settings of a pick (its searched parameters on top of the rest), ready for config.json

@@ -152,13 +152,13 @@ StrategyEngine::barsNeeded() const
     return most;
 }
 
-std::vector<StrategyBase::Levels>
-StrategyEngine::levels() const
+std::vector<StrategyBase::DecisionLevels>
+StrategyEngine::decisionLevels() const
 {
-    std::vector<StrategyBase::Levels> out;
+    std::vector<StrategyBase::DecisionLevels> out;
     for (const auto& strat : strategyList)
     {
-        StrategyBase::Levels l = strat->levels();
+        StrategyBase::DecisionLevels l = strat->decisionLevels();
         if (l.label.empty())
             l.label = strat->_strategyAttribute.name;
         if (!l.ready && marketData)

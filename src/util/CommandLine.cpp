@@ -64,7 +64,7 @@ CommandLine::toNumber(const std::string& value) const
 }
 
 int
-CommandLine::whole()
+CommandLine::integer()
 {
     std::string value = text();
     try

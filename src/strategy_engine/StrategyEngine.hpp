@@ -25,7 +25,7 @@ class StrategyEngine
         int barsNeeded() const;
 
         // Each strategy's levels after the last run (for the live app's per-minute table)
-        std::vector<StrategyBase::Levels> levels() const;
+        std::vector<StrategyBase::DecisionLevels> decisionLevels() const;
 
         // Print each strategy's status line after it runs (default on; the live app shows a table instead)
         void setPrintStatus(bool value) { printStatus = value; }
@@ -36,7 +36,7 @@ class StrategyEngine
         // Use an OMS shared with other engines instead of this engine's own (live trading of several
         // stocks: one engine per stock, one OMS for all, so orders, positions and saved trades are in one place).
         // Call before setUp. The engine points the shared OMS at its own market data each time it runs.
-        void useSharedOms(OrderManagement* shared) { oms = shared ? shared : ownOms.get(); }
+        void shareOrderManagement(OrderManagement* shared) { oms = shared ? shared : ownOms.get(); }
 
         // Given the orders every strategy proposed this bar, decide which (if any) to send.
         // All proposals must agree on ticker and direction (all buys or all sells); if they disagree,

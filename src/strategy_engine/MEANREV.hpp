@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StrategyBase.hpp"
+#include "../util/Format.hpp"
 #include "../util/Log.hpp"
 #include <cmath>
 #include <iomanip>
@@ -92,34 +93,34 @@ class MEANREV : public StrategyBase {
 
         int getState() const { return state; }
 
-        Levels levels() const override
+        DecisionLevels decisionLevels() const override
         {
-            Levels l;
-            l.label = "MEANREV(" + std::to_string(_strategyAttribute.moving_average_period) + "/" +
+            DecisionLevels levels;
+            levels.label = "MEANREV(" + std::to_string(_strategyAttribute.moving_average_period) + "/" +
                       std::to_string(_strategyAttribute.lookback_period) + ")";
             if (!ready)
-                return l;
-            l.ready = true;
-            l.current = number(lastClose);
+                return levels;
+            levels.ready = true;
+            levels.current = Format::number(lastClose);
             double entry = _strategyAttribute.entry_threshold, exit = _strategyAttribute.exit_threshold;
-            std::string z = "z " + number(lastZ, 2, true);
+            std::string z = "z " + Format::signedNumber(lastZ);
             if (state == 0)
             {
-                l.lower = number(lastMean - entry * lastSd);
-                l.upper = number(lastMean + entry * lastSd);
-                l.state = "flat, " + z;
+                levels.lower = Format::number(lastMean - entry * lastSd);
+                levels.upper = Format::number(lastMean + entry * lastSd);
+                levels.state = "flat, " + z;
             }
             else if (state > 0)
             {
-                l.upper = "exit " + number(lastMean - exit * lastSd);   // long: sells once the price is back up here
-                l.state = "long, " + z;
+                levels.upper = "exit " + Format::number(lastMean - exit * lastSd);   // long: sells once the price is back up here
+                levels.state = "long, " + z;
             }
             else
             {
-                l.lower = "exit " + number(lastMean + exit * lastSd);   // short: buys back once down here
-                l.state = "short, " + z;
+                levels.lower = "exit " + Format::number(lastMean + exit * lastSd);   // short: buys back once down here
+                levels.state = "short, " + z;
             }
-            return l;
+            return levels;
         }
 
         // Price levels that would trigger the next trade:

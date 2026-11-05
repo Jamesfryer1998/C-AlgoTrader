@@ -32,7 +32,7 @@ class MinuteReport
         struct StockRow
         {
             double price = 0;
-            std::vector<StrategyBase::Levels> strategies;
+            std::vector<StrategyBase::DecisionLevels> strategies;
             PositionSnapshot position;
             double decisionMs = 0;
         };

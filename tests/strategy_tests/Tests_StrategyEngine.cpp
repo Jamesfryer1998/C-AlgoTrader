@@ -214,7 +214,7 @@ TEST(SharedOmsTests, EachStockTradesOnItsOwnPricesThroughOneOms)
     StrategyEngine aaa, bbb, ccc;
     MarketData aaaData, bbbData, cccData;
     for (auto* engine : {&aaa, &bbb, &ccc})
-        engine->useSharedOms(&shared);
+        engine->shareOrderManagement(&shared);
     aaa.setUp(aaaConfig, aaaFactory, aaaData, &broker);
     bbb.setUp(bbbConfig, bbbFactory, bbbData, &broker);
     ccc.setUp(cccConfig, cccFactory, cccData, &broker);
@@ -253,8 +253,8 @@ TEST(SharedOmsTests, EngineUsesItsOwnOmsByDefault)
     EXPECT_NE(one.getOms(), nullptr);
     EXPECT_NE(one.getOms(), two.getOms());
     OrderManagement shared;
-    one.useSharedOms(&shared);
+    one.shareOrderManagement(&shared);
     EXPECT_EQ(one.getOms(), &shared);
-    one.useSharedOms(nullptr);   // back to its own
+    one.shareOrderManagement(nullptr);   // back to its own
     EXPECT_NE(one.getOms(), &shared);
 }

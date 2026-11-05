@@ -24,7 +24,7 @@ TEST(CommandLineTests, ReadsOptionsAndTheirValues)
         EXPECT_TRUE(args.is("--daily"));
         EXPECT_FALSE(args.hasValue());
         ASSERT_TRUE(args.next());
-        EXPECT_EQ(args.whole(), 3);
+        EXPECT_EQ(args.integer(), 3);
         ASSERT_TRUE(args.next());
         EXPECT_DOUBLE_EQ(args.number(), 2500.5);
         ASSERT_TRUE(args.next());
@@ -37,12 +37,12 @@ TEST(CommandLineTests, BadOrMissingValuesSayWhichOption)
 {
     withArgs({"--top", "3x"}, [](CommandLine& args) {
         args.next();
-        try { args.whole(); FAIL(); }
+        try { args.integer(); FAIL(); }
         catch (const std::invalid_argument& e) { EXPECT_STREQ(e.what(), "Bad value for --top: 3x"); }
     });
     withArgs({"--top", "--daily"}, [](CommandLine& args) {
         args.next();
-        try { args.whole(); FAIL(); }
+        try { args.integer(); FAIL(); }
         catch (const std::invalid_argument& e) { EXPECT_STREQ(e.what(), "Missing value for --top"); }
     });
     withArgs({"--tpo"}, [](CommandLine& args) {

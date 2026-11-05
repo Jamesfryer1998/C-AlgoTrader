@@ -46,11 +46,11 @@ namespace
 TEST(LevelsTests, RsiThresholdsAroundTheRsi)
 {
     RSI rsi(StrategyAttribute(json{{"name", "RSI"}, {"period", 5}, {"oversold_threshold", 30}, {"overbought_threshold", 70}}));
-    EXPECT_FALSE(rsi.levels().ready);
-    EXPECT_EQ(rsi.levels().label, "RSI(5)");
+    EXPECT_FALSE(rsi.decisionLevels().ready);
+    EXPECT_EQ(rsi.decisionLevels().label, "RSI(5)");
     MarketData data = bars({100, 101, 102, 103, 104, 105});   // only rises: RSI 100
     run(rsi, data);
-    auto l = rsi.levels();
+    auto l = rsi.decisionLevels();
     EXPECT_TRUE(l.ready);
     EXPECT_EQ(l.lower, "30.00");
     EXPECT_EQ(l.current, "100.00");
@@ -66,7 +66,7 @@ TEST(LevelsTests, MeanrevBandsWhenFlatAndExitWhenIn)
     for (int i = 0; i < 20; i++) closes.push_back(i % 2 ? 100.5f : 99.5f);   // mean 100, sd 0.5
     MarketData quiet = bars(closes);
     run(meanrev, quiet);
-    auto flat = meanrev.levels();
+    auto flat = meanrev.decisionLevels();
     EXPECT_EQ(flat.label, "MEANREV(10/10)");
     EXPECT_EQ(flat.lower, "99.25");
     EXPECT_EQ(flat.upper, "100.75");
@@ -76,7 +76,7 @@ TEST(LevelsTests, MeanrevBandsWhenFlatAndExitWhenIn)
     closes.push_back(97.0f);   // dip: goes long
     MarketData dip = bars(closes);
     run(meanrev, dip);
-    auto in = meanrev.levels();
+    auto in = meanrev.decisionLevels();
     EXPECT_EQ(in.lower, "");
     EXPECT_EQ(in.upper.rfind("exit ", 0), 0u) << in.upper;   // sells once back up at the mean
     EXPECT_EQ(in.state.rfind("long, z -", 0), 0u) << in.state;
@@ -90,7 +90,7 @@ TEST(LevelsTests, MacdLineToCross)
     for (int i = 0; i < 60; i++) rising.push_back(100.0f + i);
     MarketData data = bars(rising);
     run(macd, data);
-    auto l = macd.levels();
+    auto l = macd.decisionLevels();
     EXPECT_EQ(l.label, "MACD(3/6/3)");
     EXPECT_EQ(l.lower, "0.0000");   // above the zero line: it would be crossed going down
     EXPECT_EQ(l.upper, "");
@@ -105,7 +105,7 @@ TEST(LevelsTests, ScalpBandsAroundVwap)
     for (int i = 0; i < 20; i++) closes.push_back(i % 2 ? 100.1f : 99.9f);
     MarketData data = bars(closes);
     run(scalp, data);
-    auto l = scalp.levels();
+    auto l = scalp.decisionLevels();
     EXPECT_EQ(l.label, "SCALP");
     EXPECT_EQ(l.lower, "99.80");
     EXPECT_EQ(l.upper, "100.20");
@@ -123,7 +123,7 @@ TEST(LevelsTests, EngineReportsWarmingUp)
     NoBroker broker;
     engine.setUp(config, factory, data, &broker);
     engine.setPrintStatus(false);
-    auto levels = engine.levels();
+    auto levels = engine.decisionLevels();
     ASSERT_EQ(levels.size(), 1u);
     EXPECT_EQ(levels[0].label, "RSI(14)");
     EXPECT_FALSE(levels[0].ready);

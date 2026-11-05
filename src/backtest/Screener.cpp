@@ -189,7 +189,7 @@ Screener::summarise(const std::vector<Row>& rows, const std::vector<std::string>
 }
 
 std::vector<Screener::Row>
-Screener::topByTraining(const std::vector<Row>& rows, size_t n)
+Screener::bestOnTraining(const std::vector<Row>& rows, size_t n)
 {
     std::vector<Row> found;
     for (const auto& row : rows)
@@ -203,7 +203,7 @@ Screener::topByTraining(const std::vector<Row>& rows, size_t n)
 }
 
 std::vector<Screener::Row>
-Screener::heldUp(const std::vector<Row>& rows, int minTestTrades)
+Screener::goodInBothPeriods(const std::vector<Row>& rows, int minTestTrades)
 {
     std::vector<Row> out;
     for (const auto& row : rows)
@@ -218,7 +218,7 @@ Screener::heldUp(const std::vector<Row>& rows, int minTestTrades)
 std::vector<Screener::Row>
 Screener::topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades)
 {
-    std::vector<Row> candidates = heldUp(rows, minTestTrades);
+    std::vector<Row> candidates = goodInBothPeriods(rows, minTestTrades);
     auto weaker = [](const Row& r) { return std::min(r.train.sharpeRatio, r.test.sharpeRatio); };
     std::stable_sort(candidates.begin(), candidates.end(),
                      [&](const Row& a, const Row& b) { return weaker(a) > weaker(b); });
@@ -245,16 +245,16 @@ Screener::strategySettings(const Row& pick) const
 }
 
 quant::PriceTable
-Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<quant::DailyBar>>& daily) const
+Screener::dailyValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<quant::DailyBar>>& daily) const
 {
     std::map<std::string, std::vector<MarketCondition>> bars;
     for (const auto& [symbol, days] : daily)
         bars[symbol] = toBars(symbol, days);
-    return pickValues(picks, bars);
+    return dailyValues(picks, bars);
 }
 
 quant::PriceTable
-Screener::pickValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<MarketCondition>>& allBars) const
+Screener::dailyValues(const std::vector<Row>& picks, const std::map<std::string, std::vector<MarketCondition>>& allBars) const
 {
     std::vector<std::string> names;
     std::map<std::string, std::vector<quant::DailyBar>> values;

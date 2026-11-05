@@ -43,7 +43,7 @@ ScreenReport::print(std::ostream& out) const
         << testStart << " to " << testEnd << " (never used for tuning).\n\n";
     printByStrategy(out);
     printBestOnTraining(out);
-    printHeldUp(out);
+    printGoodInBothPeriods(out);
 }
 
 void
@@ -66,7 +66,7 @@ ScreenReport::printByStrategy(std::ostream& out) const
 void
 ScreenReport::printBestOnTraining(std::ostream& out) const
 {
-    std::vector<Screener::Row> best = Screener::topByTraining(rows, BEST_ON_TRAINING_SHOWN);
+    std::vector<Screener::Row> best = Screener::bestOnTraining(rows, BEST_ON_TRAINING_SHOWN);
     if (best.empty() || tradable == 0)
         return;
 
@@ -92,9 +92,9 @@ ScreenReport::printBestOnTraining(std::ostream& out) const
 }
 
 void
-ScreenReport::printHeldUp(std::ostream& out) const
+ScreenReport::printGoodInBothPeriods(std::ostream& out) const
 {
-    std::vector<Screener::Row> held = Screener::heldUp(rows);
+    std::vector<Screener::Row> held = Screener::goodInBothPeriods(rows);
     out << "\nHeld up: training Sharpe >= " << number(Screener::HELD_UP_SHARPE, 1) << ", test Sharpe >= "
         << number(Screener::HELD_UP_SHARPE, 1) << " with " << Screener::HELD_UP_TEST_TRADES
         << "+ trades, and beat buy and hold (" << held.size() << " found)\n";

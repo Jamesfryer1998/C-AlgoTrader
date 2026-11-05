@@ -49,7 +49,7 @@ LiveTrader::connectBroker()
     if (options.replay)
     {
         simulated.followLatestBar(true);
-        simulated.tradeSeveralStocks(true);
+        simulated.allowSeveralStocks(true);
         simulated.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
         simulated.setSlippage(config.value("replay_slippage_percent", DEFAULT_REPLAY_SLIPPAGE_PERCENT) / 100.0);
         simulated.setCommission(0.0);
@@ -230,7 +230,7 @@ LiveTrader::onBar(const MarketCondition& bar)
 
     MinuteReport::StockRow row;
     row.price = bar.Close;
-    row.strategies = lane.strategyLevels();
+    row.strategies = lane.decisionLevels();
     row.position = monitor->position(bar.Ticker, bar.Close);
     row.decisionMs = decisionMs;
     AccountSnapshot account = monitor->account();

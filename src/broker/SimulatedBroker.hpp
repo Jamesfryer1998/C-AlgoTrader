@@ -66,7 +66,7 @@ class SimulatedBroker : public BrokerBase {
         // Several stocks in one simulation, their bars arriving one after another (the live app's replay
         // mode): an order fills, and a position's stop loss / take profit is checked, only on its own
         // stock's bar, and each stock is valued at its own last price.
-        void tradeSeveralStocks(bool several) { severalStocks = several; }
+        void allowSeveralStocks(bool several) { severalStocks = several; }
 
         // Custom order handling
         void setSlippage(double slippagePerc);
@@ -109,7 +109,7 @@ class SimulatedBroker : public BrokerBase {
 
         // Step-by-step notes (set-up, each step, position changes): only with enableDetailedLogging.
         // Fills, and stop loss / take profit hits, always go to Log::out().
-        std::ostream& bookkeeping() const { return detailedLogging ? Log::out() : Log::silent(); }
+        std::ostream& detailLog() const { return detailedLogging ? Log::out() : Log::silent(); }
         bool severalStocks = false;
         std::map<std::string, float> latestPrices;   // each stock's last close (several stocks in one simulation)
 

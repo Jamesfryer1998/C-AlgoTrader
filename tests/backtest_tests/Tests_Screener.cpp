@@ -205,12 +205,12 @@ TEST(ScreenerTests, SummaryPicksAndCsv)
     EXPECT_DOUBLE_EQ(summary[0].medianTestSharpe, 0.3);
     EXPECT_LT(summary[0].trainTestCorrelation, 0.0);   // best in training was worst in test
 
-    auto top = Screener::topByTraining(rows, 2);
+    auto top = Screener::bestOnTraining(rows, 2);
     ASSERT_EQ(top.size(), 2u);
     EXPECT_EQ(top[0].symbol, "A");
     EXPECT_EQ(top[1].symbol, "B");
 
-    auto held = Screener::heldUp(rows);
+    auto held = Screener::goodInBothPeriods(rows);
     ASSERT_EQ(held.size(), 2u);
     EXPECT_EQ(held[0].symbol, "B");   // best test Sharpe first
     EXPECT_EQ(held[1].strategy, "MACD");
@@ -273,7 +273,7 @@ TEST(ScreenerTests, PickValuesTrackEachPicksProfit)
     meanrev.strategy = "MEANREV";
     meanrev.parameters = {{"lookback_period", 20}, {"entry_threshold", 1.5}};
 
-    quant::PriceTable values = screener.pickValues({rsi, meanrev}, {{"TEST", daily}});
+    quant::PriceTable values = screener.dailyValues({rsi, meanrev}, {{"TEST", daily}});
     ASSERT_EQ(values.symbols.size(), 2u);
     EXPECT_EQ(values.symbols[0], "TEST RSI");
     EXPECT_EQ(values.days(), 700u);
@@ -288,7 +288,7 @@ TEST(ScreenerTests, PickValuesTrackEachPicksProfit)
     // Unknown stock: left out
     Screener::Row missing = rsi;
     missing.symbol = "NONE";
-    EXPECT_EQ(screener.pickValues({missing}, {{"TEST", daily}}).symbols.size(), 0u);
+    EXPECT_EQ(screener.dailyValues({missing}, {{"TEST", daily}}).symbols.size(), 0u);
 }
 
 namespace
@@ -372,7 +372,7 @@ TEST(ScreenerTests, MinutePickValuesAreOnePerDay)
     pick.parameters = {{"period", 14}, {"oversold_threshold", 30}, {"overbought_threshold", 70}};
 
     std::vector<MarketCondition> bars = minuteBars(30);
-    quant::PriceTable values = screener.pickValues({pick}, std::map<std::string, std::vector<MarketCondition>>{{"MIN", bars}});
+    quant::PriceTable values = screener.dailyValues({pick}, std::map<std::string, std::vector<MarketCondition>>{{"MIN", bars}});
     ASSERT_EQ(values.symbols.size(), 1u);
     EXPECT_EQ(values.days(), 30u);   // the last value of each day
     EXPECT_EQ(values.dates.front(), "2025-01-06");

@@ -25,7 +25,7 @@ SimulatedBroker::SimulatedBroker(MarketData& marketdata)
     randomSeed = 42; // Default seed
     
     // Log the default settings
-    bookkeeping() << "SimulatedBroker initialized with:"
+    detailLog() << "SimulatedBroker initialized with:"
               << "\n  - Starting capital: $" << startingCapital
               << "\n  - Commission: $" << commissionPerTrade << " per trade"
               << "\n  - Slippage: ±" << (slippagePercentage * 100.0) << "% (random variation)"
@@ -81,7 +81,7 @@ SimulatedBroker::process()
     latestPrices[currentCondition.Ticker] = currentCondition.Close;
     
     // Log the current time step being processed
-    bookkeeping() << "SimulatedBroker processing time step: " << simulationTime << std::endl;
+    detailLog() << "SimulatedBroker processing time step: " << simulationTime << std::endl;
     
     // Process pending orders with latest market data
     processOrders();
@@ -104,10 +104,10 @@ SimulatedBroker::connect()
 int
 SimulatedBroker::disconnect()
 {
-    bookkeeping() << "Disconnected from simulated broker" << std::endl;
-    bookkeeping() << "Final equity: $" << currentEquity << std::endl;
-    bookkeeping() << "Total P&L: $" << (currentEquity - startingCapital) << std::endl;
-    bookkeeping() << "Total trades: " << totalTrades << std::endl;
+    detailLog() << "Disconnected from simulated broker" << std::endl;
+    detailLog() << "Final equity: $" << currentEquity << std::endl;
+    detailLog() << "Total P&L: $" << (currentEquity - startingCapital) << std::endl;
+    detailLog() << "Total trades: " << totalTrades << std::endl;
     return 1;
 }
 
@@ -145,7 +145,7 @@ SimulatedBroker::placeOrder(Order order)
     currentCondition = marketData.getCurrentData();
     simulationTime = currentCondition.DateTime;
     
-    bookkeeping() << "Order placed for order " 
+    detailLog() << "Order placed for order " 
               << order.getId() << " for " 
               << order.getTypeAsString() << " with " 
               << order.getQuantity() << " shares of " 
@@ -289,19 +289,19 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                         // Long position after covering short
                         existingPos.setQuantity(newTotalShares);
                         existingPos.setAvgPrice(executionPrice); // Reset average price as we're now long
-                        bookkeeping() << "Covered short position for " << ticker << " and established long position of " 
+                        detailLog() << "Covered short position for " << ticker << " and established long position of " 
                                   << newTotalShares << " shares" << std::endl;
                     } else {
                         // Exactly covered the short position, close position
                         positionHistory.push_back(existingPos);
                         positionsByTicker.erase(ticker);
-                        bookkeeping() << "Completely covered short position for " << ticker << std::endl;
+                        detailLog() << "Completely covered short position for " << ticker << std::endl;
                     }
                 } else {
                     // Partially covering short position
                     existingPos.setQuantity(newTotalShares);
                     // We don't update avg price for partial short covers
-                    bookkeeping() << "Partially covered short position for " << ticker 
+                    detailLog() << "Partially covered short position for " << ticker 
                               << ", remaining short: " << -newTotalShares << " shares" << std::endl;
                 }
             } else {
@@ -313,7 +313,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                 // Update position
                 existingPos.setQuantity(newTotalShares);
                 existingPos.setAvgPrice(newAvgPrice);
-                bookkeeping() << "Increased long position for " << ticker << " to " 
+                detailLog() << "Increased long position for " << ticker << " to " 
                           << newTotalShares << " shares at avg price $" 
                           << std::fixed << std::setprecision(2) << newAvgPrice << std::endl;
             }
@@ -321,7 +321,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
             // New position
             Position newPosition(ticker, quantity, executionPrice);
             positionsByTicker[ticker] = newPosition;
-            bookkeeping() << "Established new long position for " << ticker << " with " 
+            detailLog() << "Established new long position for " << ticker << " with " 
                       << quantity << " shares at $" << executionPrice << std::endl;
         }
     } else {
@@ -343,20 +343,20 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                         // Going short after closing long
                         existingPos.setQuantity(newTotalShares);
                         existingPos.setAvgPrice(executionPrice); // Reset average price as we're now short
-                        bookkeeping() << "Closed long position for " << ticker 
+                        detailLog() << "Closed long position for " << ticker 
                                   << " and established short position of " 
                                   << -newTotalShares << " shares" << std::endl;
                     } else {
                         // Exactly closed the long position
                         positionHistory.push_back(existingPos);
                         positionsByTicker.erase(ticker);
-                        bookkeeping() << "Completely closed long position for " << ticker << std::endl;
+                        detailLog() << "Completely closed long position for " << ticker << std::endl;
                     }
                 } else {
                     // Partially reducing long position
                     existingPos.setQuantity(newTotalShares);
                     // Average price remains unchanged when reducing a long position
-                    bookkeeping() << "Partially closed long position for " << ticker 
+                    detailLog() << "Partially closed long position for " << ticker 
                               << ", remaining: " << newTotalShares << " shares" << std::endl;
                 }
             } else {
@@ -367,7 +367,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
                 
                 existingPos.setQuantity(newTotalShares);
                 existingPos.setAvgPrice(newAvgPrice);
-                bookkeeping() << "Increased short position for " << ticker << " to " 
+                detailLog() << "Increased short position for " << ticker << " to " 
                           << -newTotalShares << " shares at avg price $" 
                           << std::fixed << std::setprecision(2) << newAvgPrice << std::endl;
             }
@@ -375,7 +375,7 @@ SimulatedBroker::updatePositions(const Order& order, double executionPrice)
             // No existing position, establishing a new short position
             Position newPosition(ticker, -quantity, executionPrice);
             positionsByTicker[ticker] = newPosition;
-            bookkeeping() << "Established new short position for " << ticker << " with " 
+            detailLog() << "Established new short position for " << ticker << " with " 
                       << quantity << " shares at $" << executionPrice << std::endl;
         }
     }
@@ -589,7 +589,7 @@ SimulatedBroker::setSlippage(double slippagePerc)
     double oldSlippage = slippagePercentage;
     slippagePercentage = slippagePerc;
     
-    bookkeeping() << "SimulatedBroker: Slippage changed from ±" 
+    detailLog() << "SimulatedBroker: Slippage changed from ±" 
               << std::fixed << std::setprecision(3) << (oldSlippage * 100.0) 
               << "% to ±" << (slippagePercentage * 100.0) << "%" << std::endl;
 }

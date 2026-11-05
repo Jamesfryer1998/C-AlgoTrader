@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StrategyBase.hpp"
+#include "../util/Format.hpp"
 #include "../util/Log.hpp"
 #include <cmath>
 #include <iomanip>
@@ -94,19 +95,19 @@ class RSI : public StrategyBase {
             return out.str();
         }
 
-        Levels levels() const override
+        DecisionLevels decisionLevels() const override
         {
-            Levels l;
-            l.label = "RSI(" + std::to_string(_strategyAttribute.period) + ")";
+            DecisionLevels levels;
+            levels.label = "RSI(" + std::to_string(_strategyAttribute.period) + ")";
             if (!ready)
-                return l;
-            l.ready = true;
-            l.lower = number(_strategyAttribute.oversold_threshold);
-            l.current = number(rsi);
-            l.upper = number(_strategyAttribute.overbought_threshold);
-            l.state = rsi < _strategyAttribute.oversold_threshold ? "in BUY zone"
+                return levels;
+            levels.ready = true;
+            levels.lower = Format::number(_strategyAttribute.oversold_threshold);
+            levels.current = Format::number(rsi);
+            levels.upper = Format::number(_strategyAttribute.overbought_threshold);
+            levels.state = rsi < _strategyAttribute.oversold_threshold ? "in BUY zone"
                     : rsi > _strategyAttribute.overbought_threshold ? "in SELL zone" : "";
-            return l;
+            return levels;
         }
 
     private:
