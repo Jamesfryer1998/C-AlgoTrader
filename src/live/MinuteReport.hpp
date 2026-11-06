@@ -58,6 +58,7 @@ class MinuteReport
         std::map<std::string, StockRow> rows;
         std::map<std::string, double> lastPrice;   // kept across minutes, for stocks with no bar
         std::vector<std::string> events;
+        std::vector<size_t> columnWidths;   // only ever grow, so the table keeps one size
         AccountSnapshot account;
         std::string headerNote;
 };

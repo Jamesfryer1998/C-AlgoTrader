@@ -23,3 +23,15 @@ TEST(TextTableTests, MissingCellsAndUnicode)
               "  ≥ 5\n");
     EXPECT_EQ(TextTable::length("≥ 5"), 3u);
 }
+
+TEST(TextTableTests, MinimumWidthsKeepColumnsWide)
+{
+    TextTable table({"A", "B"}, {false, true});
+    table.addRow({"x", "1"});
+    table.setMinimumWidths({3, 4});
+    EXPECT_EQ(table.columnWidths(), (std::vector<size_t>{3, 4}));
+    EXPECT_EQ(table.render(), "A       B\n---  ----\nx       1\n");
+
+    table.addRow({"long", "1"});   // a wider cell still widens its column
+    EXPECT_EQ(table.columnWidths(), (std::vector<size_t>{4, 4}));
+}

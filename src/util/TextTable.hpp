@@ -31,15 +31,30 @@ class TextTable
 
         size_t size() const { return rows.size(); }
 
-        std::string render(const std::string& indent = "") const
+        // Columns at least this wide (characters), e.g. to keep a table repeated every minute the same size
+        void setMinimumWidths(std::vector<size_t> widths)
+        {
+            minimumWidths = std::move(widths);
+        }
+
+        // Each column's width: its widest cell, header or minimum
+        std::vector<size_t> columnWidths() const
         {
             std::vector<size_t> width(headers.size());
             for (size_t c = 0; c < headers.size(); c++)
             {
                 width[c] = length(headers[c]);
+                if (c < minimumWidths.size())
+                    width[c] = std::max(width[c], minimumWidths[c]);
                 for (const auto& row : rows)
                     width[c] = std::max(width[c], length(row[c]));
             }
+            return width;
+        }
+
+        std::string render(const std::string& indent = "") const
+        {
+            std::vector<size_t> width = columnWidths();
 
             std::ostringstream out;
             auto line = [&](const std::vector<std::string>& cells) {
@@ -80,4 +95,5 @@ class TextTable
         std::vector<std::string> headers;
         std::vector<bool> right;
         std::vector<std::vector<std::string>> rows;
+        std::vector<size_t> minimumWidths;
 };

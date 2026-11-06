@@ -9,6 +9,14 @@ namespace
     const std::string NOTHING = "-";
     const std::string NO_BAR = "no bar this minute";
 
+    const std::vector<std::string> COLUMNS = {"Stock", "Strategy", "Price", "Lower", "Current", "Upper", "State",
+                                              "Position", "Unrealised", "Decision"};
+    const std::vector<bool> RIGHT_ALIGNED = {false, false, true, true, true, true, false, false, true, true};
+
+    // Starting widths, wide enough for typical cells ("MEANREV(120/120)", "exit 226.16", "-1 @ 228.32",
+    // "-$1.95 (-0.16%)", "985.71 ms"), so the table is its full size from the first minute. A wider cell
+    // widens its column from then on; columns never shrink back.
+    const std::vector<size_t> STARTING_WIDTHS = {5, 16, 7, 11, 7, 11, 24, 11, 15, 9};
     std::string orDash(const std::string& text)
     {
         return text.empty() ? NOTHING : text;
@@ -66,8 +74,7 @@ MinuteReport::print(std::ostream& out)
         out << " | " << headerNote;
     out << " ===\n";
 
-    TextTable table({"Stock", "Strategy", "Price", "Lower", "Current", "Upper", "State", "Position", "Unrealised", "Decision"},
-                    {false, false, true, true, true, true, false, false, true, true});
+    TextTable table(COLUMNS, RIGHT_ALIGNED);
     for (const auto& ticker : tickers)
     {
         auto found = rows.find(ticker);
@@ -90,6 +97,10 @@ MinuteReport::print(std::ostream& out)
                           firstLine ? Format::number(row.decisionMs) + " ms" : ""});
         }
     }
+    if (columnWidths.empty())
+        columnWidths = STARTING_WIDTHS;
+    table.setMinimumWidths(columnWidths);
+    columnWidths = table.columnWidths();
     out << table.render();
     for (const auto& event : events)
         out << "  " << event << "\n";
