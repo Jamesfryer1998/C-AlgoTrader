@@ -46,6 +46,7 @@ LiveTrader::run()
         return 1;
     backfillLanes();
     openRecords();
+    session->printMarketHours(std::cout);
 
     startFeed();
     waitUntilFinished();

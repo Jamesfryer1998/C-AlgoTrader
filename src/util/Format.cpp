@@ -1,5 +1,6 @@
 #include "Format.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
@@ -7,6 +8,10 @@ namespace
 {
     const double PERCENT = 100.0;
     const int DIGITS_PER_GROUP = 3;   // 1,234,567
+
+    const long long SECONDS_PER_MINUTE = 60;
+    const long long MINUTES_PER_HOUR = 60;
+    const long long MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 
     // "1234567.89" -> "1,234,567.89"
     std::string withThousandsSeparators(std::string digits)
@@ -52,4 +57,21 @@ namespace Format
     {
         return signedNumber(fraction * PERCENT, decimals) + "%";
     }
+}
+
+std::string
+Format::duration(long long seconds)
+{
+    long long minutes = std::max(0LL, seconds) / SECONDS_PER_MINUTE;
+    long long days = minutes / MINUTES_PER_DAY, hours = minutes % MINUTES_PER_DAY / MINUTES_PER_HOUR;
+    minutes %= MINUTES_PER_HOUR;
+
+    char text[64];
+    if (days > 0)
+        std::snprintf(text, sizeof(text), "%lldd %lldh %02lldm", days, hours, minutes);
+    else if (hours > 0)
+        std::snprintf(text, sizeof(text), "%lldh %02lldm", hours, minutes);
+    else
+        std::snprintf(text, sizeof(text), "%lldm", minutes);
+    return text;
 }

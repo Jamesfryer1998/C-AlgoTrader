@@ -28,6 +28,7 @@ namespace AlpacaApi
     inline const std::string ACCOUNT_PATH = "/v2/account";
     inline const std::string ORDERS_PATH = "/v2/orders";
     inline const std::string POSITIONS_PATH = "/v2/positions";
+    inline const std::string CLOCK_PATH = "/v2/clock";   // is the market open, and its next open / close
     inline const std::string STOCKS_PATH = "/v2/stocks/";   // + symbol + what about it, e.g. "/bars"
 
     inline const std::string FIRST_HISTORY_DAY = "2016-01-01";   // Alpaca's bar history starts in 2016

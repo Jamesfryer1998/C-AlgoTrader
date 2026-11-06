@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ctime>
+
 #include <map>
 #include <string>
 #include <nlohmann/json.hpp>
@@ -41,6 +43,16 @@ class AlpacaBroker : public BrokerBase
         // Alpaca's own figures, for display: real fills and latest prices (our PerformanceTracker is an
         // estimate from bar closes)
         AccountSnapshot getAccount();
+
+        // Alpaca's market clock (knows holidays and early closes). known = false if it couldn't be read.
+        struct MarketClock
+        {
+            bool known = false;
+            bool isOpen = false;
+            std::time_t nextOpen = 0;
+            std::time_t nextClose = 0;
+        };
+        MarketClock getMarketClock();
 
         // Alpaca's position details from the last getLatestPosition() call
         // (qty, avg_entry_price, current_price, market_value, unrealized_pl, unrealized_plpc, ...);

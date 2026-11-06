@@ -40,6 +40,9 @@ class BrokerSession
         // Where this session's trades, positions and performance are saved, under data/
         virtual std::string recordsFolder() const = 0;
 
+        // Printed at start-up: is the market open, and how long until it opens / closes (live only)
+        virtual void printMarketHours(std::ostream& out) {}
+
         virtual void beforeDecision(const MarketCondition& bar) {}
         virtual void afterDecision() {}
 
@@ -57,6 +60,7 @@ class AlpacaSession : public BrokerSession
         BrokerBase& broker() override { return alpaca; }
         AccountMonitor& account() override { return *monitor; }
         std::string recordsFolder() const override;
+        void printMarketHours(std::ostream& out) override;
         void printSummary(std::ostream& out, const std::vector<std::string>& tickers) override;
 
     private:

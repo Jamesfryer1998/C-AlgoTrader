@@ -13,10 +13,13 @@ namespace
     const int MONTHS_PER_YEAR = 12;
     const int MINUTES_PER_HOUR = 60;
     const int HOURS_PER_DAY = 24;
+    const int SECONDS_PER_MINUTE = 60;
+    const int SUNDAY = 0, SATURDAY = 6;   // std::tm's tm_wday
 
     const char* const UTC_FORMAT = "%Y-%m-%dT%H:%M:%SZ";        // 2026-10-29T14:31:00Z
     const char* const UTC_FORMAT_NO_ZONE = "%Y-%m-%dT%H:%M:%S";
     const size_t UTC_LENGTH_NO_ZONE = 19;                        // 2026-10-29T14:31:00
+    const size_t OFFSET_LENGTH = 6;                              // -04:00
     const char* const DATE_FORMAT = "%Y-%m-%d";                  // 2026-10-29
     const char* const DATE_TIME_FORMAT = "%Y-%m-%d %H:%M:%S";    // 2026-10-29 10:31:00
 
@@ -67,7 +70,17 @@ MarketTime::parseUtc(const std::string& rfc3339)
     in >> std::get_time(&tm, UTC_FORMAT_NO_ZONE);
     if (in.fail())
         return -1;
-    return timegm(&tm);
+    std::time_t utc = timegm(&tm);
+
+    // A "+HH:MM" / "-HH:MM" offset after the seconds (and any fraction): local time = UTC + offset
+    size_t sign = rfc3339.find_first_of("+-", UTC_LENGTH_NO_ZONE);
+    if (sign != std::string::npos && rfc3339.size() >= sign + OFFSET_LENGTH)
+    {
+        int hours = std::stoi(rfc3339.substr(sign + 1, 2)), minutes = std::stoi(rfc3339.substr(sign + 4, 2));
+        std::time_t offset = hours * SECONDS_PER_HOUR + minutes * SECONDS_PER_MINUTE;
+        utc += rfc3339[sign] == '+' ? -offset : offset;
+    }
+    return utc;
 }
 
 std::time_t
@@ -101,6 +114,49 @@ MarketTime::isNewYorkDst(std::time_t utc)
     std::time_t dstStart = makeUtc(year, DST_START_MONTH, nthSunday(year, DST_START_MONTH, DST_START_SUNDAY), DST_START_HOUR_UTC);
     std::time_t dstEnd = makeUtc(year, DST_END_MONTH, nthSunday(year, DST_END_MONTH, DST_END_SUNDAY), DST_END_HOUR_UTC);
     return utc >= dstStart && utc < dstEnd;
+}
+
+// Seconds New York is behind UTC at that moment
+static std::time_t newYorkOffset(std::time_t utc)
+{
+    return (MarketTime::isNewYorkDst(utc) ? SUMMER_HOURS_BEHIND_UTC : WINTER_HOURS_BEHIND_UTC) * MarketTime::SECONDS_PER_HOUR;
+}
+
+// Regular hours on the n-th New York day after the one `utc` falls in (0 = that day), as UTC times;
+// false on a weekend
+static bool sessionOnDay(std::time_t utc, int daysAhead, std::time_t& open, std::time_t& close)
+{
+    std::time_t local = utc - newYorkOffset(utc);
+    std::time_t midnight = local - local % MarketTime::SECONDS_PER_DAY + daysAhead * MarketTime::SECONDS_PER_DAY;
+    std::tm tm{};
+    gmtime_r(&midnight, &tm);
+    if (tm.tm_wday == SUNDAY || tm.tm_wday == SATURDAY)
+        return false;
+    std::time_t openLocal = midnight + MarketTime::OPEN_MINUTE * SECONDS_PER_MINUTE;
+    std::time_t closeLocal = midnight + MarketTime::CLOSE_MINUTE * SECONDS_PER_MINUTE;
+    open = openLocal + newYorkOffset(openLocal);
+    close = closeLocal + newYorkOffset(closeLocal);
+    return true;
+}
+
+std::time_t
+MarketTime::nextRegularOpen(std::time_t utc)
+{
+    std::time_t open = 0, close = 0;
+    for (int day = 0; day <= DAYS_PER_WEEK; day++)
+        if (sessionOnDay(utc, day, open, close) && open > utc)
+            return open;
+    return -1;
+}
+
+std::time_t
+MarketTime::regularCloseAfter(std::time_t utc)
+{
+    std::time_t open = 0, close = 0;
+    for (int day = 0; day <= DAYS_PER_WEEK; day++)
+        if (sessionOnDay(utc, day, open, close) && close > utc)
+            return close;
+    return -1;
 }
 
 std::string

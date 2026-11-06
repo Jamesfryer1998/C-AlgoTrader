@@ -17,6 +17,9 @@
  */
 namespace Format
 {
+    // A length of time: "45m", "2h 05m", "2d 17h 05m"
+    std::string duration(long long seconds);
+
     std::string number(double value, int decimals = 2);
     std::string signedNumber(double value, int decimals = 2);
     std::string dollars(double value, int decimals = 2);

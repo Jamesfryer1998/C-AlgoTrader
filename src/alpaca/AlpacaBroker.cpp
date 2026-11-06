@@ -1,5 +1,6 @@
 #include "AlpacaBroker.hpp"
 #include "AlpacaApi.hpp"
+#include "../util/MarketTime.hpp"
 
 #include <chrono>
 #include <cmath>
@@ -359,6 +360,22 @@ AlpacaBroker::getLatestPosition(std::string ticker)
 
     float avgPrice = AlpacaApi::numberField(result.body, AlpacaApi::AVERAGE_PRICE);
     return Position(ticker, quantity, avgPrice);
+}
+
+AlpacaBroker::MarketClock
+AlpacaBroker::getMarketClock()
+{
+    MarketClock clock;
+    HttpResult result = client.get(tradingUrl + AlpacaApi::CLOCK_PATH);
+    if (!result.ok() || !result.body.is_object())
+        return clock;
+
+    // {"is_open":false,"next_open":"2026-11-06T09:30:00-05:00","next_close":"2026-11-06T16:00:00-05:00",...}
+    clock.isOpen = result.body.value("is_open", false);
+    clock.nextOpen = MarketTime::parseUtc(result.body.value("next_open", ""));
+    clock.nextClose = MarketTime::parseUtc(result.body.value("next_close", ""));
+    clock.known = clock.nextOpen > 0 && clock.nextClose > 0;
+    return clock;
 }
 
 AccountSnapshot

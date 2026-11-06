@@ -25,7 +25,8 @@ namespace MarketTime
 
     constexpr size_t DATE_LENGTH = 10;         // "YYYY-MM-DD"
 
-    // "2026-10-29T14:31:00Z" (fractional seconds ignored) -> seconds since epoch. Returns -1 if unparseable.
+    // "2026-10-29T14:31:00Z" or "2026-10-29T10:31:00-04:00" (fractional seconds ignored) -> seconds since
+    // epoch. Returns -1 if unparseable.
     std::time_t parseUtc(const std::string& rfc3339);
 
     // "2026-10-29" -> midnight UTC of that date. Returns -1 if unparseable.
@@ -48,6 +49,11 @@ namespace MarketTime
 
     // "YYYY-MM-DD" moved back by whole months (day capped at 28 so it always exists)
     std::string monthsBefore(const std::string& date, int months);
+
+    // When regular hours next open, and when they close after that (or today's close if open now).
+    // Weekdays only: market holidays aren't known here (Alpaca's clock knows them; this is the fallback).
+    std::time_t nextRegularOpen(std::time_t utc);
+    std::time_t regularCloseAfter(std::time_t utc);
 
     // "HH:MM" of a "YYYY-MM-DD HH:MM:SS" as minutes since midnight (-1 if unreadable)
     int minuteOfDay(const std::string& dateTime);
