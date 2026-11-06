@@ -37,6 +37,14 @@ PositionSnapshot::describe() const
 }
 
 std::string
+PositionSnapshot::describeValue(double price) const
+{
+    if (!isOpen())
+        return FLAT;
+    return Format::dollars(quantity * price);
+}
+
+std::string
 PositionSnapshot::describePnL() const
 {
     if (!isOpen())

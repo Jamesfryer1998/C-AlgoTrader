@@ -7,16 +7,16 @@ namespace
 {
     const size_t TIME_WITHOUT_SECONDS = 16;   // "2026-11-05 15:57:00" -> "2026-11-05 15:57"
     const std::string NOTHING = "-";
-    const std::string NO_BAR = "no bar this minute";
+    const std::string NO_BAR = "no bar yet";   // in the Strategy column of a stock that hasn't reported this minute
 
-    const std::vector<std::string> COLUMNS = {"Stock", "Strategy", "Price", "Lower", "Current", "Upper", "State",
-                                              "Position", "Unrealised", "Decision"};
-    const std::vector<bool> RIGHT_ALIGNED = {false, false, true, true, true, true, false, false, true, true};
+    const std::vector<std::string> COLUMNS = {"Stock", "Strategy", "Price", "Lower", "Current", "Upper", "Position",
+                                              "Market Value", "Unrealised", "Decision"};
+    const std::vector<bool> RIGHT_ALIGNED = {false, false, true, true, true, true, false, true, true, true};
 
     // Starting widths, wide enough for typical cells ("MEANREV(120/120)", "exit 226.16", "-1 @ 228.32",
-    // "-$1.95 (-0.16%)", "985.71 ms"), so the table is its full size from the first minute. A wider cell
-    // widens its column from then on; columns never shrink back.
-    const std::vector<size_t> STARTING_WIDTHS = {5, 16, 7, 11, 7, 11, 24, 11, 15, 9};
+    // "$12,375.00", "-$1.95 (-0.16%)", "985.71 ms"), so the table is its full size from the first minute.
+    // A wider cell widens its column from then on; columns never shrink back.
+    const std::vector<size_t> STARTING_WIDTHS = {5, 16, 7, 11, 7, 11, 11, 12, 15, 9};
     std::string orDash(const std::string& text)
     {
         return text.empty() ? NOTHING : text;
@@ -81,8 +81,7 @@ MinuteReport::print(std::ostream& out)
         if (found == rows.end())
         {
             auto last = lastPrice.find(ticker);
-            table.addRow({ticker, "", last != lastPrice.end() ? Format::number(last->second) : NOTHING, "", "", "",
-                          NO_BAR});
+            table.addRow({ticker, NO_BAR, last != lastPrice.end() ? Format::number(last->second) : NOTHING});
             continue;
         }
 
@@ -92,8 +91,9 @@ MinuteReport::print(std::ostream& out)
             const StrategyBase::DecisionLevels& levels = row.strategies[i];
             bool firstLine = i == 0;   // stock-wide columns only on a stock's first line
             table.addRow({firstLine ? ticker : "", levels.label, firstLine ? Format::number(row.price) : "",
-                          orDash(levels.lower), orDash(levels.current), orDash(levels.upper), levels.state,
-                          firstLine ? row.position.describe() : "", firstLine ? row.position.describePnL() : "",
+                          orDash(levels.lower), orDash(levels.current), orDash(levels.upper),
+                          firstLine ? row.position.describe() : "", firstLine ? row.position.describeValue(row.price) : "",
+                          firstLine ? row.position.describePnL() : "",
                           firstLine ? Format::number(row.decisionMs) + " ms" : ""});
         }
     }

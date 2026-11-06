@@ -23,6 +23,8 @@ struct PositionSnapshot
     bool isOpen() const { return quantity != 0; }
     std::string describe() const;     // "1 @ 104.65", or "-" when flat
     std::string describePnL() const;  // "+$0.32 (+0.31%)", or "-" when flat
+    // What the position is worth at `price` (negative when short), e.g. "$1,235.20"; "-" when flat
+    std::string describeValue(double price) const;
     json toJson() const;
 };
 
