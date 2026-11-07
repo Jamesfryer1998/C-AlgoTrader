@@ -10,7 +10,7 @@ namespace
 {
     const std::string RISK = "risk";
 
-    // Keys from config.json that apply to every engine, unless the "risk" block sets them itself
+    // Keys from config/risk.json that apply to every engine, unless the "risk" block sets them itself
     const std::vector<std::string> SHARED_KEYS = {"bars_per_year"};
 }
 

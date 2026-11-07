@@ -23,6 +23,19 @@ cmake ..
 make -j4
 ```
 
+### Config
+
+Settings are in `config/` in the project root (next to `data/`). The app reads the first three as one config,
+so each setting lives in exactly one of them:
+
+| File | What's in it |
+|---|---|
+| `general.json` | data folder, starting capital, data size limit, the `"alpaca"` block |
+| `strategy.json` | the `"portfolio"` (each stock and its strategy) and the default `"strategies"` |
+| `risk.json` | the `"risk"` engine (position sizing), order limits, and `risk_app`'s comparison and tuning grids |
+| `screen.json` | `screen_app`'s stocks, dates and strategy grids |
+| `optimisation.json` | `optimise_app`'s strategy grids |
+
 ### To Run (live, Alpaca)
 The trading app now streams real-time 1-minute bars from Alpaca and sends orders to Alpaca's API.
 No CSV files or broker desktop app are needed.
@@ -40,7 +53,7 @@ No CSV files or broker desktop app are needed.
    ```
    Stop it with `Ctrl+C`.
 
-Settings live in the `"alpaca"` block of `src/config/config.json`:
+Settings live in the `"alpaca"` block of `config/general.json`:
 
 | Key | Meaning |
 |---|---|
@@ -65,12 +78,12 @@ bars instead of Alpaca's stream, with a simulated broker filling the orders and 
 
 Nothing is sent to Alpaca. Bars for the chosen days (and the few days before, which the strategies warm up on)
 that aren't saved yet are downloaded first into `data/minute/<TICKER>/`, using the keys in `.env`. Fills are at
-each bar's close with 0.01% slippage against us (`"backtest_slippage_percent"` in config.json). Records go to
+each bar's close with 0.01% slippage against us (`"backtest_slippage_percent"` in config/general.json). Records go to
 `data/backtest/<day>/` (fresh each run), so `data/live/` and the paper account are untouched. At the end it
 prints the simulated equity, P&L, fills per stock and the most capital in use.
 
 #### Trading several stocks (`"portfolio"`)
-Add a `"portfolio"` list to `src/config/config.json` and the app trades every stock in it at once, each with
+Add a `"portfolio"` list to `config/strategy.json` and the app trades every stock in it at once, each with
 its own strategy and settings, from a single Alpaca stream:
 
 ```json

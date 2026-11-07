@@ -30,7 +30,7 @@ using json = nlohmann::json;
  *
  *   main()
  *    └─ LiveTrader::run()
- *        ├─ loadPortfolio, createLanes     the stocks in config.json, each with its own strategies
+ *        ├─ loadPortfolio, createLanes     the stocks in config/strategy.json, each with its own strategies
  *        ├─ openFeed, connectBroker        live: Alpaca's stream and Alpaca; --backtest: saved bars, simulated broker
  *        ├─ backfillLanes, openRecords     history so strategies can decide at once; trades.csv etc.
  *        └─ feed.start ──> onBar(bar), once per stock per minute, on the feed's thread:
@@ -42,7 +42,7 @@ using json = nlohmann::json;
  *              5. updateBook(lane, bar)                 positions and P&L catch up with the broker
  *              6. addToReport(...)                      one row in this minute's table (MinuteReport)
  *
- * The stocks and their strategies come from "portfolio" in config.json (see Portfolio). One OMS, one trade log
+ * The stocks and their strategies come from "portfolio" in config/strategy.json (see Portfolio). One OMS, one trade log
  * and one P&L book cover every stock. Nothing runs on a timer: each bar is decided as soon as it arrives.
  *
  * Backtest (--backtest) is the same session with a BacktestStream feed and a BacktestSession broker, so the whole

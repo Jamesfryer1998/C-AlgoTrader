@@ -8,6 +8,7 @@
 #include <set>
 #include <sstream>
 #include "ScreenReport.hpp"
+#include "../util/Config.hpp"
 #include "TopPicksReport.hpp"
 #include "../util/Format.hpp"
 
@@ -15,7 +16,6 @@ using Format::number;
 
 namespace
 {
-    const std::string SCREEN_SETTINGS = "/src/config/screen.json";   // under the project root
     const std::string RESULTS_FOLDER = "screen/";                    // under data/, then minute/ or daily/
     const std::string RESULTS_FILE = "/screen_results.csv";
 
@@ -36,7 +36,7 @@ namespace
 StockScreen::StockScreen(const json& baseConfig, const std::string& projectRoot, const std::string& dataRoot,
                          const ScreenOptions& options)
     : options(options),
-      screen(ScreenSettings::load(projectRoot + SCREEN_SETTINGS, options)),
+      screen(ScreenSettings::load(projectRoot + ConfigFiles::SCREEN, options)),
       resultsFolder(dataRoot + RESULTS_FOLDER + screen.mode),
       resultsPath(resultsFolder + RESULTS_FILE),
       screener(baseConfig, screen.settings),
@@ -165,5 +165,5 @@ StockScreen::printResults(const std::vector<Screener::Row>& rows)
     std::vector<std::string> saved = topPicks.save(resultsFolder);
 
     std::cout << "\nAll results: " << resultsPath << "\nTop picks: " << saved[0] << " and " << saved[1]
-              << " (config.json strategy blocks)\n";
+              << " (config/strategy.json portfolio blocks)\n";
 }

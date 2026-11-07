@@ -17,7 +17,7 @@ using json = nlohmann::json;
  * Sends orders to Alpaca over its REST API. Nothing needs to be running on your computer
  * apart from this program.
  *
- * Config (src/config/config.json -> "alpaca"):
+ * Config (config/general.json -> "alpaca"):
  *   "trading_url": "https://paper-api.alpaca.markets"  -> paper trading (fake money)
  *                  "https://api.alpaca.markets"        -> live trading (real money)
  *   "dry_run": true  -> print the order instead of sending it

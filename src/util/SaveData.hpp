@@ -8,7 +8,7 @@
 /**
  * SaveData
  *
- * Keeps the data folder under a size limit (config.json "data_limit_gb", 5 GB unless set). Sizes are file
+ * Keeps the data folder under a size limit (config/general.json "data_limit_gb", 5 GB unless set). Sizes are file
  * contents in decimal gigabytes (1 GB = 1,000,000,000 bytes), as Finder shows them; `du` reports a little more
  * because files take whole disk blocks. Everything that
  * saves or downloads a file into data/ tells it so:

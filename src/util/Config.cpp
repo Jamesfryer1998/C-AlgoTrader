@@ -1,6 +1,7 @@
 #include "Config.hpp"
 #include "Log.hpp"
 #include <fstream>
+#include <map>
 #include <vector>
 
 namespace
@@ -23,16 +24,25 @@ Config::~Config()
 json
 Config::loadConfig()
 {
-    if(!loaded)
-    {
-        loadJson(formConfigPath());
-        Log::out() << "JSON Data: " << configData.dump(4) << std::endl;
+    if (loaded)
         return configData;
-    }
-    else
+
+    json merged = json::object();
+    std::map<std::string, std::string> fileOfKey;
+    for (const auto& configFile : ConfigFiles::APP_CONFIG)
     {
-        return configData;
+        loadJson(formConfigPath(configFile));
+        for (const auto& [key, value] : configData.items())
+        {
+            if (fileOfKey.count(key))
+                throw std::runtime_error("\"" + key + "\" is in both " + fileOfKey[key] + " and " + configFile);
+            fileOfKey[key] = configFile;
+            merged[key] = value;
+        }
     }
+    configData = merged;
+    Log::out() << "JSON Data: " << configData.dump(4) << std::endl;
+    return configData;
 }
 
 void 
@@ -53,11 +63,9 @@ Config::loadJson(const std::string& path)
 }
 
 string
-Config::formConfigPath()
+Config::formConfigPath(const string& configFile)
 {
-    string projectRoot = getProjectRoot();
-    string configPath = projectRoot + JSON_CONFIG_NAME;
-    return configPath;
+    return getProjectRoot() + configFile;
 }
 
 string

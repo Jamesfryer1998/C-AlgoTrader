@@ -10,7 +10,7 @@ using json = nlohmann::json;
 /**
  * ScreenSettings
  *
- * What one screen covers: src/config/screen.json's common settings with the "minute" or "daily" section on
+ * What one screen covers: config/screen.json's common settings with the "minute" or "daily" section on
  * top, then anything given on the command line. Works out the dates:
  *
  *   minute bars   the last history_months up to today, the final test_months being the test period

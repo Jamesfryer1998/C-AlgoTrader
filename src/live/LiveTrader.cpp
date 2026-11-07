@@ -8,6 +8,7 @@
 #include "../alpaca/AlpacaStream.hpp"
 #include "BacktestDownloader.hpp"
 #include "../backtest/BacktestStream.hpp"
+#include "../util/Config.hpp"
 #include "../util/Defaults.hpp"
 #include "../util/Format.hpp"
 #include "../util/Log.hpp"
@@ -91,7 +92,7 @@ LiveTrader::loadPortfolio()
     }
     catch (const std::exception& e)
     {
-        std::cerr << "ERROR - " << e.what() << " (src/config/config.json)" << std::endl;
+        std::cerr << "ERROR - " << e.what() << " (" << ConfigFiles::STRATEGY << ")" << std::endl;
         return false;
     }
 

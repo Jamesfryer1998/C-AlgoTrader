@@ -48,7 +48,7 @@ ScreenOptions::printUsage(std::ostream& out)
 
 Usage: screen_app [options]
   --daily                   daily bars since 2016 instead of 1-minute bars (settings then mean days)
-  --symbols AAPL,MSFT,...   stocks to screen (default: "universe" in src/config/screen.json, the S&P 100)
+  --symbols AAPL,MSFT,...   stocks to screen (default: "universe" in config/screen.json, the S&P 100)
   --strategies RSI,MEANREV  strategies to try (default: all in screen.json)
   --months 24               minute bars: months of history (default: from screen.json)
   --test-months 6           minute bars: months at the end used as the test period (default: from screen.json)

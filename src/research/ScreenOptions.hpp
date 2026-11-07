@@ -8,7 +8,7 @@
 /**
  * ScreenOptions
  *
- * screen_app's command line. Anything not given comes from src/config/screen.json (see ScreenSettings).
+ * screen_app's command line. Anything not given comes from config/screen.json (see ScreenSettings).
  */
 struct ScreenOptions
 {

@@ -377,9 +377,9 @@ TEST(ScreenerTests, MinutePickValuesAreOnePerDay)
     EXPECT_EQ(values.days(), 30u);   // the last value of each day
     EXPECT_EQ(values.dates.front(), "2025-01-06");
 
-    json ready = screener.strategySettings(pick);   // full block for config.json
+    json ready = screener.strategySettings(pick);   // full block for strategy.json
     EXPECT_EQ(ready["name"], "RSI");
     EXPECT_EQ(ready["period"], 14);
-    EXPECT_EQ(ready["stop_loss"], 10);   // not searched: kept from config.json
+    EXPECT_EQ(ready["stop_loss"], 10);   // not searched: kept from strategy.json
     EXPECT_EQ(ready["active"], 1);
 }

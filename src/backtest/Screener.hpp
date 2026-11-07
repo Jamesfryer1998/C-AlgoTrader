@@ -26,7 +26,7 @@ using json = nlohmann::json;
  * The test years never influence a choice, so they show what tuning-then-trading would really have done.
  * Strategies start the test years warmed up (the end of the training years is fed in as history first).
  *
- * Settings: src/config/screen.json (stock list, costs, and a "minute" and a "daily" section with the dates and
+ * Settings: config/screen.json (stock list, costs, and a "minute" and a "daily" section with the dates and
  * the grid for each strategy). The section in use is merged over the common settings before it gets here,
  * with "bars_per_year" set so Sharpe ratios are annualised for that bar size.
  */
@@ -67,7 +67,7 @@ class Screener
             double trainTestCorrelation = 0; // across stocks: does a better training Sharpe mean a better test one?
         };
 
-        // baseConfig: config.json (risk limits, current strategy settings); settings: screen.json
+        // baseConfig: the app config (risk limits, current strategy settings); settings: screen.json
         Screener(const json& baseConfig, const json& settings);
 
         // Daily bars in the form the strategy tester reads (one bar per day at the close)
@@ -114,7 +114,7 @@ class Screener
         quant::PriceTable dailyValues(const std::vector<Row>& picks,
                                      const std::map<std::string, std::vector<quant::DailyBar>>& daily) const;
 
-        // The full strategy settings of a pick (its searched parameters on top of the rest), ready for config.json
+        // The full strategy settings of a pick (its searched parameters on top of the rest), ready for config/strategy.json
         json strategySettings(const Row& pick) const;
 
         // Save / load results (so a long screen can be resumed)
@@ -132,6 +132,6 @@ class Screener
     private:
         json baseConfig;
         json settings;
-        double maxPosition;   // max_position_size from config.json
+        double maxPosition;   // max_position_size from config/risk.json
         Optimiser optimiser;
 };

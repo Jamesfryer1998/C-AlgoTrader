@@ -3,7 +3,7 @@
 /**
  * Defaults
  *
- * Values every part of the app falls back on when config.json doesn't say, kept in one place so the
+ * Values every part of the app falls back on when the config doesn't say, kept in one place so the
  * strategy tester, the backtest, the simulated broker, the P&L book and the reports all agree.
  */
 namespace Defaults

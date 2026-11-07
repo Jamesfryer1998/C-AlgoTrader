@@ -13,13 +13,13 @@ using json = nlohmann::json;
  * RiskComparison
  *
  * Which risk engine suits the portfolio? Backtests the same saved days once per engine, with the portfolio
- * and strategies in config.json and only "risk" changed, then compares them side by side:
+ * and strategies in config/strategy.json and only "risk" changed, then compares them side by side:
  *
  *   Risk engine                Return  Max drawdown  Sharpe  Most capital in use  Fills
  *   -------------------------  ------  ------------  ------  -------------------  -----
  *   FIXED_SIZE 1                +1.67%         0.40%    3.10      $3,557 (3.6%)    3995
  *
- * The engines and their settings come from config.json's "risk_comparison" list; without one, each engine
+ * The engines and their settings come from config/risk.json's "risk_comparison" list; without one, each engine
  * runs with its defaults. Each backtest's records go to data/backtest/<day>/ as usual (the last one is kept).
  */
 class RiskComparison

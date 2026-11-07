@@ -11,7 +11,7 @@
 
 /*
  * Which risk engine (position sizing) to trade with, and with which settings? Backtests the portfolio in
- * config.json once per engine (RiskComparison), or tunes each engine's settings on training days and checks
+ * the config once per engine (RiskComparison), or tunes each engine's settings on training days and checks
  * them on later test days (RiskTuning, --tune), saving the winner with --save.
  */
 
@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
         SaveData::configure(dataRoot, algoConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
 
         if (options.tune)
-            return RiskTuning(algoConfig, dataRoot, root + JSON_CONFIG_NAME, options).run(std::cout);
+            return RiskTuning(algoConfig, dataRoot, config.formConfigPath(ConfigFiles::RISK), options).run(std::cout);
         return RiskComparison(algoConfig, dataRoot, options).run(std::cout);
     }
     catch (const std::exception& e)

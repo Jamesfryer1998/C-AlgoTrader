@@ -28,7 +28,7 @@
  *   ./build/app/optimise_app --strategy RSI          one strategy
  *   ./build/app/optimise_app --download              fetch any missing data from Alpaca first
  *
- * What to try is set in src/config/optimisation.json. Results go to data/optimisation/.
+ * What to try is set in config/optimisation.json. Results go to data/optimisation/.
  */
 
 namespace fs = std::filesystem;
@@ -135,8 +135,8 @@ int main(int argc, char* argv[])
     json baseConfig = config.loadConfig();
     json settings;
     {
-        std::ifstream file(root + "/src/config/optimisation.json");
-        if (!file) { std::cerr << "Missing src/config/optimisation.json" << std::endl; return 1; }
+        std::ifstream file(config.formConfigPath(ConfigFiles::OPTIMISATION));
+        if (!file) { std::cerr << "Missing " << ConfigFiles::OPTIMISATION << std::endl; return 1; }
         settings = json::parse(file, nullptr, true, true);
     }
     if (testMonths >= 0) settings["test_months"] = testMonths;
@@ -210,7 +210,7 @@ int main(int argc, char* argv[])
             });
         double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
 
-        // Current config.json settings, for comparison
+        // Current settings in config/strategy.json, for comparison
         Optimiser::Result current;
         current.settings = optimiser.currentSettings(name);
         try
@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
         }
         catch (const std::exception& e)
         {
-            std::cout << "  (current config.json settings for " << name << " can't run: " << e.what() << ")" << std::endl;
+            std::cout << "  (current settings for " << name << " can't run: " << e.what() << ")" << std::endl;
         }
 
         std::cout << "Done in " << Format::number(seconds, 0) << "s\n\n"
@@ -266,6 +266,6 @@ int main(int argc, char* argv[])
 
     std::string bestPath = dataDir + "optimisation/best_" + stamp + ".json";
     std::ofstream(bestPath) << best.dump(2) << "\n";
-    std::cout << "Best settings per strategy (copy into src/config/config.json if you want them): " << bestPath << std::endl;
+    std::cout << "Best settings per strategy (copy into config/strategy.json if you want them): " << bestPath << std::endl;
     return 0;
 }

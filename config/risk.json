@@ -1,0 +1,23 @@
+{
+    "max_position_size": 10.0,
+    "max_exposure": 5.0,
+    "slippage_tolerance": 2.0,
+    "_risk_comment": "How many shares each order is for, the same engine for every stock (see src/risk/RiskEngine.hpp). FIXED_SIZE = every order is \"quantity\" shares, capped by max_position_size (how it traded before). The others size in $ and are capped by max_stock_percent / max_portfolio_percent of equity instead. Compare them with: ./build/app/risk_app --backtest 2025-11-03 --days 120. Tune them (grids in risk_tuning) and save the best here with: ./build/app/risk_app --tune --backtest 2025-11-03 --days 120 --test-days 60 --save",
+    "_risk_tuned": "Chosen by risk_app --tune on 2026-11-07: training +41.0% (drawdown 4.4%), test +5.7% (drawdown 7.1%); one share per order made +0.9% and +0.2%",
+    "risk": {"name": "VOLATILITY_TARGET", "daily_volatility_percent": 1.0, "max_stock_percent": 40, "volatility_bars": 60},
+    "risk_comparison": [
+        {"name": "FIXED_SIZE", "quantity": 1},
+        {"name": "FIXED_FRACTION", "position_percent": 10, "max_stock_percent": 20, "max_portfolio_percent": 100},
+        {"name": "RISK_PER_TRADE", "risk_percent": 0.5, "max_stock_percent": 20, "max_portfolio_percent": 100},
+        {"name": "VOLATILITY_TARGET", "daily_volatility_percent": 0.25, "volatility_bars": 60, "max_stock_percent": 20, "max_portfolio_percent": 100}
+    ],
+    "risk_tuning": {
+        "max_drawdown_percent": 10,
+        "finalists": 3,
+        "grids": {
+            "FIXED_FRACTION": {"position_percent": [5, 10, 15, 20, 30], "max_stock_percent": [20, 40]},
+            "RISK_PER_TRADE": {"risk_percent": [0.05, 0.1, 0.15, 0.2, 0.3], "max_stock_percent": [20, 40]},
+            "VOLATILITY_TARGET": {"daily_volatility_percent": [0.1, 0.25, 0.5, 1.0], "volatility_bars": [30, 60, 120], "max_stock_percent": [20, 40]}
+        }
+    }
+}

@@ -6,7 +6,7 @@
 
 namespace
 {
-    // slippage_tolerance in config.json is a percentage
+    // slippage_tolerance in config/risk.json is a percentage
     const double PERCENT = 100.0;
 
     // max_position_size (shares) only limits the FIXED_SIZE risk engine. The other engines size positions in $,

@@ -23,7 +23,7 @@ struct RiskOptions
     bool tune = false;
     int testDays = NOT_GIVEN;            // tuning: days after the training days to check the best settings on
     double maxDrawdownPercent = NOT_GIVEN;   // tuning: the most a setting may lose from a high (else config / default)
-    bool save = false;                   // tuning: write the chosen settings into config.json's "risk"
+    bool save = false;                   // tuning: write the chosen settings into config/risk.json's "risk"
 
     // Throws std::invalid_argument with a readable message
     static RiskOptions parse(int argc, char* argv[]);

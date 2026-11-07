@@ -19,7 +19,7 @@ using json = nlohmann::json;
  * minute closes. Every bar is converted to a MarketCondition (its Ticker says which stock) and handed to
  * the callback. One connection carries any number of tickers (Alpaca allows one stream per account).
  *
- * Config (src/config/config.json -> "alpaca"):
+ * Config (config/general.json -> "alpaca"):
  *   "data_feed": "iex"  -> free, real-time, IEX exchange only
  *                "sip"  -> all US exchanges, needs Alpaca's paid Algo Trader Plus plan
  *                "test" -> Alpaca's test stream: fake symbol FAKEPACA, runs 24/7 (good for checking the wiring)
@@ -32,7 +32,7 @@ class AlpacaStream : public BarFeed
     public:
         AlpacaStream(const json& config);
 
-        // Trade several tickers: subscribe to all of these instead of config.json's "ticker".
+        // Trade several tickers: subscribe to all of these instead of config/general.json's "ticker".
         // Ignored on the "test" feed, which only has FAKEPACA. Call before start().
         void setSymbols(const std::vector<std::string>& tickers);
         const std::vector<std::string>& getSymbols() const { return symbols; }

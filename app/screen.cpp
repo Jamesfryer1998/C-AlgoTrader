@@ -11,13 +11,13 @@
 /*
  * Strategy screen: which stock / strategy combinations look worth trading?
  *
- * Every stock in src/config/screen.json (the S&P 100 by default) x every strategy (RSI, MACD, MEANREV, SCALP).
+ * Every stock in config/screen.json (the S&P 100 by default) x every strategy (RSI, MACD, MEANREV, SCALP).
  * Each strategy is tuned per stock on a training period, then only that pick is run on a test period it
  * never saw, and compared with buying and holding the stock. Ends with the top picks and the Monte Carlo
  * risk of trading them together. See StockScreen and Screener.
  *
  *   default   1-minute bars (the live app's bars): the last 24 months, the final 6 being the test period.
- *             Settings are in minutes, so the picks can go straight into config.json.
+ *             Settings are in minutes, so the picks can go straight into config/strategy.json.
  *   --daily   daily bars since 2016, tested from 2024. Settings are in days.
  */
 

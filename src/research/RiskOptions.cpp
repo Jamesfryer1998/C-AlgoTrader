@@ -32,7 +32,7 @@ RiskOptions::parse(int argc, char* argv[])
 void
 RiskOptions::printUsage(std::ostream& out)
 {
-    out << R"(Risk engines (position sizing) on backtested days, with the portfolio in config.json
+    out << R"(Risk engines (position sizing) on backtested days, with the portfolio in config/strategy.json
 
 Compare the engines:
   risk_app --backtest 2025-11-03 --days 120 [--engines RISK_PER_TRADE,FIXED_FRACTION]
@@ -46,9 +46,9 @@ and pick the setting that made the most without falling more than --max-drawdown
   --engines A,B         only these engines (default: all)
   --test-days 40        tuning: days after the training days (default: half as many as --days)
   --max-drawdown 10     tuning: the largest fall from a high allowed, % (default: config or 10)
-  --save                tuning: write the chosen settings into config.json's "risk"
+  --save                tuning: write the chosen settings into config/risk.json's "risk"
 
 Engines: FIXED_SIZE, FIXED_FRACTION, RISK_PER_TRADE, VOLATILITY_TARGET. Settings to compare are in
-config.json's "risk_comparison", the grids to tune in "risk_tuning" (defaults if missing).
+config/risk.json's "risk_comparison", the grids to tune in "risk_tuning" (defaults if missing).
 )";
 }

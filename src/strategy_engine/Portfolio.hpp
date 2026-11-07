@@ -9,7 +9,7 @@ using json = nlohmann::json;
 /**
  * Portfolio
  *
- * Which stocks the live app trades, and with which strategies. In src/config/config.json:
+ * Which stocks the live app trades, and with which strategies. In config/strategy.json:
  *
  *   "portfolio": [
  *       {"ticker": "TXN",  "strategy": {"name": "MEANREV", "lookback_period": 60, ...}},
@@ -25,7 +25,7 @@ using json = nlohmann::json;
 struct PortfolioEntry
 {
     std::string ticker;
-    json config;   // the whole config.json, with "ticker" and "strategies" set for this stock
+    json config;   // the whole config, with "ticker" and "strategies" set for this stock
 };
 
 namespace Portfolio

@@ -11,7 +11,7 @@ using json = nlohmann::json;
  * AlpacaApi
  *
  * Alpaca's addresses, data feeds and limits, and the reading of its bar messages, shared by the stream,
- * the broker and the history downloads. config.json's "alpaca" section can point the URLs elsewhere
+ * the broker and the history downloads. config/general.json's "alpaca" section can point the URLs elsewhere
  * (live trading, or a local test server).
  */
 namespace AlpacaApi

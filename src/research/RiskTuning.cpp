@@ -202,7 +202,7 @@ RiskTuning::run(std::ostream& out)
 
     if (!options.save)
     {
-        out << "Run again with --save to put it in config.json.\n";
+        out << "Run again with --save to put it in config/risk.json.\n";
         return 0;
     }
     std::ostringstream note;

@@ -14,7 +14,7 @@
 
 namespace
 {
-    // Used when config.json doesn't say
+    // Used when config/general.json doesn't say
     const std::string DEFAULT_FEED = AlpacaApi::SIP_FEED;   // all exchanges: real volumes
     const std::string DEFAULT_ADJUSTMENT = "split";          // prices adjusted for stock splits
 

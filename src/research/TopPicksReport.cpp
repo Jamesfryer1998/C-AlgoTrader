@@ -114,7 +114,7 @@ TopPicksReport::save(const std::string& folder) const
     std::string picksPath = folder + PICKS_FILE, configPath = folder + PICKS_CONFIG_FILE;
     Screener::writeTopPicksCsv(picksPath, picks);
 
-    // The same picks as config.json strategy blocks, with the ticker each one is for
+    // The same picks as config/strategy.json portfolio blocks, with the ticker each one is for
     json ready = json::array();
     for (const auto& pick : picks)
         ready.push_back({{"ticker", pick.symbol}, {"strategy", screener.strategySettings(pick)}});

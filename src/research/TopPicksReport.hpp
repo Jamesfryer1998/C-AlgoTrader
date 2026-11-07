@@ -10,7 +10,7 @@
 /**
  * TopPicksReport
  *
- * The combinations to take forward (Screener::topPicks), saved as top_picks.csv and as config.json strategy
+ * The combinations to take forward (Screener::topPicks), saved as top_picks.csv and as config/strategy.json portfolio
  * blocks ready to paste (top_picks_config.json), and the Monte Carlo risk of trading them together:
  * each pick's daily P&L with its chosen setting, simulated forward a month at a time.
  */

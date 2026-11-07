@@ -13,7 +13,7 @@ using json = nlohmann::json;
  * Optimiser
  *
  * Searches for the best settings for a strategy by backtesting every combination of the values listed
- * in src/config/optimisation.json, in parallel.
+ * in config/optimisation.json, in parallel.
  *
  * To avoid fooling ourselves with settings that only fit the past by luck ("overfitting"), the data is
  * split in two:
@@ -36,16 +36,16 @@ class Optimiser
             double score = 0;             // objective on the training data
         };
 
-        // baseConfig: config.json (risk limits, current strategy settings)
+        // baseConfig: the app config (risk limits, current strategy settings)
         // settings:   optimisation.json
         Optimiser(const json& baseConfig, const json& settings);
 
         // Every combination of the listed values for a strategy (invalid ones, e.g. MACD short >= long,
-        // removed), starting from the strategy's current settings in config.json. If max_combinations > 0
+        // removed), starting from the strategy's current settings in config/strategy.json. If max_combinations > 0
         // and there are more, a fixed random sample of that size is used.
         std::vector<json> parameterGrid(const std::string& strategyName) const;
 
-        // The strategy's current settings from config.json (forced active)
+        // The strategy's current settings from config/strategy.json (forced active)
         json currentSettings(const std::string& strategyName) const;
 
         // Backtest one strategy setting over bars and return its performance. The first warmupBars bars only

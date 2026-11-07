@@ -17,7 +17,7 @@ using json = nlohmann::json;
  *   Datetime,Ticker,Open,Close,Volume,TimeInterval
  *   2026-10-28 09:30:00,NVDA,181.90,181.72,7189234,1m
  *
- * Config (src/config/config.json -> "alpaca"):
+ * Config (config/general.json -> "alpaca"):
  *   "history_feed": "sip" -> all US exchanges. Free on the Basic plan for anything older than 15 minutes.
  *                   "iex" -> IEX only (matches the free live stream, much lower volumes)
  *   "history_adjustment": "split" (default) -> prices adjusted for stock splits, so NVDA's 10-for-1 split in

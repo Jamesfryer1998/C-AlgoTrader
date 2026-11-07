@@ -23,9 +23,9 @@ using json = nlohmann::json;
  *     (the position was opened at full size, and topping it up as the price moves would mean many tiny orders)
  *   - the target is capped: max_stock_percent of equity in one stock (default 20) and max_portfolio_percent
  *     across all stocks (default 100: no borrowing); and max_position_size shares if the "risk" block sets one.
- *     config.json's top-level max_position_size only limits FIXED_SIZE.
+ *     config/risk.json's max_position_size only limits FIXED_SIZE.
  *
- * One engine sizes every stock, set in config.json next to the portfolio:
+ * One engine sizes every stock, set in config/risk.json:
  *
  *   "risk": {"name": "RISK_PER_TRADE", "risk_percent": 0.5, "max_stock_percent": 20, "max_portfolio_percent": 100}
  *
