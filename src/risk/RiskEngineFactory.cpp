@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include "FixedFractionRisk.hpp"
 #include "FixedSizeRisk.hpp"
+#include "KellyRisk.hpp"
 #include "RiskPerTradeRisk.hpp"
 #include "VolatilityTargetRisk.hpp"
 
@@ -32,12 +33,15 @@ namespace RiskEngineFactory
             return std::make_unique<RiskPerTradeRisk>(settings);
         if (name == VolatilityTargetRisk::NAME)
             return std::make_unique<VolatilityTargetRisk>(settings);
+        if (name == KellyRisk::NAME)
+            return std::make_unique<KellyRisk>(settings);
         throw std::runtime_error("Unknown risk engine \"" + name + "\" (use one of: FIXED_SIZE, FIXED_FRACTION, "
-                                 "RISK_PER_TRADE, VOLATILITY_TARGET)");
+                                 "RISK_PER_TRADE, VOLATILITY_TARGET, KELLY)");
     }
 
     std::vector<std::string> names()
     {
-        return {FixedSizeRisk::NAME, FixedFractionRisk::NAME, RiskPerTradeRisk::NAME, VolatilityTargetRisk::NAME};
+        return {FixedSizeRisk::NAME, FixedFractionRisk::NAME, RiskPerTradeRisk::NAME, VolatilityTargetRisk::NAME,
+                KellyRisk::NAME};
     }
 }

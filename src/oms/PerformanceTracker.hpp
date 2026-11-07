@@ -66,6 +66,9 @@ class PerformanceTracker
 
         double getEquity() const;
         double getPositionQuantity(const std::string& ticker) const;
+
+        // Each closed (or reduced) position of one stock as a return on what it cost: 0.01 = +1%. Oldest first.
+        const std::vector<double>& closedTradeReturns(const std::string& ticker) const;
         PerformanceSummary summary() const;
 
         static json toJson(const PerformanceSummary& summary);
@@ -87,5 +90,6 @@ class PerformanceTracker
 
         std::map<std::string, Holding> holdings;
         std::vector<double> closedTradePnL;
+        std::map<std::string, std::vector<double>> closedReturnsByTicker;
         std::vector<double> equityCurve;
 };

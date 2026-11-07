@@ -28,6 +28,8 @@ namespace
         {"RISK_PER_TRADE", {{"risk_percent", {0.05, 0.1, 0.15, 0.2, 0.3}}, {"max_stock_percent", {20, 40}}}},
         {"VOLATILITY_TARGET", {{"daily_volatility_percent", {0.1, 0.25, 0.5, 1.0}}, {"volatility_bars", {30, 60, 120}},
                                {"max_stock_percent", {20, 40}}}},
+        {"KELLY", {{"kelly_fraction", {0.25, 0.5}}, {"lookback_trades", {30, 60}}, {"min_trades", {10, 20}},
+                   {"max_stock_percent", {20, 40}}}},
     };
 
     // The baseline every setting is shown against: one share per order, as the app traded before

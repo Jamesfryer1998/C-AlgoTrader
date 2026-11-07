@@ -46,6 +46,8 @@ PerformanceTracker::recordFill(const std::string& ticker, bool isBuy, double qua
     double pnl = closingQty * (price - holding.avgPrice) * direction;
     realisedPnL += pnl;
     closedTradePnL.push_back(pnl);
+    if (holding.avgPrice > 0)
+        closedReturnsByTicker[ticker].push_back((price - holding.avgPrice) / holding.avgPrice * direction);
 
     holding.quantity += (signedQty > 0 ? closingQty : -closingQty);
     double remaining = quantity - closingQty;
@@ -61,6 +63,14 @@ PerformanceTracker::recordFill(const std::string& ticker, bool isBuy, double qua
         holding.quantity = 0;
         holding.avgPrice = 0;
     }
+}
+
+const std::vector<double>&
+PerformanceTracker::closedTradeReturns(const std::string& ticker) const
+{
+    static const std::vector<double> NONE;
+    auto found = closedReturnsByTicker.find(ticker);
+    return found == closedReturnsByTicker.end() ? NONE : found->second;
 }
 
 void

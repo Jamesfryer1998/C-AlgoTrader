@@ -357,6 +357,7 @@ LiveTrader::sizingContext(const std::string& ticker, float held)
     context.equity = session->account().account().equity;
     context.heldQuantity = held;
     context.otherPositionsValue = capital.current() - capital.valueOf(ticker);
+    context.closedTradeReturns = &tracker.closedTradeReturns(ticker);
     return context;
 }
 

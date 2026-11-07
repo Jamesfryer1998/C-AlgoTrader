@@ -219,6 +219,7 @@ StrategyTester::executeTimeStep(const MarketCondition& bar)
         context.equity = broker.getCurrentEquity();
         context.heldQuantity = held;
         context.bars = &marketData;
+        context.closedTradeReturns = &tracker.closedTradeReturns(bar.Ticker);
         order = risk->size(*order, context);
     }
     if (order)

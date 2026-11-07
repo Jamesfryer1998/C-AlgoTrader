@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
 #include "../data_access/MarketData.hpp"
 #include "../oms/Order.hpp"
@@ -32,7 +33,7 @@ using json = nlohmann::json;
  * Each stock gets its own copy (they share no state), built from that block.
  *
  * Engines: FIXED_SIZE (the default: every order is "quantity" shares, as before), FIXED_FRACTION,
- * RISK_PER_TRADE, VOLATILITY_TARGET. See each class.
+ * RISK_PER_TRADE, VOLATILITY_TARGET, KELLY. See each class.
  */
 class RiskEngine
 {
@@ -44,6 +45,7 @@ class RiskEngine
             float heldQuantity = 0;           // in this stock (+ long, - short)
             double otherPositionsValue = 0;   // every other stock's position, at its last price (shorts at full size)
             const MarketData* bars = nullptr; // this stock's recent bars, newest last
+            const std::vector<double>* closedTradeReturns = nullptr;   // this stock's closed trades (0.01 = +1%), oldest first
         };
 
         explicit RiskEngine(const json& settings);

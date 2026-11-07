@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <cmath>
 #include "../../src/risk/RiskEngineFactory.hpp"
+#include "../../src/risk/KellyRisk.hpp"
 #include "../../src/risk/VolatilityTargetRisk.hpp"
 
 namespace
@@ -97,6 +98,63 @@ TEST(RiskEngineTests, VolatilityTargetSizesCalmStocksBigger)
     ASSERT_TRUE(sized);
     double expected = std::floor(250 / (100 * perBar * std::sqrt(390.0)));   // $250 a day / $ move a share a day
     EXPECT_NEAR(sized->getQuantity(), expected, 1);
+}
+
+TEST(RiskEngineTests, KellyPositionFromWinsAndLosses)
+{
+    // 60% win +1%, 40% lose -1%: 0.6 / 0.01 - 0.4 / 0.01 = 20 (2000% of equity)
+    std::vector<double> edge = {0.01, 0.01, 0.01, -0.01, -0.01};
+    EXPECT_NEAR(KellyRisk::kellyPosition(edge), 20, 1e-9);
+
+    // A coin flip that pays the same either way has no edge
+    EXPECT_DOUBLE_EQ(KellyRisk::kellyPosition({0.01, -0.01}), 0);
+    // Losing more than it wins: still 0, never negative
+    EXPECT_DOUBLE_EQ(KellyRisk::kellyPosition({0.01, -0.02, -0.02}), 0);
+    // Nothing to go on, or never a win
+    EXPECT_DOUBLE_EQ(KellyRisk::kellyPosition({}), 0);
+    EXPECT_DOUBLE_EQ(KellyRisk::kellyPosition({-0.01}), 0);
+    // Never a loss: no limit of its own
+    EXPECT_TRUE(std::isinf(KellyRisk::kellyPosition({0.01, 0.02})));
+}
+
+TEST(RiskEngineTests, KellyStartsAtAFixedShareUntilThereAreEnoughTrades)
+{
+    auto risk = engine({{"name", "KELLY"}, {"min_trades", 4}, {"starting_percent", 5}});
+    std::vector<double> trades = {0.01, -0.01, 0.01};   // 3 of the 4 needed
+
+    auto context = account(100000);
+    context.closedTradeReturns = &trades;
+    auto sized = risk->size(buyAt100(), context);
+    ASSERT_TRUE(sized);
+    EXPECT_FLOAT_EQ(sized->getQuantity(), 50);   // 5% of $100,000 at $100
+}
+
+TEST(RiskEngineTests, KellyScalesTheEdgeAndIsCapped)
+{
+    // A small edge on 1% moves: 0.55 / 0.01 - 0.45 / 0.01 = 10 (1000% of equity), half Kelly 500%
+    std::vector<double> trades;
+    for (int i = 0; i < 11; i++) trades.push_back(0.01);
+    for (int i = 0; i < 9; i++) trades.push_back(-0.01);
+    auto capped = engine({{"name", "KELLY"}, {"min_trades", 20}, {"kelly_fraction", 0.5}, {"max_stock_percent", 20}});
+    auto context = account(100000);
+    context.closedTradeReturns = &trades;
+    auto sized = capped->size(buyAt100(), context);
+    ASSERT_TRUE(sized);
+    EXPECT_FLOAT_EQ(sized->getQuantity(), 200);   // the 20% cap, not 500%
+
+    // A tiny edge on wide moves fits under the cap: 0.55 / 0.5 - 0.45 / 0.5 = 0.2, x 0.5 = 10% of equity
+    std::vector<double> wide;
+    for (double r : trades) wide.push_back(r * 50);
+    context.closedTradeReturns = &wide;
+    sized = capped->size(buyAt100(), context);
+    ASSERT_TRUE(sized);
+    EXPECT_FLOAT_EQ(sized->getQuantity(), 100);
+
+    // Only the last lookback_trades count: the last 4 all lost, so no trade
+    auto recent = engine({{"name", "KELLY"}, {"min_trades", 4}, {"lookback_trades", 4}});
+    std::vector<double> turnedBad = {0.05, 0.05, 0.05, -0.01, -0.01, -0.01, -0.01};
+    context.closedTradeReturns = &turnedBad;
+    EXPECT_FALSE(recent->size(buyAt100(), context));
 }
 
 TEST(RiskEngineTests, UnknownEngineIsAnError)
