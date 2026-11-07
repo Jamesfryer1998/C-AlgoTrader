@@ -35,8 +35,9 @@ LiveOptions::printUsage(std::ostream& out)
 
 Usage: algo_trader_app [options]
   (no options)              trade live on Alpaca's stream (paper or live account, from config.json)
-  --replay [YYYY-MM-DD]     replay saved 1-minute bars with a simulated broker instead: no orders reach
-                            Alpaca and no keys are needed (default day: the latest saved for every stock)
+  --replay [YYYY-MM-DD]     replay 1-minute bars with a simulated broker instead: no orders reach Alpaca.
+                            Bars not saved for that day (and the days before, for warm-up) are downloaded
+                            first, which needs the keys in .env. No day: the latest saved for every stock
   --days 3                  replay this many trading days from that day (default 1)
   --speed 10                replayed minutes per second (default 10; 0 = as fast as possible)
 )";

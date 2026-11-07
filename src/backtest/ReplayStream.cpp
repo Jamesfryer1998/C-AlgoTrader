@@ -13,8 +13,6 @@ namespace
     // Minute bars a screen downloaded: data/minute/<TICKER>/marketData_<TICKER>_<YYYY-MM-DD>.csv
     const std::string MINUTE_FOLDER = "minute";
 
-    // Saved days loaded before the first replayed day, enough for any strategy's back-fill
-    const int HISTORY_DAYS = 5;
     const int LOADING_THREADS = 4;
 }
 

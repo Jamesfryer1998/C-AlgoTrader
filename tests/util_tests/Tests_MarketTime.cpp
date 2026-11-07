@@ -94,3 +94,15 @@ TEST(MarketTimeTests, NextRegularOpenSkipsWeekends)
     std::time_t julyMonday = MarketTime::parseUtc("2026-07-06T12:00:00Z");
     EXPECT_EQ(MarketTime::nextRegularOpen(julyMonday), MarketTime::parseUtc("2026-07-06T13:30:00Z"));
 }
+
+TEST(MarketTimeTests, WeekdaysSkipWeekends)
+{
+    EXPECT_TRUE(MarketTime::isWeekday("2026-11-06"));    // Friday
+    EXPECT_FALSE(MarketTime::isWeekday("2026-11-07"));   // Saturday
+    EXPECT_EQ(MarketTime::addWeekdays("2026-11-06", 1), "2026-11-09");
+    EXPECT_EQ(MarketTime::addWeekdays("2026-11-09", -1), "2026-11-06");
+    EXPECT_EQ(MarketTime::addWeekdays("2026-10-15", -5), "2026-10-08");
+    EXPECT_EQ(MarketTime::addWeekdays("2026-10-15", 0), "2026-10-15");
+    EXPECT_EQ(MarketTime::weekdaysBetween("2026-11-06", "2026-11-10"),
+              (std::vector<std::string>{"2026-11-06", "2026-11-09", "2026-11-10"}));
+}

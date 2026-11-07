@@ -2,6 +2,7 @@
 
 #include <ctime>
 #include <string>
+#include <vector>
 
 /**
  * MarketTime
@@ -49,6 +50,15 @@ namespace MarketTime
 
     // "YYYY-MM-DD" moved back by whole months (day capped at 28 so it always exists)
     std::string monthsBefore(const std::string& date, int months);
+
+    // Is "YYYY-MM-DD" a Monday to Friday?
+    bool isWeekday(const std::string& date);
+
+    // "YYYY-MM-DD" moved by n weekdays (negative = back), e.g. Friday + 1 = Monday. Holidays aren't known.
+    std::string addWeekdays(const std::string& date, int n);
+
+    // Every weekday from first to last ("YYYY-MM-DD", inclusive)
+    std::vector<std::string> weekdaysBetween(const std::string& first, const std::string& last);
 
     // When regular hours next open, and when they close after that (or today's close if open now).
     // Weekdays only: market holidays aren't known here (Alpaca's clock knows them; this is the fallback).

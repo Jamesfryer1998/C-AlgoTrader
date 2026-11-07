@@ -139,6 +139,55 @@ static bool sessionOnDay(std::time_t utc, int daysAhead, std::time_t& open, std:
     return true;
 }
 
+// "YYYY-MM-DD" for a midnight UTC time
+static std::string formatDate(std::time_t day)
+{
+    std::tm tm{};
+    gmtime_r(&day, &tm);
+    char text[16];
+    std::strftime(text, sizeof(text), DATE_FORMAT, &tm);
+    return text;
+}
+
+static bool isWeekdayAt(std::time_t day)
+{
+    std::tm tm{};
+    gmtime_r(&day, &tm);
+    return tm.tm_wday != SUNDAY && tm.tm_wday != SATURDAY;
+}
+
+bool
+MarketTime::isWeekday(const std::string& date)
+{
+    std::time_t day = parseDate(date);
+    return day >= 0 && isWeekdayAt(day);
+}
+
+std::string
+MarketTime::addWeekdays(const std::string& date, int n)
+{
+    std::time_t day = parseDate(date);
+    int step = n < 0 ? -1 : 1;
+    for (int moved = 0; moved != n;)
+    {
+        day += step * SECONDS_PER_DAY;
+        if (isWeekdayAt(day))
+            moved += step;
+    }
+    return formatDate(day);
+}
+
+std::vector<std::string>
+MarketTime::weekdaysBetween(const std::string& first, const std::string& last)
+{
+    std::vector<std::string> days;
+    std::time_t end = parseDate(last);
+    for (std::time_t day = parseDate(first); day >= 0 && day <= end; day += SECONDS_PER_DAY)
+        if (isWeekdayAt(day))
+            days.push_back(formatDate(day));
+    return days;
+}
+
 std::time_t
 MarketTime::nextRegularOpen(std::time_t utc)
 {

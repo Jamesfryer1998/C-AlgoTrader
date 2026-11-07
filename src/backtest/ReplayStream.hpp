@@ -22,6 +22,9 @@
 class ReplayStream : public BarFeed
 {
     public:
+        // Saved days loaded before the first replayed day, enough for any strategy's back-fill
+        static constexpr int HISTORY_DAYS = 5;
+
         // dataRoot: the project's data/ folder. date: first day to replay (YYYY-MM-DD; empty = the latest day
         // every ticker has saved). days: how many trading days to replay from there.
         ReplayStream(const std::string& dataRoot, const std::vector<std::string>& tickers, std::string date,

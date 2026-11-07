@@ -6,6 +6,7 @@
 #include <thread>
 #include "../alpaca/AlpacaApi.hpp"
 #include "../alpaca/AlpacaStream.hpp"
+#include "ReplayDownloader.hpp"
 #include "../backtest/ReplayStream.hpp"
 #include "../util/Defaults.hpp"
 #include "../util/Format.hpp"
@@ -98,7 +99,7 @@ LiveTrader::createLanes()
     report = std::make_unique<MinuteReport>(tickers);
 }
 
-// Live: Alpaca's WebSocket stream. Replay: the saved bars of the chosen days.
+// Live: Alpaca's WebSocket stream. Replay: the saved bars of the chosen days (downloading any that are missing).
 bool
 LiveTrader::openFeed()
 {
@@ -108,6 +109,13 @@ LiveTrader::openFeed()
         stream->setSymbols(tickers);
         feed = std::move(stream);
         return true;
+    }
+
+    if (!options.replayDay.empty())
+    {
+        ReplayDownloader downloader(config, dataRoot);
+        if (!downloader.downloadMissing(tickers, options.replayDay, options.replayDays))
+            return false;
     }
 
     auto replay = std::make_unique<ReplayStream>(dataRoot, tickers, options.replayDay, options.replayDays,
