@@ -11,7 +11,7 @@ using json = nlohmann::json;
 /**
  * AlpacaHistory
  *
- * Downloads historical 1-minute bars from Alpaca and saves them as CSV files the backtester reads.
+ * Downloads historical 1-minute bars from Alpaca and saves them as CSV files the strategy tester reads.
  *
  *   data/marketData_NVDA_2026-10-28.csv   one file per trading day, New York exchange time
  *   Datetime,Ticker,Open,Close,Volume,TimeInterval
@@ -48,7 +48,7 @@ class AlpacaHistory
         // Path of the CSV for one day, e.g. <dataDir>/marketData_NVDA_2026-10-28.csv
         std::string csvPath(const std::string& dataDir, const std::string& date) const;
 
-        // Write bars to a CSV in the backtester's format
+        // Write bars to a CSV in the market data format
         static bool writeCsv(const std::string& path, const std::vector<MarketCondition>& bars);
 
     private:

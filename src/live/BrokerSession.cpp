@@ -11,11 +11,11 @@ namespace
     // Where each session's trades, positions and performance go, under data/
     const std::string LIVE_FOLDER = "live";
     const std::string DRY_RUN_FOLDER = "live_dry_run";
-    const std::string REPLAY_FOLDER = "replay/";   // + the first replayed day
+    const std::string BACKTEST_FOLDER = "backtest/";   // + the first backtested day
 
-    // Replay fills: slippage against us on every fill (config "replay_slippage_percent" overrides), no commission
-    const double DEFAULT_REPLAY_SLIPPAGE_PERCENT = 0.01;
-    const double REPLAY_COMMISSION = 0.0;
+    // Backtest fills: slippage against us on every fill (config "backtest_slippage_percent" overrides), no commission
+    const double DEFAULT_BACKTEST_SLIPPAGE_PERCENT = 0.01;
+    const double BACKTEST_COMMISSION = 0.0;
 
     // The simulated broker only needs the bar being processed
     const size_t SIMULATED_BROKER_BARS = 5;
@@ -129,34 +129,34 @@ AlpacaSession::printSummary(std::ostream& out, const std::vector<std::string>& t
     }
 }
 
-// ---------- Replay ----------
+// ---------- Backtest ----------
 
-ReplaySession::ReplaySession(const json& config, const std::string& firstDay)
+BacktestSession::BacktestSession(const json& config, const std::string& firstDay)
     : config(config), firstDay(firstDay), simulated(latestBars), monitor(simulated)
 {
 }
 
 bool
-ReplaySession::connect()
+BacktestSession::connect()
 {
     simulated.followLatestBar(true);
     simulated.allowSeveralStocks(true);
     simulated.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
-    simulated.setSlippage(config.value("replay_slippage_percent", DEFAULT_REPLAY_SLIPPAGE_PERCENT) / PERCENT);
-    simulated.setCommission(REPLAY_COMMISSION);
+    simulated.setSlippage(config.value("backtest_slippage_percent", DEFAULT_BACKTEST_SLIPPAGE_PERCENT) / PERCENT);
+    simulated.setCommission(BACKTEST_COMMISSION);
     simulated.setStartingCapital(config.value("starting_capital", Defaults::STARTING_CAPITAL));
     return simulated.connect();
 }
 
 std::string
-ReplaySession::recordsFolder() const
+BacktestSession::recordsFolder() const
 {
-    return REPLAY_FOLDER + firstDay;
+    return BACKTEST_FOLDER + firstDay;
 }
 
 // The simulated broker prices this bar's orders off its close
 void
-ReplaySession::beforeDecision(const MarketCondition& bar)
+BacktestSession::beforeDecision(const MarketCondition& bar)
 {
     monitor.onDay(MarketTime::datePart(bar.DateTime));
     latestBars.addBar(bar, SIMULATED_BROKER_BARS);
@@ -164,13 +164,13 @@ ReplaySession::beforeDecision(const MarketCondition& bar)
 
 // Fill this bar's orders, run stop losses / take profits for this stock
 void
-ReplaySession::afterDecision()
+BacktestSession::afterDecision()
 {
     simulated.nextStep();
 }
 
 void
-ReplaySession::printSummary(std::ostream& out, const std::vector<std::string>& tickers)
+BacktestSession::printSummary(std::ostream& out, const std::vector<std::string>& tickers)
 {
     double start = simulated.getStartingCapital(), equity = simulated.getCurrentEquity();
     out << "Simulated equity " << Format::dollars(equity) << " (" << Format::dollarChange(equity - start) << ", "

@@ -70,7 +70,7 @@ class Screener
         // baseConfig: config.json (risk limits, current strategy settings); settings: screen.json
         Screener(const json& baseConfig, const json& settings);
 
-        // Daily bars in the form the backtester reads (one bar per day at the close)
+        // Daily bars in the form the strategy tester reads (one bar per day at the close)
         static std::vector<MarketCondition> toBars(const std::string& symbol, const std::vector<quant::DailyBar>& daily);
 
         // Screen one stock with every strategy in `strategies`, on bars of any size (oldest first; the size must

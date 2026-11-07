@@ -20,7 +20,7 @@
  *                        if they disagree, nothing is traded
  *
  * The engine only decides. Sending the order (risk checks, then the broker) is the caller's job, through the
- * OrderManagement: the live app's LiveTrader::onBar and the Backtester's executeTimeStep.
+ * OrderManagement: the live app's LiveTrader::onBar and the StrategyTester's executeTimeStep.
  */
 class StrategyEngine
 {

@@ -1,4 +1,4 @@
-#include "ReplayStream.hpp"
+#include "BacktestStream.hpp"
 #include "../util/MarketTime.hpp"
 
 #include <algorithm>
@@ -18,21 +18,21 @@ namespace
 
 namespace fs = std::filesystem;
 
-ReplayStream::ReplayStream(const std::string& dataRoot, const std::vector<std::string>& tickers, std::string date,
+BacktestStream::BacktestStream(const std::string& dataRoot, const std::vector<std::string>& tickers, std::string date,
                            int days, double speed)
     : dataRoot(dataRoot), tickers(tickers), firstDay(std::move(date)), dayCount(std::max(1, days)), speed(speed)
 {
 }
 
 std::string
-ReplayStream::folderFor(const std::string& dataRoot, const std::string& ticker)
+BacktestStream::folderFor(const std::string& dataRoot, const std::string& ticker)
 {
     fs::path own = fs::path(dataRoot) / MINUTE_FOLDER / ticker;
     return fs::is_directory(own) ? own.string() : dataRoot;
 }
 
 std::vector<std::string>
-ReplayStream::savedDays(const std::string& dataRoot, const std::string& ticker)
+BacktestStream::savedDays(const std::string& dataRoot, const std::string& ticker)
 {
     std::vector<std::string> found;
     std::string prefix = DEFAULT_MARKET_DATA_FILE_NAME + "_" + ticker + "_";
@@ -50,7 +50,7 @@ ReplayStream::savedDays(const std::string& dataRoot, const std::string& ticker)
 }
 
 bool
-ReplayStream::load()
+BacktestStream::load()
 {
     // The trading days every ticker has saved
     std::set<std::string> common;
@@ -90,7 +90,7 @@ ReplayStream::load()
         return false;
     }
     if (!firstDay.empty() && *from != firstDay)
-        std::cout << "No saved bars for every stock on " << firstDay << "; replaying from " << *from << std::endl;
+        std::cout << "No saved bars for every stock on " << firstDay << "; backtesting from " << *from << std::endl;
     days.assign(from, std::min(from + dayCount, all.end()));
 
     std::string historyStart = from - all.begin() >= HISTORY_DAYS ? *(from - HISTORY_DAYS) : all.front();
@@ -117,7 +117,7 @@ ReplayStream::load()
 }
 
 std::vector<MarketCondition>
-ReplayStream::history(const std::string& ticker, int count)
+BacktestStream::history(const std::string& ticker, int count)
 {
     auto found = before.find(ticker);
     if (found == before.end() || count <= 0)
@@ -128,7 +128,7 @@ ReplayStream::history(const std::string& ticker, int count)
 }
 
 void
-ReplayStream::start(BarHandler onBar, std::function<void()> onFinished)
+BacktestStream::start(BarHandler onBar, std::function<void()> onFinished)
 {
     stop();
     running = true;
@@ -150,7 +150,7 @@ ReplayStream::start(BarHandler onBar, std::function<void()> onFinished)
 }
 
 void
-ReplayStream::stop()
+BacktestStream::stop()
 {
     running = false;
     if (worker.joinable())

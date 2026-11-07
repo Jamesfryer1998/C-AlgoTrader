@@ -14,9 +14,9 @@ using json = nlohmann::json;
  *
  * Finds the risk engine settings to trade with, the way the screen tunes strategies:
  *
- *   1. Training: replay the training days once for every setting in each engine's grid
+ *   1. Training: backtest the training days once for every setting in each engine's grid
  *   2. Shortlist: the settings that made the most without falling more than max_drawdown_percent
- *   3. Test: replay the shortlist on the days after training, which no setting was chosen on
+ *   3. Test: backtest the shortlist on the days after training, which no setting was chosen on
  *   4. Pick: the shortlisted setting with the best weaker return of the two periods, if it also stayed within
  *      the drawdown limit on the test days; with --save it goes into config.json's "risk"
  *
@@ -34,7 +34,7 @@ class RiskTuning
         RiskTuning(const json& config, const std::string& dataRoot, const std::string& configPath,
                    const RiskOptions& options);
 
-        // 0 when a setting was chosen (and saved with --save), 1 if none passed or a replay failed
+        // 0 when a setting was chosen (and saved with --save), 1 if none passed or a backtest failed
         int run(std::ostream& out);
 
         // Every combination in each engine's grid, as "risk" blocks
@@ -56,7 +56,7 @@ class RiskTuning
         };
 
         bool withinLimit(const LiveTrader::Result& result) const;
-        bool replay(Candidate& candidate, bool testPeriod, std::ostream& out);
+        bool backtest(Candidate& candidate, bool testPeriod, std::ostream& out);
         void printTable(std::ostream& out, const std::vector<Candidate>& rows, bool withTest) const;
 
         json config;

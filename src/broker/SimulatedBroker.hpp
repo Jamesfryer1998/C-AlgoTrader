@@ -60,10 +60,10 @@ class SimulatedBroker : public BrokerBase {
         void setSlippageMode(SlippageMode mode) { slippageMode = mode; }
 
         // true: each step uses the newest bar in MarketData (for a rolling window of bars, as the
-        // Backtester and live trading use). false: step N uses bar N (the original behaviour).
+        // StrategyTester and live trading use). false: step N uses bar N (the original behaviour).
         void followLatestBar(bool follow) { useLatestBar = follow; }
 
-        // Several stocks in one simulation, their bars arriving one after another (the live app's replay
+        // Several stocks in one simulation, their bars arriving one after another (the live app's backtest
         // mode): an order fills, and a position's stop loss / take profit is checked, only on its own
         // stock's bar, and each stock is valued at its own last price.
         void allowSeveralStocks(bool several) { severalStocks = several; }

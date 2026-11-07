@@ -1,4 +1,4 @@
-#include "ReplayDownloader.hpp"
+#include "BacktestDownloader.hpp"
 
 #include <algorithm>
 #include <ctime>
@@ -7,7 +7,7 @@
 #include <iostream>
 #include <set>
 #include "../alpaca/AlpacaHistory.hpp"
-#include "../backtest/ReplayStream.hpp"
+#include "../backtest/BacktestStream.hpp"
 #include "../util/MarketTime.hpp"
 #include "../util/SaveData.hpp"
 
@@ -33,16 +33,16 @@ namespace
     }
 }
 
-ReplayDownloader::ReplayDownloader(const json& config, const std::string& dataRoot)
+BacktestDownloader::BacktestDownloader(const json& config, const std::string& dataRoot)
     : config(config), dataRoot(dataRoot)
 {
 }
 
 bool
-ReplayDownloader::downloadMissing(const std::vector<std::string>& tickers, const std::string& firstDay, int days)
+BacktestDownloader::downloadMissing(const std::vector<std::string>& tickers, const std::string& firstDay, int days)
 {
     std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(std::time(nullptr)));
-    std::string historyStart = MarketTime::addWeekdays(firstDay, -ReplayStream::HISTORY_DAYS);
+    std::string historyStart = MarketTime::addWeekdays(firstDay, -BacktestStream::HISTORY_DAYS);
     std::string lastDay = std::min(MarketTime::addWeekdays(firstDay, std::max(days, 1) - 1), today);
     if (lastDay < historyStart)
         return true;
@@ -56,7 +56,7 @@ ReplayDownloader::downloadMissing(const std::vector<std::string>& tickers, const
             continue;
 
         std::cout << "Downloading " << ticker << " minute bars " << historyStart << " to " << lastDay
-                  << " from Alpaca for the replay..." << std::endl;
+                  << " from Alpaca for the backtest..." << std::endl;
         json stockConfig = config;
         stockConfig["ticker"] = ticker;
         AlpacaHistory history(stockConfig);
@@ -72,9 +72,9 @@ ReplayDownloader::downloadMissing(const std::vector<std::string>& tickers, const
 }
 
 std::set<std::string>
-ReplayDownloader::coveredDays(const std::string& ticker) const
+BacktestDownloader::coveredDays(const std::string& ticker) const
 {
-    std::vector<std::string> saved = ReplayStream::savedDays(dataRoot, ticker);
+    std::vector<std::string> saved = BacktestStream::savedDays(dataRoot, ticker);
     std::set<std::string> days(saved.begin(), saved.end());
     std::set<std::string> empty = readDays((std::filesystem::path(folderFor(ticker)) / DAYS_WITHOUT_BARS_FILE).string());
     days.insert(empty.begin(), empty.end());
@@ -83,12 +83,12 @@ ReplayDownloader::coveredDays(const std::string& ticker) const
 
 // Today may simply not have finished, so only earlier days are remembered
 void
-ReplayDownloader::rememberDaysWithoutBars(const std::string& ticker, const std::vector<std::string>& needed,
+BacktestDownloader::rememberDaysWithoutBars(const std::string& ticker, const std::vector<std::string>& needed,
                                           const std::string& today) const
 {
     std::string path = (std::filesystem::path(folderFor(ticker)) / DAYS_WITHOUT_BARS_FILE).string();
     std::set<std::string> empty = readDays(path);
-    std::vector<std::string> saved = ReplayStream::savedDays(dataRoot, ticker);
+    std::vector<std::string> saved = BacktestStream::savedDays(dataRoot, ticker);
     std::set<std::string> have(saved.begin(), saved.end());
 
     size_t before = empty.size();
@@ -101,10 +101,10 @@ ReplayDownloader::rememberDaysWithoutBars(const std::string& ticker, const std::
 }
 
 std::string
-ReplayDownloader::folderFor(const std::string& ticker) const
+BacktestDownloader::folderFor(const std::string& ticker) const
 {
-    bool hasSavedBars = !ReplayStream::savedDays(dataRoot, ticker).empty();
+    bool hasSavedBars = !BacktestStream::savedDays(dataRoot, ticker).empty();
     if (hasSavedBars)
-        return ReplayStream::folderFor(dataRoot, ticker);
+        return BacktestStream::folderFor(dataRoot, ticker);
     return (std::filesystem::path(dataRoot) / MINUTE_FOLDER / ticker).string();
 }

@@ -2,7 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <vector>
-#include "backtest/Backtester.hpp"
+#include "backtest/StrategyTester.hpp"
 #include "strategy_engine/StrategyEngine.hpp"
 #include "strategy_engine/StrategyFactory.hpp"
 
@@ -69,12 +69,12 @@ namespace
     {
         json config = makeConfig(strategy);
         std::vector<MarketCondition> market = makeMarket();
-        Backtester backtester(config);
-        backtester.setStartingCapital(100000.0);
-        backtester.setCommissionPerTrade(1.0);
-        backtester.setSlippagePercentage(0.0);
-        backtester.runOn(market);
-        PerformanceMetrics m = backtester.getPerformanceMetrics();
+        StrategyTester tester(config);
+        tester.setStartingCapital(100000.0);
+        tester.setCommissionPerTrade(1.0);
+        tester.setSlippagePercentage(0.0);
+        tester.runOn(market);
+        PerformanceMetrics m = tester.getPerformanceMetrics();
         std::printf("REGRESSION VALUES backtest %s: fills=%d finalEquity=%.2f realised=%.2f unrealised=%.2f "
                     "commission=%.2f wins=%d losses=%d maxDD=%.4f sharpe=%.4f\n",
                     strategy["name"].get<std::string>().c_str(), m.numTrades, m.finalEquity, m.realisedPnL,

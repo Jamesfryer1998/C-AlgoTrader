@@ -100,7 +100,7 @@ class TradeStore
 
         const std::string& getDirectory() const { return directory; }
 
-        // Start afresh: delete the files a store keeps in `directory` (e.g. before a replay)
+        // Start afresh: delete the files a store keeps in `directory` (e.g. before a backtest)
         static void removeFiles(const std::string& directory);
 
     private:

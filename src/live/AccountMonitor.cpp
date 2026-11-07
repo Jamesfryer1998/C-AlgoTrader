@@ -9,7 +9,7 @@ namespace
 {
     const std::string FLAT = "-";            // shown for a stock we don't hold
     const int PNL_PERCENT_DECIMALS = 2;      // minute moves are small
-    const std::string REPLAY_NOTE = "REPLAY";
+    const std::string BACKTEST_NOTE = "BACKTEST";
     const std::string DRY_RUN_NOTE = "dry run estimate ";
 
     // A position at the latest price: P&L in dollars and as a fraction of what it cost
@@ -117,7 +117,7 @@ DryRunAccountMonitor::position(const std::string& ticker, double lastPrice)
 std::string
 SimulatedAccountMonitor::headerNote() const
 {
-    return REPLAY_NOTE;
+    return BACKTEST_NOTE;
 }
 
 std::string

@@ -83,7 +83,7 @@ RiskTuning::RiskTuning(const json& config, const std::string& dataRoot, const st
     maxDrawdown = limitPercent / PERCENT;
     finalists = tuning.value("finalists", DEFAULT_FINALISTS);
     testDays = options.testDays != RiskOptions::NOT_GIVEN ? options.testDays
-                                                          : std::max(1, options.replay.replayDays / TEST_DAYS_DIVISOR);
+                                                          : std::max(1, options.period.backtestDays / TEST_DAYS_DIVISOR);
 }
 
 std::vector<json>
@@ -109,7 +109,7 @@ RiskTuning::grid(const json& config, const std::vector<std::string>& engines)
 int
 RiskTuning::run(std::ostream& out)
 {
-    int trainDays = options.replay.replayDays;
+    int trainDays = options.period.backtestDays;
 
     std::vector<Candidate> candidates;
     candidates.push_back({BASELINE, RiskComparison::label(config, BASELINE), {}, {}});
@@ -118,11 +118,11 @@ RiskTuning::run(std::ostream& out)
 
     // 1. Training
     out << "Training: " << candidates.size() << " settings x " << trainDays << " day(s) from "
-        << options.replay.replayDay << std::endl;
+        << options.period.backtestDay << std::endl;
     for (size_t i = 0; i < candidates.size(); i++)
     {
         out << "  [" << i + 1 << "/" << candidates.size() << "] " << candidates[i].name << "..." << std::flush;
-        if (!replay(candidates[i], false, out))
+        if (!backtest(candidates[i], false, out))
             return 1;
     }
     Candidate baseline = candidates.front();
@@ -155,12 +155,12 @@ RiskTuning::run(std::ostream& out)
     testFirstDay = MarketTime::addWeekdays(baseline.train.lastDay, 1);
     out << "\nTest: the best " << shortlist.size() << " on " << testDays << " day(s) from " << testFirstDay << std::endl;
     out << "  " << baseline.name << "..." << std::flush;
-    if (!replay(baseline, true, out))
+    if (!backtest(baseline, true, out))
         return 1;
     for (auto& candidate : shortlist)
     {
         out << "  " << candidate.name << "..." << std::flush;
-        if (!replay(candidate, true, out))
+        if (!backtest(candidate, true, out))
             return 1;
     }
 
@@ -227,15 +227,15 @@ RiskTuning::withinLimit(const LiveTrader::Result& result) const
 }
 
 bool
-RiskTuning::replay(Candidate& candidate, bool testPeriod, std::ostream& out)
+RiskTuning::backtest(Candidate& candidate, bool testPeriod, std::ostream& out)
 {
     bool ok = false;
-    std::string firstDay = testPeriod ? testFirstDay : options.replay.replayDay;
-    int days = testPeriod ? testDays : options.replay.replayDays;
-    LiveTrader::Result result = RiskComparison::replayWith(config, dataRoot, candidate.risk, firstDay, days, ok);
+    std::string firstDay = testPeriod ? testFirstDay : options.period.backtestDay;
+    int days = testPeriod ? testDays : options.period.backtestDays;
+    LiveTrader::Result result = RiskComparison::backtestWith(config, dataRoot, candidate.risk, firstDay, days, ok);
     if (!ok)
     {
-        out << " replay failed" << std::endl;
+        out << " backtest failed" << std::endl;
         return false;
     }
     (testPeriod ? candidate.test : candidate.train) = result;

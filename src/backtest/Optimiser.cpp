@@ -6,7 +6,7 @@
 #include <mutex>
 #include <random>
 #include <thread>
-#include "Backtester.hpp"
+#include "StrategyTester.hpp"
 #include "../strategy_engine/MACD.hpp"
 #include "../strategy_engine/MEANREV.hpp"
 #include "../strategy_engine/RSI.hpp"
@@ -116,12 +116,12 @@ Optimiser::evaluate(const json& strategySettings, const std::vector<MarketCondit
     json config = baseConfig;
     config["strategies"] = json::array({strategySettings});
 
-    Backtester backtester(config);
-    backtester.useCosts(BacktestCosts(settings));
-    backtester.keepEquityCurve(false);
-    backtester.setWarmupBars(warmupBars);
-    backtester.runOn(bars);
-    return backtester.getSummary();
+    StrategyTester tester(config);
+    tester.useCosts(TradingCosts(settings));
+    tester.keepEquityCurve(false);
+    tester.setWarmupBars(warmupBars);
+    tester.runOn(bars);
+    return tester.getSummary();
 }
 
 double

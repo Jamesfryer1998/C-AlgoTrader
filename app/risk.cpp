@@ -10,7 +10,7 @@
 #include "../src/util/SaveData.hpp"
 
 /*
- * Which risk engine (position sizing) to trade with, and with which settings? Replays the portfolio in
+ * Which risk engine (position sizing) to trade with, and with which settings? Backtests the portfolio in
  * config.json once per engine (RiskComparison), or tunes each engine's settings on training days and checks
  * them on later test days (RiskTuning, --tune), saving the winner with --save.
  */
@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
         RiskOptions::printUsage(std::cerr);
         return 1;
     }
-    if (options.replay.showHelp)
+    if (options.period.showHelp)
     {
         RiskOptions::printUsage(std::cout);
         return 0;
@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
 
     try
     {
-        Log::verbose = false;   // many replays: no per-bar notes
+        Log::verbose = false;   // many backtests: no per-bar notes
         Config config;
         std::string root = config.getProjectRoot();
         DotEnv::load(root + "/.env");

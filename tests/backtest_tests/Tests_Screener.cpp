@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <ctime>
 #include <filesystem>
-#include "../../src/backtest/Backtester.hpp"
+#include "../../src/backtest/StrategyTester.hpp"
 #include "../../src/backtest/Screener.hpp"
 #include "../../src/util/Log.hpp"
 
@@ -78,17 +78,17 @@ TEST(ScreenerTests, WarmupBarsAreHistoryOnly)
     json config = baseConfig();
     config["bars_per_year"] = 252.0;
 
-    Backtester cold(config);
+    StrategyTester cold(config);
     cold.keepEquityCurve(false);
     cold.runOn(std::vector<MarketCondition>(bars.begin() + 300, bars.end()));
 
     // The same last 100 days, with 300 earlier days fed in first as history: no trades happen during them
-    Backtester warm(config);
+    StrategyTester warm(config);
     warm.keepEquityCurve(false);
     warm.setWarmupBars(300);
     warm.runOn(bars);
 
-    Backtester everything(config);
+    StrategyTester everything(config);
     everything.keepEquityCurve(false);
     everything.runOn(bars);
 
@@ -105,7 +105,7 @@ TEST(ScreenerTests, SharpeIsAnnualisedForDailyBars)
     json daily = baseConfig();
     daily["bars_per_year"] = 252.0;
 
-    Backtester a(minute), b(daily);
+    StrategyTester a(minute), b(daily);
     a.keepEquityCurve(false);
     b.keepEquityCurve(false);
     a.runOn(bars);

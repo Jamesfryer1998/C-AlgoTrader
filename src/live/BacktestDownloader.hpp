@@ -8,20 +8,20 @@
 using json = nlohmann::json;
 
 /**
- * ReplayDownloader
+ * BacktestDownloader
  *
- * Before a replay of a chosen day (--replay 2026-10-15 [--days 3]), downloads from Alpaca any minute bars
- * that aren't saved yet: the replayed days, plus the few days before them that strategies are warmed up on.
+ * Before a backtest of a chosen day (--backtest 2026-10-15 [--days 3]), downloads from Alpaca any minute bars
+ * that aren't saved yet: the backtested days, plus the few days before them that strategies are warmed up on.
  * Each stock is checked on its own, and only a stock missing a weekday in that range is downloaded (days
  * already saved are skipped by the download itself).
  *
  * Weekdays Alpaca has no bars for (market holidays like Thanksgiving, or a halted stock) are remembered in
  * the stock's folder (.days_without_bars.json) after a download, so they don't trigger another one.
  */
-class ReplayDownloader
+class BacktestDownloader
 {
     public:
-        ReplayDownloader(const json& config, const std::string& dataRoot);
+        BacktestDownloader(const json& config, const std::string& dataRoot);
 
         // False if a needed download failed (e.g. Alpaca unreachable or no keys)
         bool downloadMissing(const std::vector<std::string>& tickers, const std::string& firstDay, int days);

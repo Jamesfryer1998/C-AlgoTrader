@@ -2,7 +2,7 @@
 #include <memory>
 #include <fstream>
 #include <cstdio>
-#include "../../src/backtest/Backtester.hpp"
+#include "../../src/backtest/StrategyTester.hpp"
 #include "../../src/broker/SimulatedBroker.hpp"
 #include "../../src/data_access/MarketData.hpp"
 #include "../../src/strategy_engine/StrategyEngine.hpp"
@@ -11,11 +11,11 @@
 #include "../../src/oms/Position.hpp"
 #include "MockMarketDataAdapter.hpp"
 
-// Test fixture for Backtester tests
-class BacktesterTests : public ::testing::Test {
+// Test fixture for StrategyTester tests
+class StrategyTesterTests : public ::testing::Test {
 public:
     std::unique_ptr<MockMarketDataAdapter> mockAdapter;
-    std::unique_ptr<Backtester> backtester;
+    std::unique_ptr<StrategyTester> tester;
     json testConfig;
     Config config;
     
@@ -30,15 +30,15 @@ public:
     }
     
     void TearDown() override {
-        backtester.reset();
+        tester.reset();
         mockAdapter.reset();
     }
     
-    void createBacktester(std::vector<MarketCondition> mockData={}) {
+    void createTester(std::vector<MarketCondition> mockData={}) {
         // Reset market data first to ensure we have fresh data for each test
         mockAdapter->setupMockDataForTesting(20); // Use 20 days for more robust testing
         
-        // Get a copy of the market data for use in backtester
+        // Get a copy of the market data for use in tester
         if(mockData.size() == 0) {
             mockData = mockAdapter->getAdapter().getDataSize() > 0 ? 
                 mockAdapter->createMockData(20) : 
@@ -65,29 +65,29 @@ public:
             mockAdapter->setMockData(mockData);
         }
         
-        // Create and configure the backtester
-        backtester = std::make_unique<Backtester>(testConfig);
-        backtester->setMarketData(mockData);
-        backtester->useDirectMarketData(true);
+        // Create and configure the tester
+        tester = std::make_unique<StrategyTester>(testConfig);
+        tester->setMarketData(mockData);
+        tester->useDirectMarketData(true);
         
-        // Verify the data was properly set in the backtester
-        std::cout << "After setting market data in backtester" << std::endl;
+        // Verify the data was properly set in the tester
+        std::cout << "After setting market data in tester" << std::endl;
     }
     
-    // Helper method to create a backtester with custom settings
-    void createBacktesterWithSettings(double capital = 100000.0, double commission = 1.0, 
+    // Helper method to create a tester with custom settings
+    void createTesterWithSettings(double capital = 100000.0, double commission = 1.0, 
                                       double slippage = 0.0005, bool detailedLogging = false,
                                       std::vector<MarketCondition> mockData = {}) {
-        // Create the basic backtester first
-        createBacktester(mockData);
+        // Create the basic tester first
+        createTester(mockData);
         
         // Now apply the custom settings
-        backtester->setStartingCapital(capital);
-        backtester->setCommissionPerTrade(commission);
-        backtester->setSlippagePercentage(slippage);
-        backtester->enableDetailedLogging(detailedLogging);
+        tester->setStartingCapital(capital);
+        tester->setCommissionPerTrade(commission);
+        tester->setSlippagePercentage(slippage);
+        tester->enableDetailedLogging(detailedLogging);
         
-        std::cout << "Backtester configured with custom settings: " 
+        std::cout << "StrategyTester configured with custom settings: " 
                   << "capital=" << capital 
                   << ", commission=" << commission 
                   << ", slippage=" << slippage 
@@ -96,97 +96,97 @@ public:
     }
 };
 
-TEST_F(BacktesterTests, CanBeInstantiated) {
-    createBacktester();
-    ASSERT_NE(backtester.get(), nullptr);
+TEST_F(StrategyTesterTests, CanBeInstantiated) {
+    createTester();
+    ASSERT_NE(tester.get(), nullptr);
 }
 
-TEST_F(BacktesterTests, ConfigurationSettersWork) {
-    createBacktester();
+TEST_F(StrategyTesterTests, ConfigurationSettersWork) {
+    createTester();
     
     // Set configuration parameters
     double startingCapital = 50000.0;
     double commission = 2.5;
     double slippage = 0.001;
     
-    backtester->setStartingCapital(startingCapital);
-    backtester->setCommissionPerTrade(commission);
-    backtester->setSlippagePercentage(slippage);
-    backtester->enableDetailedLogging(true);
+    tester->setStartingCapital(startingCapital);
+    tester->setCommissionPerTrade(commission);
+    tester->setSlippagePercentage(slippage);
+    tester->enableDetailedLogging(true);
     
     // Unfortunately, we can't directly test the values were set since they're private
-    // However, we can verify the backtester still works after setting these values
-    EXPECT_NO_THROW(backtester->run());
+    // However, we can verify the tester still works after setting these values
+    EXPECT_NO_THROW(tester->run());
 }
 
-TEST_F(BacktesterTests, DateRangeSettingWorks) {
-    createBacktester();
+TEST_F(StrategyTesterTests, DateRangeSettingWorks) {
+    createTester();
     
     std::string startDate = "2025-03-20";
     std::string endDate = "2025-03-25";
     
-    backtester->setDateRange(startDate, endDate);
+    tester->setDateRange(startDate, endDate);
     
     // Again, we can't directly verify the internal state, but we can ensure it doesn't crash
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
 }
 
-TEST_F(BacktesterTests, ThreadingSettingWorks) {
-    createBacktester();
+TEST_F(StrategyTesterTests, ThreadingSettingWorks) {
+    createTester();
     
     int numThreads = 4;
-    backtester->setNumThreads(numThreads);
+    tester->setNumThreads(numThreads);
     
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
 }
 
-TEST_F(BacktesterTests, InitializationProcess) {
+TEST_F(StrategyTesterTests, InitializationProcess) {
     // This is a bit of an implementation-dependent test
     // but we can at least verify the initialization doesn't throw
-    createBacktester();
+    createTester();
     
     // We can't directly call initializeBacktest() as it's private
     // but we can verify the run() method, which calls it, works
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
 }
 
-TEST_F(BacktesterTests, DISABLED_SharpeRatioCalculation) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, DISABLED_SharpeRatioCalculation) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // In our mock data scenario, prices are steadily increasing,
     // so Sharpe ratio should be positive
     EXPECT_NEAR(metrics.sharpeRatio, -8.62, 0.01);
 }
 
-TEST_F(BacktesterTests, MaxDrawdownCalculation) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, MaxDrawdownCalculation) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // Since our mock data has steadily increasing prices, 
     // drawdown should be minimal, but we can at least check it's valid
     EXPECT_GE(metrics.maxDrawdownPercent, 0.0);
 }
 
-TEST_F(BacktesterTests, AnnualizedReturnCalculation) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, AnnualizedReturnCalculation) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // In our steadily increasing price scenario, return should be positive
     EXPECT_LE(metrics.annualizedReturn, 0.0);
 }
 
-TEST_F(BacktesterTests, PnLCalculation) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, PnLCalculation) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // Check total P&L is calculated
     EXPECT_NEAR(metrics.totalPnL, -36, 1);
@@ -195,52 +195,52 @@ TEST_F(BacktesterTests, PnLCalculation) {
     EXPECT_NEAR(metrics.totalPnLPercent, 0.035, 0.1);
 }
 
-TEST_F(BacktesterTests, StartingCapitalReflectedInMetrics) {
+TEST_F(StrategyTesterTests, StartingCapitalReflectedInMetrics) {
     double testCapital = 75000.0;
-    createBacktesterWithSettings(testCapital);
-    backtester->run();
+    createTesterWithSettings(testCapital);
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     EXPECT_EQ(metrics.startingCapital, testCapital);
 }
 
-TEST_F(BacktesterTests, FinalEquityCalculation) {
+TEST_F(StrategyTesterTests, FinalEquityCalculation) {
     double testCapital = 50000.0;
-    createBacktesterWithSettings(testCapital);
-    backtester->run();
+    createTesterWithSettings(testCapital);
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // Final equity should be different from starting capital due to trading activity
     EXPECT_NEAR(metrics.finalEquity, 49964, 1.0);
 }
 
-TEST_F(BacktesterTests, TradeCountCalculation) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, TradeCountCalculation) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // There should be some trades recorded
     EXPECT_GE(metrics.numTrades, 0);
 }
 
-TEST_F(BacktesterTests, DISABLED_WinningLosingTradeCalculation) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, DISABLED_WinningLosingTradeCalculation) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // The sum of winning and losing trades should equal total trades
     EXPECT_EQ(metrics.winningTrades + metrics.losingTrades, metrics.numTrades);
 }
 
-TEST_F(BacktesterTests, WinRateCalculation) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, WinRateCalculation) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // Win rate should be between 0 and 100 percent
     EXPECT_GE(metrics.winRate, 0.0);
@@ -249,31 +249,31 @@ TEST_F(BacktesterTests, WinRateCalculation) {
 
 //TODO:
 // Add fixed seed into this test class, see simulated broker tests
-TEST_F(BacktesterTests, DISABLED_CommissionAffectsTradingPerformance) {
+TEST_F(StrategyTesterTests, DISABLED_CommissionAffectsTradingPerformance) {
     // Run with low commission
-    createBacktesterWithSettings(100000.0, 1.0);
-    backtester->run();
-    const PerformanceMetrics& lowCommMetrics = backtester->getPerformanceMetrics();
+    createTesterWithSettings(100000.0, 1.0);
+    tester->run();
+    const PerformanceMetrics& lowCommMetrics = tester->getPerformanceMetrics();
     
     // Run with high commission
-    createBacktesterWithSettings(100000.0, 100.0); // Much higher commission
-    backtester->run();
-    const PerformanceMetrics& highCommMetrics = backtester->getPerformanceMetrics();
+    createTesterWithSettings(100000.0, 100.0); // Much higher commission
+    tester->run();
+    const PerformanceMetrics& highCommMetrics = tester->getPerformanceMetrics();
     
     // Higher commission should result in lower P&L
     EXPECT_EQ(lowCommMetrics.totalPnL, highCommMetrics.totalPnL);
 }
 
-TEST_F(BacktesterTests, SlippageAffectsTradingPerformance) {
+TEST_F(StrategyTesterTests, SlippageAffectsTradingPerformance) {
     // Run with low slippage
-    createBacktesterWithSettings(100000.0, 1.0, 0.0001);
-    backtester->run();
-    const PerformanceMetrics& lowSlippageMetrics = backtester->getPerformanceMetrics();
+    createTesterWithSettings(100000.0, 1.0, 0.0001);
+    tester->run();
+    const PerformanceMetrics& lowSlippageMetrics = tester->getPerformanceMetrics();
     
     // Run with high slippage
-    createBacktesterWithSettings(100000.0, 1.0, 0.01); // 1% slippage
-    backtester->run();
-    const PerformanceMetrics& highSlippageMetrics = backtester->getPerformanceMetrics();
+    createTesterWithSettings(100000.0, 1.0, 0.01); // 1% slippage
+    tester->run();
+    const PerformanceMetrics& highSlippageMetrics = tester->getPerformanceMetrics();
     
     // Higher slippage should generally result in lower P&L
     // However, this is probabilistic, so we can't make a deterministic assertion
@@ -282,16 +282,16 @@ TEST_F(BacktesterTests, SlippageAffectsTradingPerformance) {
     EXPECT_GE(highSlippageMetrics.totalPnL, -1000.0);
 }
 
-TEST_F(BacktesterTests, DISABLED_CapitalLevelAffectsAbsolutePnLButNotPercentage) {
+TEST_F(StrategyTesterTests, DISABLED_CapitalLevelAffectsAbsolutePnLButNotPercentage) {
     // Run with low capital
-    createBacktesterWithSettings(10000.0);
-    backtester->run();
-    const PerformanceMetrics& lowCapitalMetrics = backtester->getPerformanceMetrics();
+    createTesterWithSettings(10000.0);
+    tester->run();
+    const PerformanceMetrics& lowCapitalMetrics = tester->getPerformanceMetrics();
     
     // Run with high capital
-    createBacktesterWithSettings(100000.0);
-    backtester->run();
-    const PerformanceMetrics& highCapitalMetrics = backtester->getPerformanceMetrics();
+    createTesterWithSettings(100000.0);
+    tester->run();
+    const PerformanceMetrics& highCapitalMetrics = tester->getPerformanceMetrics();
     
     // Absolute P&L should be different but percentage P&L should be similar
     // (not exactly the same due to fixed costs like commission)
@@ -301,32 +301,32 @@ TEST_F(BacktesterTests, DISABLED_CapitalLevelAffectsAbsolutePnLButNotPercentage)
     // the commission impact is different at different capital levels
 }
 
-TEST_F(BacktesterTests, ExecutionTimeTracking) {
-    createBacktesterWithSettings();
-    backtester->run();
+TEST_F(StrategyTesterTests, ExecutionTimeTracking) {
+    createTesterWithSettings();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // Execution time should be positive
     EXPECT_GT(metrics.executionTime.count(), 0.0);
 }
 
-TEST_F(BacktesterTests, DISABLED_MultipleRunsProduceConsistentResults) {
-    createBacktesterWithSettings();
-    backtester->run();
-    const PerformanceMetrics& firstRunMetrics = backtester->getPerformanceMetrics();
+TEST_F(StrategyTesterTests, DISABLED_MultipleRunsProduceConsistentResults) {
+    createTesterWithSettings();
+    tester->run();
+    const PerformanceMetrics& firstRunMetrics = tester->getPerformanceMetrics();
     
-    // Create a new backtester with the same settings
-    createBacktesterWithSettings();
-    backtester->run();
-    const PerformanceMetrics& secondRunMetrics = backtester->getPerformanceMetrics();
+    // Create a new tester with the same settings
+    createTesterWithSettings();
+    tester->run();
+    const PerformanceMetrics& secondRunMetrics = tester->getPerformanceMetrics();
     
     // Results should be consistent between runs
     EXPECT_EQ(firstRunMetrics.totalPnL, secondRunMetrics.totalPnL);
     EXPECT_EQ(firstRunMetrics.numTrades, secondRunMetrics.numTrades);
 }
 
-TEST_F(BacktesterTests, DISABLED_CompleteBacktestProcess) {
+TEST_F(StrategyTesterTests, DISABLED_CompleteBacktestProcess) {
     // auto marketData = std::make_unique<MockMarketData>();
     auto mockAdapter = std::make_unique<MockMarketDataAdapter>();
     std::vector<MarketCondition> complexData;
@@ -356,11 +356,11 @@ TEST_F(BacktesterTests, DISABLED_CompleteBacktestProcess) {
     }
     
     mockAdapter->setMockData(complexData);
-    createBacktesterWithSettings(100000.0, 1.0, 0.001, false, complexData);
+    createTesterWithSettings(100000.0, 1.0, 0.001, false, complexData);
 
-    backtester->run();
+    tester->run();
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // Verify metrics were calculated
     EXPECT_NE(metrics.totalPnL, 0.0);
@@ -368,10 +368,10 @@ TEST_F(BacktesterTests, DISABLED_CompleteBacktestProcess) {
     EXPECT_GT(metrics.executionTime.count(), 0.0);
 }
 
-TEST_F(BacktesterTests, FormatFunctionsWork) {
-    createBacktesterWithSettings();
+TEST_F(StrategyTesterTests, FormatFunctionsWork) {
+    createTesterWithSettings();
     
     // We can't directly test these private methods, but we can run the code
     // that uses them and verify it doesn't crash
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
 }

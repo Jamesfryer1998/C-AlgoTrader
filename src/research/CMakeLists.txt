@@ -7,7 +7,7 @@ target_link_libraries(research_lib
     live_lib
     risk_lib
     alpaca_lib
-    backtester_lib
+    backtest_lib
     quant_lib
     util_lib
     nlohmann_json)

@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 # Detect the number of CPU cores
 NUM_CORES=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null)
 
-echo -e "${BLUE}Building AlgoTrader Backtester...${NC}"
+echo -e "${BLUE}Building AlgoTrader...${NC}"
 
 # Step 1: Run CMake configuration
 cmake -B build
@@ -37,22 +37,9 @@ fi
 
 echo -e "${GREEN}✅ Build successful!${NC}"
 
-echo -e "\n${BLUE}==================== Running Backtester ====================\n${NC}"
+echo -e "\n${BLUE}==================== Running the backtest ====================\n${NC}"
 
-# Filter out our special flags
-FILTERED_ARGS=()
-for arg in "$@"; do
-    if [ "$arg" != "--debug-backtester-tests" ]; then
-        FILTERED_ARGS+=("$arg")
-    fi
-done
+# Everything after the script name goes to the backtest, e.g. 2026-10-01 --days 20
+./build/app/algo_trader_app --backtest "$@"
 
-# Add default arguments to use all cores if no threads are specified
-if [[ ! "${FILTERED_ARGS[*]}" =~ "--threads" ]]; then
-    FILTERED_ARGS+=("--threads" "$NUM_CORES")
-fi
-
-# Run the backtester with command line arguments
-./build/app/backtest_app "${FILTERED_ARGS[@]}"
-
-echo -e "\n${GREEN}✅ Backtester execution complete!${NC}"
+echo -e "\n${GREEN}✅ Backtest complete!${NC}"

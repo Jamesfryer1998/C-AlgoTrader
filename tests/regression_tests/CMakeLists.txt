@@ -2,7 +2,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 add_executable(regression_tests ${SOURCES})
 
 target_link_libraries(regression_tests
-    backtester_lib
+    backtest_lib
     broker_lib
     strategy_lib
     oms_lib

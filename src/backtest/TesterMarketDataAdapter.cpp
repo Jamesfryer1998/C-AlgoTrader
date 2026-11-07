@@ -1,27 +1,27 @@
-#include "BacktestMarketDataAdapter.hpp"
+#include "TesterMarketDataAdapter.hpp"
 #include "../util/Log.hpp"
 #include <stdexcept>
 #include <iostream>
 
-BacktestMarketDataAdapter::BacktestMarketDataAdapter()
+TesterMarketDataAdapter::TesterMarketDataAdapter()
     : marketData(nullptr), currentIndex(0)
 {
 }
 
-BacktestMarketDataAdapter::~BacktestMarketDataAdapter()
+TesterMarketDataAdapter::~TesterMarketDataAdapter()
 {
     // We don't own the marketData pointer, so don't delete it
 }
 
 void 
-BacktestMarketDataAdapter::initialize(MarketData& marketDataInstance)
+TesterMarketDataAdapter::initialize(MarketData& marketDataInstance)
 {
     marketData = &marketDataInstance;
     currentIndex = 0;
 }
 
 void 
-BacktestMarketDataAdapter::loadHistoricalData(const json& configData, const std::string& startDate, const std::string& endDate)
+TesterMarketDataAdapter::loadHistoricalData(const json& configData, const std::string& startDate, const std::string& endDate)
 {
     validateMarketData();
     
@@ -34,12 +34,12 @@ BacktestMarketDataAdapter::loadHistoricalData(const json& configData, const std:
     // Reset the index
     rewind();
     
-    std::cout << "BacktestMarketDataAdapter: Loaded " << fullDataset.size() 
+    std::cout << "TesterMarketDataAdapter: Loaded " << fullDataset.size() 
               << " historical data points from " << startDate << " to " << endDate << std::endl;
 }
 
 void 
-BacktestMarketDataAdapter::loadHistoricalDataParallel(const json& configData, int numThreads,
+TesterMarketDataAdapter::loadHistoricalDataParallel(const json& configData, int numThreads,
                                                       const std::string& startDate, const std::string& endDate)
 {
     validateMarketData();
@@ -53,12 +53,12 @@ BacktestMarketDataAdapter::loadHistoricalDataParallel(const json& configData, in
     // Reset the index
     rewind();
     
-    std::cout << "BacktestMarketDataAdapter: Loaded " << fullDataset.size() 
+    std::cout << "TesterMarketDataAdapter: Loaded " << fullDataset.size() 
               << " historical data points using " << numThreads << " threads" << std::endl;
 }
 
 void 
-BacktestMarketDataAdapter::loadMockData(const std::vector<MarketCondition>& mockData)
+TesterMarketDataAdapter::loadMockData(const std::vector<MarketCondition>& mockData)
 {
     validateMarketData();
     
@@ -75,18 +75,18 @@ BacktestMarketDataAdapter::loadMockData(const std::vector<MarketCondition>& mock
     // Reset the index
     rewind();
     
-    std::cout << "BacktestMarketDataAdapter: Loaded " << fullDataset.size() 
+    std::cout << "TesterMarketDataAdapter: Loaded " << fullDataset.size() 
               << " mock data points" << std::endl;
 }
 
 bool 
-BacktestMarketDataAdapter::hasNext() const
+TesterMarketDataAdapter::hasNext() const
 {
     return static_cast<size_t>(currentIndex) < fullDataset.size();
 }
 
 void 
-BacktestMarketDataAdapter::next()
+TesterMarketDataAdapter::next()
 {
     if (!hasNext()) {
         return;
@@ -111,7 +111,7 @@ BacktestMarketDataAdapter::next()
 }
 
 void 
-BacktestMarketDataAdapter::rewind()
+TesterMarketDataAdapter::rewind()
 {
     Log::out() << "Rewinding to the beginning of the data" << std::endl;
     currentIndex = 0;
@@ -125,19 +125,19 @@ BacktestMarketDataAdapter::rewind()
 }
 
 int 
-BacktestMarketDataAdapter::getCurrentIndex() const
+TesterMarketDataAdapter::getCurrentIndex() const
 {
     return currentIndex;
 }
 
 size_t 
-BacktestMarketDataAdapter::getDataSize() const
+TesterMarketDataAdapter::getDataSize() const
 {
     return fullDataset.size();
 }
 
 MarketCondition 
-BacktestMarketDataAdapter::getCurrentData() const
+TesterMarketDataAdapter::getCurrentData() const
 {
     validateMarketData();
     
@@ -156,13 +156,13 @@ BacktestMarketDataAdapter::getCurrentData() const
 }
 
 bool 
-BacktestMarketDataAdapter::reachedEnd() const
+TesterMarketDataAdapter::reachedEnd() const
 {
     return static_cast<size_t>(currentIndex + 1) >= fullDataset.size();
 }
 
 void 
-BacktestMarketDataAdapter::updateMarketDataWithCurrentPoint()
+TesterMarketDataAdapter::updateMarketDataWithCurrentPoint()
 {
     validateMarketData();
     
@@ -176,7 +176,7 @@ BacktestMarketDataAdapter::updateMarketDataWithCurrentPoint()
 }
 
 void 
-BacktestMarketDataAdapter::validateMarketData() const
+TesterMarketDataAdapter::validateMarketData() const
 {
     if (marketData == nullptr) {
         throw std::runtime_error("MarketData instance not initialized. Call initialize() first.");

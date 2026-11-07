@@ -17,8 +17,8 @@
 #include "../strategy_engine/StrategyEngine.hpp"
 #include "../strategy_engine/StrategyFactory.hpp"
 #include "../broker/SimulatedBroker.hpp"
-#include "BacktestCosts.hpp"
-#include "BacktestMarketDataAdapter.hpp"
+#include "TradingCosts.hpp"
+#include "TesterMarketDataAdapter.hpp"
 #include "../oms/PerformanceTracker.hpp"
 
 /**
@@ -46,19 +46,19 @@ struct PerformanceMetrics {
 };
 
 /**
- * Backtester class
+ * StrategyTester class
  * 
  * Manages the backtesting of trading strategies with historical market data.
  * Uses adapter patterns to coordinate interactions between core components without
  * modifying their implementation.
  */
-class Backtester {
+class StrategyTester {
 public:
     /**
      * Constructor
-     * @param algoConfig JSON configuration for the backtester
+     * @param algoConfig JSON configuration for the tester
      */
-    Backtester(const json& algoConfig);
+    StrategyTester(const json& algoConfig);
 
     /**
      * Run the backtest simulation
@@ -95,7 +95,7 @@ public:
     void setCommissionPerTrade(double commission);
     void setSlippagePercentage(double slippage);
     // Capital, commission and slippage together (slippage always against us, as in live trading)
-    void useCosts(const BacktestCosts& costs);
+    void useCosts(const TradingCosts& costs);
     void setDataTimeframe(const std::string& timeframe);
     void enableDetailedLogging(bool enable);
     void saveResultsToFile(const std::string& filename);
@@ -112,7 +112,7 @@ public:
 private:
     // Core components
     MarketData marketData;                    // Raw market data instance
-    BacktestMarketDataAdapter marketDataAdapter;  // Adapter for backtest control
+    TesterMarketDataAdapter marketDataAdapter;  // Adapter for backtest control
     SimulatedBroker broker;                   // Simulated broker for order execution
     StrategyFactory stratFactory;             // Factory for creating strategies
     StrategyEngine stratEngine;               // The strategies and the vote between them

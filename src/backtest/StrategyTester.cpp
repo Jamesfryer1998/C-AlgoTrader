@@ -1,4 +1,4 @@
-#include "Backtester.hpp"
+#include "StrategyTester.hpp"
 #include "../util/Log.hpp"
 #include "../util/MarketTime.hpp"
 #include <cmath>
@@ -15,7 +15,7 @@ namespace
     const char* const TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S";
 }
 
-Backtester::Backtester(const json& algoConfig)
+StrategyTester::StrategyTester(const json& algoConfig)
         : marketData(), 
           broker(marketData),
           stratFactory(algoConfig), 
@@ -47,51 +47,51 @@ Backtester::Backtester(const json& algoConfig)
     Log::out() << "Default date range: " << startDate << " to " << endDate << std::endl;
 }
 
-void Backtester::setStartingCapital(double capital) {
+void StrategyTester::setStartingCapital(double capital) {
     broker.setStartingCapital(capital);
 }
 
-void Backtester::setCommissionPerTrade(double commission) {
+void StrategyTester::setCommissionPerTrade(double commission) {
     broker.setCommission(commission);
 }
 
-void Backtester::setSlippagePercentage(double slippage) {
+void StrategyTester::setSlippagePercentage(double slippage) {
     broker.setSlippage(slippage);
-    Log::out() << "Backtester: Setting slippage to " << std::fixed << std::setprecision(3) 
+    Log::out() << "StrategyTester: Setting slippage to " << std::fixed << std::setprecision(3) 
               << (slippage * 100.0) << "% (random variation within +/- this range)" << std::endl;
 }
 
-void Backtester::useCosts(const BacktestCosts& costs) {
+void StrategyTester::useCosts(const TradingCosts& costs) {
     setStartingCapital(costs.startingCapital);
     setCommissionPerTrade(costs.commissionPerTrade);
     setSlippagePercentage(costs.slippageFraction());
     broker.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
 }
 
-void Backtester::enableDetailedLogging(bool enable) {
+void StrategyTester::enableDetailedLogging(bool enable) {
     detailedLogging = enable;
 }
 
-void Backtester::saveResultsToFile(const std::string& filename) {
+void StrategyTester::saveResultsToFile(const std::string& filename) {
     resultsFilename = filename;
 }
 
-void Backtester::setDateRange(const std::string& start, const std::string& end) {
+void StrategyTester::setDateRange(const std::string& start, const std::string& end) {
     startDate = start;
     endDate = end;
     Log::out() << "Set backtest date range: " << startDate << " to " << endDate << std::endl;
 }
 
-void Backtester::setNumThreads(int threads) {
+void StrategyTester::setNumThreads(int threads) {
     numThreads = threads;
 }
 
-void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
+void StrategyTester::setMarketData(std::vector<MarketCondition>& mockData) {
     Log::out() << "Setting mock market data with " << mockData.size() << " data points" << std::endl;
     
     // Verify the mock data is not empty
     if (mockData.empty()) {
-        std::cerr << "ERROR: Attempted to set empty mock data in Backtester::setMarketData!" << std::endl;
+        std::cerr << "ERROR: Attempted to set empty mock data in StrategyTester::setMarketData!" << std::endl;
         return;
     }
     
@@ -109,12 +109,12 @@ void Backtester::setMarketData(std::vector<MarketCondition>& mockData) {
     Log::out() << "Current index: " << marketDataAdapter.getCurrentIndex() << std::endl;
 }
 
-void Backtester::useDirectMarketData(bool useDirect) {
+void StrategyTester::useDirectMarketData(bool useDirect) {
     useDirectData = useDirect;
 }
 
 void 
-Backtester::run() 
+StrategyTester::run() 
 {
     std::cout << "Starting backtest from " << startDate << " to " << endDate << "..." << std::endl;
     
@@ -142,7 +142,7 @@ Backtester::run()
 }
 
 void
-Backtester::runOn(const std::vector<MarketCondition>& bars)
+StrategyTester::runOn(const std::vector<MarketCondition>& bars)
 {
     auto startTime = std::chrono::high_resolution_clock::now();
     if (bars.size() <= warmupBars) {
@@ -190,7 +190,7 @@ Backtester::runOn(const std::vector<MarketCondition>& bars)
 }
 
 void
-Backtester::initializeBacktest() 
+StrategyTester::initializeBacktest() 
 {
     // Reset performance tracking
     equityCurve.clear();
@@ -203,11 +203,11 @@ Backtester::initializeBacktest()
 }
 
 void
-Backtester::executeTimeStep(const MarketCondition& bar)
+StrategyTester::executeTimeStep(const MarketCondition& bar)
 {
     // 1. The new bar arrives (strategies see the newest windowBars bars, like live trading)
     marketData.addBar(bar, windowBars);
-    Log::out() << "Backtester time step: " << bar.DateTime << std::endl;
+    Log::out() << "StrategyTester time step: " << bar.DateTime << std::endl;
 
     // 2. Strategies vote; the risk engine sizes an agreed order, which goes through the risk checks to the
     //    simulated broker
@@ -239,7 +239,7 @@ Backtester::executeTimeStep(const MarketCondition& bar)
 }
 
 void
-Backtester::recordNewFills()
+StrategyTester::recordNewFills()
 {
     const std::vector<Order>& fills = broker.getFilledOrders();
     for (; fillsRecorded < fills.size(); fillsRecorded++) {
@@ -250,7 +250,7 @@ Backtester::recordNewFills()
 }
 
 void 
-Backtester::logPerformance() 
+StrategyTester::logPerformance() 
 {
     if (detailedLogging) {
         std::cout << "Current Equity: " << formatCurrency(broker.getCurrentEquity())
@@ -261,7 +261,7 @@ Backtester::logPerformance()
 }
 
 void
-Backtester::calculateMetrics() 
+StrategyTester::calculateMetrics() 
 {
     PerformanceSummary summary = tracker.summary();
 
@@ -290,7 +290,7 @@ Backtester::calculateMetrics()
 }
 
 void 
-Backtester::printReport() 
+StrategyTester::printReport() 
 {
     std::cout << "\n===== BACKTEST RESULTS =====\n" << std::endl;
     
@@ -325,7 +325,7 @@ Backtester::printReport()
 }
 
 void 
-Backtester::saveResults() 
+StrategyTester::saveResults() 
 {
     std::ofstream outFile(resultsFilename);
     
@@ -378,13 +378,13 @@ Backtester::saveResults()
 }
 
 const PerformanceMetrics& 
-Backtester::getPerformanceMetrics() const 
+StrategyTester::getPerformanceMetrics() const 
 {
     return metrics;
 }
 
 std::string 
-Backtester::getCurrentTimestamp() const 
+StrategyTester::getCurrentTimestamp() const 
 {
     auto now = std::chrono::system_clock::now();
     auto in_time_t = std::chrono::system_clock::to_time_t(now);
@@ -395,7 +395,7 @@ Backtester::getCurrentTimestamp() const
 }
 
 std::string 
-Backtester::formatCurrency(double amount) const 
+StrategyTester::formatCurrency(double amount) const 
 {
     std::stringstream ss;
     ss << "$" << std::fixed << std::setprecision(2) << amount;
@@ -403,7 +403,7 @@ Backtester::formatCurrency(double amount) const
 }
 
 std::string 
-Backtester::formatPercent(double percentage) const 
+StrategyTester::formatPercent(double percentage) const 
 {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(2) << percentage;

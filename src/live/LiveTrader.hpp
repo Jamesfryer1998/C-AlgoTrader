@@ -30,7 +30,7 @@ using json = nlohmann::json;
  *   main()
  *    └─ LiveTrader::run()
  *        ├─ loadPortfolio, createLanes     the stocks in config.json, each with its own strategies
- *        ├─ openFeed, connectBroker        live: Alpaca's stream and Alpaca; --replay: saved bars, simulated broker
+ *        ├─ openFeed, connectBroker        live: Alpaca's stream and Alpaca; --backtest: saved bars, simulated broker
  *        ├─ backfillLanes, openRecords     history so strategies can decide at once; trades.csv etc.
  *        └─ feed.start ──> onBar(bar), once per stock per minute, on the feed's thread:
  *              1. lane.addBar(bar)                      the new price
@@ -44,15 +44,15 @@ using json = nlohmann::json;
  * The stocks and their strategies come from "portfolio" in config.json (see Portfolio). One OMS, one trade log
  * and one P&L book cover every stock. Nothing runs on a timer: each bar is decided as soon as it arrives.
  *
- * Replay (--replay) is the same session with a ReplayStream feed and a ReplaySession broker, so the whole
- * process can be watched without the market open or orders reaching Alpaca. Records go to data/replay/<day>/.
+ * Backtest (--backtest) is the same session with a BacktestStream feed and a BacktestSession broker, so the whole
+ * process can be watched without the market open or orders reaching Alpaca. Records go to data/backtest/<day>/.
  */
 class LiveTrader
 {
     public:
         LiveTrader(const json& config, const LiveOptions& options, const std::string& dataRoot);
 
-        // Runs until Ctrl+C (or the end of a replay). Returns the process exit code.
+        // Runs until Ctrl+C (or the end of a backtest). Returns the process exit code.
         int run();
 
         // For the SIGINT / SIGTERM handler
@@ -68,7 +68,7 @@ class LiveTrader
             double mostCapitalInUse = 0;
             size_t fills = 0;
             int days = 0;
-            std::string firstDay, lastDay;   // a replay's first and last day
+            std::string firstDay, lastDay;   // a backtest's first and last day
         };
         const Result& getResult() const { return result; }
 

@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <map>
 #include <set>
-#include "Backtester.hpp"
+#include "StrategyTester.hpp"
 #include <sstream>
 #include "../quant/Stats.hpp"
 #include "../util/MarketTime.hpp"
@@ -285,13 +285,13 @@ Screener::dailyValues(const std::vector<Row>& picks, const std::map<std::string,
         json config = baseConfig;
         config["strategies"] = json::array({strategySettings(pick)});
 
-        Backtester backtester(config);
-        backtester.useCosts(BacktestCosts(settings));
-        backtester.keepEquityCurve(true);
+        StrategyTester tester(config);
+        tester.useCosts(TradingCosts(settings));
+        tester.keepEquityCurve(true);
         const std::vector<MarketCondition>& bars = found->second;
-        backtester.runOn(bars);
+        tester.runOn(bars);
 
-        const auto& curve = backtester.getEquityCurve();
+        const auto& curve = tester.getEquityCurve();
         if (curve.size() < 2)
             continue;
         double capital = maxPosition * bars.front().Close;

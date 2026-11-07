@@ -8,7 +8,7 @@
 #include "../src/util/SaveData.hpp"
 
 /*
- * Live trading on Alpaca, or a replay of saved bars with a simulated broker (--replay). See LiveTrader.
+ * Live trading on Alpaca, or a backtest of saved bars with a simulated broker (--backtest). See LiveTrader.
  * Alpaca keys are read from .env in the project root (copy .env.example to .env and fill it in).
  */
 

@@ -105,7 +105,7 @@ namespace
         return config;
     }
 
-    // One bar the way the live app and the backtester handle it: the engine decides, the OMS sends
+    // One bar the way the live app and the tester handle it: the engine decides, the OMS sends
     void decideAndSend(StrategyEngine& engine, MarketData& data, const MarketCondition& bar, OrderManagement& oms)
     {
         data.addBar(bar);

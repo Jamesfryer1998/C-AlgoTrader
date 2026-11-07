@@ -5,16 +5,16 @@
 #include "../data_access/MarketData.hpp"
 
 /**
- * BacktestMarketDataAdapter
+ * TesterMarketDataAdapter
  * 
  * This adapter wraps a MarketData instance and manages its state for backtesting.
  * It handles the time-stepping logic and data indexing without requiring modifications
  * to the core MarketData class.
  */
-class BacktestMarketDataAdapter {
+class TesterMarketDataAdapter {
 public:
-    BacktestMarketDataAdapter();
-    ~BacktestMarketDataAdapter();
+    TesterMarketDataAdapter();
+    ~TesterMarketDataAdapter();
     
     /**
      * Initialize the adapter with a MarketData instance

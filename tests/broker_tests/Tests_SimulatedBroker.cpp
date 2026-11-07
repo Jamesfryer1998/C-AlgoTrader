@@ -730,7 +730,7 @@ TEST_F(SimulatedBrokerTests, IntegrationWithMultipleOrdersAndMarketMovements)
     EXPECT_GE(actualPnL, expectedMinPnL);
     EXPECT_LE(actualPnL, expectedMaxPnL);
 }
-// The live app's replay: several stocks' bars arrive one after another through one feed
+// The live app's backtest: several stocks' bars arrive one after another through one feed
 TEST(SimulatedBrokerSeveralStocksTests, EachStockUsesItsOwnPrice)
 {
     MarketData feed;

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <cmath>
 #include <cstdio>
-#include "../../src/backtest/Backtester.hpp"
+#include "../../src/backtest/StrategyTester.hpp"
 #include "../../src/util/Log.hpp"
 
 namespace
@@ -52,13 +52,13 @@ TEST(ScalpBacktestTests, ScalpsAndIsFlatAtTheEndOfEveryDay)
     for (int days = 1; days <= 3; days++)
     {
         std::vector<MarketCondition> upTo(bars.begin(), bars.begin() + days * 390);
-        Backtester backtester(scalpConfig());
-        backtester.setCommissionPerTrade(0);
-        backtester.keepEquityCurve(false);
-        backtester.runOn(upTo);
+        StrategyTester tester(scalpConfig());
+        tester.setCommissionPerTrade(0);
+        tester.keepEquityCurve(false);
+        tester.runOn(upTo);
 
-        EXPECT_FLOAT_EQ(backtester.getBroker().getLatestPosition("TEST").getQuantity(), 0) << "day " << days;
-        const auto& fills = backtester.getBroker().getFilledOrders();
+        EXPECT_FLOAT_EQ(tester.getBroker().getLatestPosition("TEST").getQuantity(), 0) << "day " << days;
+        const auto& fills = tester.getBroker().getFilledOrders();
         EXPECT_GE(fills.size(), static_cast<size_t>(4 * days)) << "day " << days;   // it does trade
         EXPECT_EQ(fills.size() % 2, 0u) << "every trade opened was closed";
     }

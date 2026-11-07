@@ -6,8 +6,8 @@
 #include <thread>
 #include "../alpaca/AlpacaApi.hpp"
 #include "../alpaca/AlpacaStream.hpp"
-#include "ReplayDownloader.hpp"
-#include "../backtest/ReplayStream.hpp"
+#include "BacktestDownloader.hpp"
+#include "../backtest/BacktestStream.hpp"
 #include "../util/Defaults.hpp"
 #include "../util/Format.hpp"
 #include "../util/Log.hpp"
@@ -84,7 +84,7 @@ LiveTrader::loadPortfolio()
 
     // Alpaca's test feed only streams its fake symbol
     bool testFeed = config.value("alpaca", json::object()).value("data_feed", "") == AlpacaApi::TEST_FEED;
-    if (!options.replay && testFeed)
+    if (!options.backtest && testFeed)
     {
         if (portfolio.size() > 1)
             screen() << "Test feed: only " << AlpacaApi::TEST_SYMBOL << " streams, so trading it alone with "
@@ -109,11 +109,11 @@ LiveTrader::createLanes()
     report = std::make_unique<MinuteReport>(tickers);
 }
 
-// Live: Alpaca's WebSocket stream. Replay: the saved bars of the chosen days (downloading any that are missing).
+// Live: Alpaca's WebSocket stream. Backtest: the saved bars of the chosen days (downloading any that are missing).
 bool
 LiveTrader::openFeed()
 {
-    if (!options.replay)
+    if (!options.backtest)
     {
         auto stream = std::make_unique<AlpacaStream>(config);
         stream->setSymbols(tickers);
@@ -121,31 +121,31 @@ LiveTrader::openFeed()
         return true;
     }
 
-    if (!options.replayDay.empty())
+    if (!options.backtestDay.empty())
     {
-        ReplayDownloader downloader(config, dataRoot);
-        if (!downloader.downloadMissing(tickers, options.replayDay, options.replayDays))
+        BacktestDownloader downloader(config, dataRoot);
+        if (!downloader.downloadMissing(tickers, options.backtestDay, options.backtestDays))
             return false;
     }
 
-    auto replay = std::make_unique<ReplayStream>(dataRoot, tickers, options.replayDay, options.replayDays,
-                                                 options.replaySpeed);
-    if (!replay->load())
+    auto stream = std::make_unique<BacktestStream>(dataRoot, tickers, options.backtestDay, options.backtestDays,
+                                                 options.backtestSpeed);
+    if (!stream->load())
         return false;
-    const auto& days = replay->getDays();
-    screen() << "\nREPLAY of " << days.front() << (days.size() > 1 ? " to " + days.back() : std::string())
-              << " (" << replay->minutes() << " minutes) with a simulated broker, "
-              << (options.replaySpeed > 0 ? Format::number(options.replaySpeed, 0) + " minutes per second"
+    const auto& days = stream->getDays();
+    screen() << "\nBACKTEST of " << days.front() << (days.size() > 1 ? " to " + days.back() : std::string())
+              << " (" << stream->minutes() << " minutes) with a simulated broker, "
+              << (options.backtestSpeed > 0 ? Format::number(options.backtestSpeed, 0) + " minutes per second"
                                           : std::string("as fast as possible"))
               << ". Nothing is sent to Alpaca." << std::endl;
-    session = std::make_unique<ReplaySession>(config, days.front());
+    session = std::make_unique<BacktestSession>(config, days.front());
     result.firstDay = days.front();
     result.lastDay = days.back();
-    feed = std::move(replay);
+    feed = std::move(stream);
     return true;
 }
 
-// Live: Alpaca (check our keys work and the account is reachable). Replay: the simulated broker.
+// Live: Alpaca (check our keys work and the account is reachable). Backtest: the simulated broker.
 bool
 LiveTrader::connectBroker()
 {
@@ -171,12 +171,12 @@ LiveTrader::backfillLanes()
 }
 
 // Trades and positions from the last run are reloaded (live), then each stock is checked against the broker.
-// A replay always starts fresh.
+// A backtest always starts fresh.
 void
 LiveTrader::openRecords()
 {
     recordsDir = dataRoot + session->recordsFolder();
-    if (options.replay)
+    if (options.backtest)
         TradeStore::removeFiles(recordsDir);
 
     store = std::make_unique<TradeStore>(recordsDir);
@@ -198,7 +198,7 @@ LiveTrader::startFeed()
                 [this] { feedFinished = true; stopRequested = true; });
 }
 
-// Bars arrive on the feed's own thread. This one waits for Ctrl+C (or the end of a replay), printing a
+// Bars arrive on the feed's own thread. This one waits for Ctrl+C (or the end of a backtest), printing a
 // minute's table if some stock still hasn't reported a while after the first one did.
 void
 LiveTrader::waitUntilFinished()
@@ -215,7 +215,7 @@ LiveTrader::waitUntilFinished()
 void
 LiveTrader::stopFeed()
 {
-    screen() << (feedFinished ? "\nReplay finished." : "\nStopping...") << std::endl;
+    screen() << (feedFinished ? "\nBacktest finished." : "\nStopping...") << std::endl;
     feed->stop();
 
     std::lock_guard<std::mutex> guard(reportLock);

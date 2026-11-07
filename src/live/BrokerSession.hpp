@@ -18,12 +18,12 @@ using json = nlohmann::json;
  * BrokerSession
  *
  * Where the live app's orders go and how it sees the account, so LiveTrader runs the same way live and in a
- * replay:
+ * backtest:
  *
  *   AlpacaSession   orders go to Alpaca (or are only printed in a dry run); figures are Alpaca's own
- *   ReplaySession   a simulated broker fills orders at each saved bar's close and runs stop losses itself
+ *   BacktestSession   a simulated broker fills orders at each saved bar's close and runs stop losses itself
  *
- * Around each stock's decision LiveTrader calls beforeDecision(bar) and afterDecision(): a replay uses them to
+ * Around each stock's decision LiveTrader calls beforeDecision(bar) and afterDecision(): a backtest uses them to
  * show the simulated broker the bar and then fill that bar's orders; Alpaca needs neither.
  */
 class BrokerSession
@@ -46,7 +46,7 @@ class BrokerSession
         virtual void beforeDecision(const MarketCondition& bar) {}
         virtual void afterDecision() {}
 
-        // Orders filled so far (a replay counts them; Alpaca's aren't tracked here)
+        // Orders filled so far (a backtest counts them; Alpaca's aren't tracked here)
         virtual size_t fills() const { return 0; }
 
         // Printed when the session ends
@@ -73,11 +73,11 @@ class AlpacaSession : public BrokerSession
         std::unique_ptr<AccountMonitor> monitor;
 };
 
-class ReplaySession : public BrokerSession
+class BacktestSession : public BrokerSession
 {
     public:
-        // firstDay: the first replayed day, which names the records folder (data/replay/<day>/)
-        ReplaySession(const json& config, const std::string& firstDay);
+        // firstDay: the first backtested day, which names the records folder (data/backtest/<day>/)
+        BacktestSession(const json& config, const std::string& firstDay);
 
         bool connect() override;
         BrokerBase& broker() override { return simulated; }

@@ -22,19 +22,19 @@ RiskComparison::RiskComparison(const json& config, const std::string& dataRoot, 
 }
 
 LiveTrader::Result
-RiskComparison::replayWith(const json& config, const std::string& dataRoot, const json& risk,
+RiskComparison::backtestWith(const json& config, const std::string& dataRoot, const json& risk,
                            const std::string& firstDay, int days, bool& ok)
 {
-    LiveOptions replay;
-    replay.replay = true;
-    replay.quiet = true;
-    replay.replaySpeed = 0;   // as fast as possible
-    replay.replayDay = firstDay;
-    replay.replayDays = days;
+    LiveOptions backtest;
+    backtest.backtest = true;
+    backtest.quiet = true;
+    backtest.backtestSpeed = 0;   // as fast as possible
+    backtest.backtestDay = firstDay;
+    backtest.backtestDays = days;
 
     json withEngine = config;
     withEngine[RISK] = risk;
-    LiveTrader trader(withEngine, replay, dataRoot);
+    LiveTrader trader(withEngine, backtest, dataRoot);
     ok = trader.run() == 0;
     return trader.getResult();
 }
@@ -95,10 +95,10 @@ RiskComparison::run(std::ostream& out)
     for (const auto& block : blocks)
     {
         std::string name = label(config, block);
-        out << "Replaying with " << name << "..." << std::flush;
+        out << "Backtesting with " << name << "..." << std::flush;
         bool ok = false;
-        LiveTrader::Result result = replayWith(config, dataRoot, block, options.replay.replayDay,
-                                               options.replay.replayDays, ok);
+        LiveTrader::Result result = backtestWith(config, dataRoot, block, options.period.backtestDay,
+                                               options.period.backtestDays, ok);
         if (!ok)
         {
             out << " failed" << std::endl;
@@ -118,7 +118,7 @@ RiskComparison::printTable(std::ostream& out) const
     TextTable table(TABLE_COLUMNS, TABLE_RIGHT_ALIGNED);
     for (size_t i = 0; i < results.size(); i++)
         table.addRow(tableRow(labels[i], results[i]));
-    out << "\n=== Risk engines on the same " << (results.empty() ? 0 : results.front().days) << " replayed day(s) ===\n"
+    out << "\n=== Risk engines on the same " << (results.empty() ? 0 : results.front().days) << " backtested day(s) ===\n"
         << table.render()
         << "Same portfolio, strategies and simulated broker (slippage on every fill); only the sizing changes.\n"
         << "Sharpe is from daily returns. Settings were tuned at 1 share: bigger sizes mean more slippage live.\n";

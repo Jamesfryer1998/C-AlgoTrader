@@ -10,15 +10,15 @@
  *
  * risk_app's command line:
  *
- *   risk_app --replay 2025-11-03 --days 120                      compare the engines (RiskComparison)
- *   risk_app --tune --replay 2025-11-03 --days 120 --test-days 40 --save
+ *   risk_app --backtest 2025-11-03 --days 120                      compare the engines (RiskComparison)
+ *   risk_app --tune --backtest 2025-11-03 --days 120 --test-days 40 --save
  *                                                                tune their settings (RiskTuning)
  */
 struct RiskOptions
 {
     static constexpr int NOT_GIVEN = -1;
 
-    LiveOptions replay;                  // the replayed days (replayDay, replayDays)
+    LiveOptions period;                  // the backtested days (backtestDay, backtestDays)
     std::vector<std::string> engines;    // only these engines (empty: all)
     bool tune = false;
     int testDays = NOT_GIVEN;            // tuning: days after the training days to check the best settings on

@@ -9,7 +9,7 @@ struct AccountSnapshot
 {
     bool available = false;   // false if the broker couldn't be asked
     double equity = 0;        // cash + market value of everything held
-    double lastEquity = 0;    // equity at the previous close (or the start of the replayed day)
+    double lastEquity = 0;    // equity at the previous close (or the start of the backtested day)
     double cash = 0;
 
     double todayPnL() const { return equity - lastEquity; }

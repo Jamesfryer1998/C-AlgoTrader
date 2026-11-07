@@ -137,7 +137,7 @@ SimulatedBroker::getLatestPrice(std::string ticker)
         return currentCondition.Close;
     }
 
-    // Several stocks (the live app's replay mode): each stock's last price
+    // Several stocks (the live app's backtest mode): each stock's last price
     auto known = latestPrices.find(ticker);
     if (known != latestPrices.end())
         return known->second;
@@ -555,7 +555,7 @@ SimulatedBroker::nextStep()
 {
     process();
     
-    // Note: The Backtester now controls the time stepping and data handling,
+    // Note: The StrategyTester now controls the time stepping and data handling,
     // so this method just runs the current step's processing
     
     // Move to the next market condition

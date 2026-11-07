@@ -88,7 +88,7 @@ MarketData::processParallel(json configData, int numThreads, const std::string& 
         endDate = configData["backtest_end_date"];
     }
 
-    // A range passed in (e.g. from backtest_app --start-date/--end-date) wins
+    // A range passed in (setDateRange) wins
     if (!requestedStart.empty() && !requestedEnd.empty()) {
         startDate = requestedStart;
         endDate = requestedEnd;

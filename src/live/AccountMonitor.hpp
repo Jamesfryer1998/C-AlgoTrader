@@ -32,7 +32,7 @@ struct PositionSnapshot
  * AccountMonitor
  *
  * Where the live app's table gets the account's value and each stock's position from. One per broker:
- * Alpaca's own figures when trading, the simulated broker's in a replay, our own estimate in a dry run.
+ * Alpaca's own figures when trading, the simulated broker's in a backtest, our own estimate in a dry run.
  */
 class AccountMonitor
 {
@@ -42,7 +42,7 @@ class AccountMonitor
         virtual AccountSnapshot account() = 0;
         virtual PositionSnapshot position(const std::string& ticker, double lastPrice) = 0;
 
-        // Extra text for the table's header line, e.g. "REPLAY"
+        // Extra text for the table's header line, e.g. "BACKTEST"
         virtual std::string headerNote() const { return ""; }
 };
 
@@ -58,7 +58,7 @@ class AlpacaAccountMonitor : public AccountMonitor
         AlpacaBroker& broker;
 };
 
-// The simulated broker in a replay. "Today" is measured from the start of the replayed day.
+// The simulated broker in a backtest. "Today" is measured from the start of the backtested day.
 class SimulatedAccountMonitor : public AccountMonitor
 {
     public:

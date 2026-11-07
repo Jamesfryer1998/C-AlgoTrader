@@ -41,7 +41,7 @@ struct PerformanceSummary
  * PerformanceTracker
  *
  * One place that works out P&L and risk metrics from fills and prices, used by both
- * the backtester and live trading.
+ * the strategy tester, the backtest and live trading.
  *
  *   recordFill()  every time an order is filled (or, live, sent)
  *   markPrice()   with the latest price of a ticker

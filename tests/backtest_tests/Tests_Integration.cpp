@@ -2,7 +2,7 @@
 #include <cmath>
 #include <functional>
 #include <memory>
-#include "../../src/backtest/Backtester.hpp"
+#include "../../src/backtest/StrategyTester.hpp"
 #include "../../src/broker/SimulatedBroker.hpp"
 #include "../../src/data_access/MarketData.hpp"
 #include "../../src/strategy_engine/StrategyEngine.hpp"
@@ -128,7 +128,7 @@ class BacktestIntegrationTests : public ::testing::Test {
 public:
     std::unique_ptr<MockMarketDataAdapter> mockAdapter;
     std::unique_ptr<SimulatedBroker> broker;
-    std::unique_ptr<Backtester> backtester;
+    std::unique_ptr<StrategyTester> tester;
     json testConfig;
     Config config;
     
@@ -143,7 +143,7 @@ public:
     }
     
     void TearDown() override {
-        backtester.reset();
+        tester.reset();
         broker.reset();
         mockAdapter.reset();
     }
@@ -163,11 +163,11 @@ public:
         mockAdapter->setMockData(mockData);
     }
     
-    // Advance one bar the same way Backtester::executeTimeStep does:
+    // Advance one bar the same way StrategyTester::executeTimeStep does:
     // reveal the next bar to MarketData, then let the broker process it.
     // Returns false when there is no more data.
     bool step() {
-        BacktestMarketDataAdapter& adapter = mockAdapter->getAdapter();
+        TesterMarketDataAdapter& adapter = mockAdapter->getAdapter();
         if (!adapter.hasNext())
             return false;
         adapter.next();
@@ -183,11 +183,11 @@ public:
     }
     
     void createBacktester() {
-        backtester = std::make_unique<Backtester>(testConfig);
+        tester = std::make_unique<StrategyTester>(testConfig);
         // Get the complete dataset from the adapter
         std::vector<MarketCondition> mockData = mockAdapter->getFullDataset();
-        backtester->setMarketData(mockData);
-        backtester->useDirectMarketData(true);
+        tester->setMarketData(mockData);
+        tester->useDirectMarketData(true);
     }
 };
 
@@ -197,10 +197,10 @@ TEST_F(BacktestIntegrationTests, DISABLED_BacktesterWithSimulatedBrokerTrendingM
     createBacktester();
     
     // Run backtest
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
     
     // Check the results
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // In a trending market, we would expect:
     // - Positive P&L
@@ -217,10 +217,10 @@ TEST_F(BacktestIntegrationTests, DISABLED_BacktesterWithSimulatedBrokerVolatileM
     createBacktester();
     
     // Run backtest
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
     
     // Check the results
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // In a volatile market, we would expect:
     // - Some trades executed
@@ -238,15 +238,15 @@ TEST_F(BacktestIntegrationTests, DISABLED_CommissionImpactOnBacktestResults) {
     broker->setCommission(0.5);
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& lowCommMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& lowCommMetrics = tester->getPerformanceMetrics();
     
     createBroker();
     broker->setCommission(20.0);
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& highCommMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& highCommMetrics = tester->getPerformanceMetrics();
     
     // Higher commission should result in lower P&L
     EXPECT_GT(lowCommMetrics.totalPnL, highCommMetrics.totalPnL);
@@ -259,15 +259,15 @@ TEST_F(BacktestIntegrationTests, SlippageImpactOnBacktestResults) {
     broker->setSlippage(0.0001);
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& lowSlippageMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& lowSlippageMetrics = tester->getPerformanceMetrics();
     
     createBroker();
     broker->setSlippage(0.01);
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& highSlippageMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& highSlippageMetrics = tester->getPerformanceMetrics();
     
     // Higher slippage generally results in lower P&L, but this is probabilistic
     // We'll check that both runs produce valid metrics
@@ -282,15 +282,15 @@ TEST_F(BacktestIntegrationTests, DISABLED_StartingCapitalImpactOnBacktestResults
     broker->setStartingCapital(10000.0);
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& lowCapitalMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& lowCapitalMetrics = tester->getPerformanceMetrics();
     
     createBroker();
     broker->setStartingCapital(1000000.0); // $1,000,000
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& highCapitalMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& highCapitalMetrics = tester->getPerformanceMetrics();
     
     // The absolute P&L should be different, but percentage metrics might be similar
     EXPECT_NE(lowCapitalMetrics.totalPnL, highCapitalMetrics.totalPnL);
@@ -304,9 +304,9 @@ TEST_F(BacktestIntegrationTests, DISABLED_MultiAssetBacktesting) {
     createBroker();
     createBacktester();
     
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // We should have results with non-zero metrics
     EXPECT_GT(metrics.numTrades, 0);
@@ -320,8 +320,8 @@ TEST_F(BacktestIntegrationTests, DISABLED_LongTermVsShortTermBacktesting) {
     createBroker();
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& shortTermMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& shortTermMetrics = tester->getPerformanceMetrics();
     
     auto longTermData = TestMarketDataProvider::createTrendingMarketData(60);
     mockAdapter->setMockData(longTermData);
@@ -329,8 +329,8 @@ TEST_F(BacktestIntegrationTests, DISABLED_LongTermVsShortTermBacktesting) {
     createBroker();
     createBacktester();
     
-    backtester->run();
-    const PerformanceMetrics& longTermMetrics = backtester->getPerformanceMetrics();
+    tester->run();
+    const PerformanceMetrics& longTermMetrics = tester->getPerformanceMetrics();
     
     EXPECT_GT(longTermMetrics.numTrades, shortTermMetrics.numTrades);
     
@@ -380,9 +380,9 @@ TEST_F(BacktestIntegrationTests, DISABLED_ResilienceToExtremeMarketConditions) {
     createBroker();
     createBacktester();
     
-    EXPECT_NO_THROW(backtester->run());
+    EXPECT_NO_THROW(tester->run());
     
-    const PerformanceMetrics& metrics = backtester->getPerformanceMetrics();
+    const PerformanceMetrics& metrics = tester->getPerformanceMetrics();
     
     // Max drawdown should be significant due to the crash
     EXPECT_GT(metrics.maxDrawdownPercent, 20.0);

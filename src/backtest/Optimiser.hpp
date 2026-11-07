@@ -49,7 +49,7 @@ class Optimiser
         json currentSettings(const std::string& strategyName) const;
 
         // Backtest one strategy setting over bars and return its performance. The first warmupBars bars only
-        // fill the strategy's history (see Backtester::setWarmupBars).
+        // fill the strategy's history (see StrategyTester::setWarmupBars).
         PerformanceSummary evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars,
                                     size_t warmupBars = 0) const;
 
