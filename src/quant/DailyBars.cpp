@@ -6,6 +6,7 @@
 #include <iterator>
 #include <set>
 #include <sstream>
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -19,14 +20,19 @@ namespace quant
 {
     bool writeDailyCsv(const std::string& path, const std::vector<DailyBar>& bars)
     {
-        std::ofstream file(path);
-        if (!file)
-            return false;
-        file << CSV_HEADER << "\n" << std::setprecision(PRICE_DIGITS);
-        for (const auto& b : bars)
-            file << b.date << "," << b.open << "," << b.high << "," << b.low << "," << b.close << ","
-                 << std::fixed << std::setprecision(0) << b.volume << std::defaultfloat << std::setprecision(PRICE_DIGITS) << "\n";
-        return static_cast<bool>(file);
+        bool written = false;
+        {
+            std::ofstream file(path);
+            if (!file)
+                return false;
+            file << CSV_HEADER << "\n" << std::setprecision(PRICE_DIGITS);
+            for (const auto& b : bars)
+                file << b.date << "," << b.open << "," << b.high << "," << b.low << "," << b.close << ","
+                     << std::fixed << std::setprecision(0) << b.volume << std::defaultfloat << std::setprecision(PRICE_DIGITS) << "\n";
+            written = static_cast<bool>(file);
+        }
+        SaveData::saved(path);
+        return written;
     }
 
     std::vector<DailyBar> readDailyCsv(const std::string& path)

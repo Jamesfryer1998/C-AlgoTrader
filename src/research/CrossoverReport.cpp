@@ -2,8 +2,10 @@
 
 #include <cmath>
 #include <fstream>
+#include <sstream>
 #include "PerformanceTable.hpp"
 #include "../util/Format.hpp"
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -56,10 +58,11 @@ std::string
 CrossoverReport::save(const std::string& folder) const
 {
     std::string path = folder + FILE_PREFIX + symbol + FILE_EXTENSION;
-    std::ofstream file(path);
+    std::ostringstream file;
     file << CSV_HEADER << "\n";
     for (size_t i = 0; i < result.dates.size(); i++)
         file << result.dates[i] << "," << result.closes[i] << "," << result.fastAverage[i] << "," << result.slowAverage[i]
              << "," << result.position[i] << "," << result.strategyReturns[i] << "," << result.buyHoldReturns[i] << "\n";
+    SaveData::write(path, file.str());
     return path;
 }

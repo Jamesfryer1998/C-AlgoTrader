@@ -9,6 +9,7 @@
 #include "../alpaca/AlpacaHistory.hpp"
 #include "../backtest/ReplayStream.hpp"
 #include "../util/MarketTime.hpp"
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -96,7 +97,7 @@ ReplayDownloader::rememberDaysWithoutBars(const std::string& ticker, const std::
             empty.insert(day);
     if (empty.size() == before)
         return;
-    std::ofstream(path) << json(std::vector<std::string>(empty.begin(), empty.end())).dump(JSON_INDENT) << "\n";
+    SaveData::write(path, json(std::vector<std::string>(empty.begin(), empty.end())).dump(JSON_INDENT) + "\n");
 }
 
 std::string

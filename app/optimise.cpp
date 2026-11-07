@@ -19,6 +19,7 @@
 #include "../src/util/MarketTime.hpp"
 #include "../src/alpaca/AlpacaApi.hpp"
 #include "../src/util/Defaults.hpp"
+#include "../src/util/SaveData.hpp"
 
 /*
  * optimise_app - find the best settings for each strategy
@@ -149,6 +150,7 @@ int main(int argc, char* argv[])
 
     std::string ticker = baseConfig.at("ticker");
     std::string dataDir = root + "/" + baseConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
+    SaveData::configure(dataDir, baseConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
 
     // ---- Data ----
     if (download)

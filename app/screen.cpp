@@ -6,6 +6,7 @@
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/Log.hpp"
 #include "../src/util/Defaults.hpp"
+#include "../src/util/SaveData.hpp"
 
 /*
  * Strategy screen: which stock / strategy combinations look worth trading?
@@ -47,6 +48,7 @@ int main(int argc, char* argv[])
         DotEnv::load(root + "/.env");
         json baseConfig = config.loadConfig();
         std::string dataRoot = root + "/" + baseConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
+        SaveData::configure(dataRoot, baseConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
 
         StockScreen screen(baseConfig, root, dataRoot, options);
         return screen.run();

@@ -3,6 +3,7 @@
 #include <map>
 #include <chrono>
 #include <iomanip>
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -178,6 +179,7 @@ DataStitcher::saveStitchedData(const std::vector<MarketCondition>& data, const s
     }
     
     outFile.close();
+    SaveData::saved(outputFilePath);
     std::cout << "Saved stitched data to: " << outputFilePath << std::endl;
     
     return true;

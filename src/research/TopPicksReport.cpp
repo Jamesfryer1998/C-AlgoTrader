@@ -5,6 +5,7 @@
 #include "ScreenReport.hpp"
 #include "../util/Format.hpp"
 #include "../util/TextTable.hpp"
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -117,6 +118,6 @@ TopPicksReport::save(const std::string& folder) const
     json ready = json::array();
     for (const auto& pick : picks)
         ready.push_back({{"ticker", pick.symbol}, {"strategy", screener.strategySettings(pick)}});
-    std::ofstream(configPath) << ready.dump(JSON_INDENT) << "\n";
+    SaveData::write(configPath, ready.dump(JSON_INDENT) + "\n");
     return {picksPath, configPath};
 }

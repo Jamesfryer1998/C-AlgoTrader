@@ -7,6 +7,7 @@
 #include "../src/util/Defaults.hpp"
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/Log.hpp"
+#include "../src/util/SaveData.hpp"
 
 /*
  * Which risk engine (position sizing) to trade with, and with which settings? Replays the portfolio in
@@ -41,6 +42,7 @@ int main(int argc, char* argv[])
         DotEnv::load(root + "/.env");
         json algoConfig = config.loadConfig();
         std::string dataRoot = root + "/" + algoConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
+        SaveData::configure(dataRoot, algoConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
 
         if (options.tune)
             return RiskTuning(algoConfig, dataRoot, root + JSON_CONFIG_NAME, options).run(std::cout);

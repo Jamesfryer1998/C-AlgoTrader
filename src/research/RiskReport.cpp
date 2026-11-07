@@ -1,8 +1,10 @@
 #include "RiskReport.hpp"
 
 #include <fstream>
+#include <sstream>
 #include "../util/Format.hpp"
 #include "../util/TextTable.hpp"
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -82,11 +84,12 @@ std::string
 RiskReport::save(const std::string& folder) const
 {
     std::string path = folder + SIMULATIONS_FILE;
-    std::ofstream file(path);
+    std::ostringstream file;
     file << CSV_HEADER << "\n";
     for (size_t i = 0; i < result.simulatedReturns.size(); i++)
         file << i + 1 << "," << result.simulatedReturns[i] << ","
              << result.simulatedReturns[i] * settings.portfolioValue << "\n";
+    SaveData::write(path, file.str());
     return path;
 }
 

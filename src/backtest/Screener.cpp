@@ -11,6 +11,7 @@
 #include <sstream>
 #include "../quant/Stats.hpp"
 #include "../util/MarketTime.hpp"
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -388,9 +389,7 @@ static std::vector<std::string> splitCsv(const std::string& line)
 bool
 Screener::writeCsv(const std::string& path, const std::vector<Row>& rows)
 {
-    std::ofstream file(path);
-    if (!file)
-        return false;
+    std::ostringstream file;
     file << CSV_HEADER << "\n" << std::setprecision(10);
     for (const auto& r : rows)
     {
@@ -404,15 +403,13 @@ Screener::writeCsv(const std::string& path, const std::vector<Row>& rows)
              << r.buyHoldReturn << "," << r.buyHoldSharpe << "," << r.buyHoldMaxDrawdown << ","
              << (r.beatsBuyHold() ? 1 : 0) << "\n";
     }
-    return static_cast<bool>(file);
+    return SaveData::write(path, file.str());
 }
 
 bool
 Screener::writeTopPicksCsv(const std::string& path, const std::vector<Row>& picks)
 {
-    std::ofstream file(path);
-    if (!file)
-        return false;
+    std::ostringstream file;
     file << "rank,symbol,strategy,parameters,train_sharpe,test_sharpe,buy_hold_sharpe,test_return_on_max_position,"
             "test_closed_trades\n";
     for (size_t i = 0; i < picks.size(); i++)
@@ -422,7 +419,7 @@ Screener::writeTopPicksCsv(const std::string& path, const std::vector<Row>& pick
              << r.train.sharpeRatio << "," << r.test.sharpeRatio << "," << r.buyHoldSharpe << ","
              << r.testReturnOnMaxPosition << "," << r.test.closedTrades << "\n";
     }
-    return true;
+    return SaveData::write(path, file.str());
 }
 
 std::vector<Screener::Row>

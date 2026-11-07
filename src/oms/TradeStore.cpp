@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <sstream>
+#include "../util/SaveData.hpp"
 
 static const char* TRADES_FILE = "trades.csv";
 static const char* POSITIONS_FILE = "positions.csv";
@@ -216,6 +217,7 @@ TradeStore::writeAtomically(const std::string& fileName, const std::string& cont
         file << contents;
     }
     std::filesystem::rename(tempPath, finalPath);
+    SaveData::saved(finalPath);
 }
 
 void
@@ -235,6 +237,8 @@ TradeStore::appendTrade(const TradeRecord& trade)
         if (isNew)
             file << joinColumns(TRADE_COLUMNS) << "\n";
         file << line;
+        file.close();
+        SaveData::saved(filePath);
     });
 }
 

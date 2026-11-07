@@ -2,3 +2,5 @@
 file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 
 add_library(quant_lib ${SOURCES})
+
+target_link_libraries(quant_lib util_lib)

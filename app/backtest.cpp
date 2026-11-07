@@ -7,6 +7,7 @@
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/MarketTime.hpp"
 #include "../src/util/Defaults.hpp"
+#include "../src/util/SaveData.hpp"
 
 namespace
 {
@@ -105,6 +106,7 @@ int main(int argc, char* argv[]) {
         if (download) {
             DotEnv::load(config.getProjectRoot() + "/.env");
             std::string dataDir = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
+            SaveData::configure(dataDir, algoConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
             AlpacaHistory history(algoConfig);
             if (history.downloadToCsv(startDate, endDate, dataDir) < 0) {
                 std::cerr << "Download failed - check your keys in .env and the dates" << std::endl;

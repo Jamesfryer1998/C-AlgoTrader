@@ -6,6 +6,7 @@
 #include <iomanip>
 #include "../risk/RiskEngineFactory.hpp"
 #include "../util/Defaults.hpp"
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -371,6 +372,7 @@ Backtester::saveResults()
     }
     
     outFile.close();
+    SaveData::saved(resultsFilename);
     
     std::cout << "Results saved to " << resultsFilename << std::endl;
 }

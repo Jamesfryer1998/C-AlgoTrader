@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <sstream>
 #include "PerformanceTable.hpp"
 #include "../util/Format.hpp"
 #include "../util/TextTable.hpp"
+#include "../util/SaveData.hpp"
 
 using Format::number;
 using Format::percent;
@@ -121,17 +123,20 @@ PairsReport::save(const std::string& folder) const
 {
     std::string base = folder + PAIRS_FILE_PREFIX + result.y + "_" + result.x;
 
-    std::ofstream daily(base + DAILY_FILE_SUFFIX);
+    std::ostringstream daily;
     daily << DAILY_CSV_HEADER << "\n";
     for (size_t i = 0; i < result.dates.size(); i++)
         daily << result.dates[i] << "," << result.z[i] << "," << result.hedgeRatio[i] << "," << result.position[i]
               << "," << result.dailyReturns[i] << "\n";
 
-    std::ofstream trades(base + TRADES_FILE_SUFFIX);
+    SaveData::write(base + DAILY_FILE_SUFFIX, daily.str());
+
+    std::ostringstream trades;
     trades << TRADES_CSV_HEADER << "\n";
     for (const auto& t : result.trades)
         trades << t.entryDate << "," << t.exitDate << "," << t.side << "," << t.hedgeRatio << "," << t.entryZ << ","
                << t.exitZ << "," << t.days << "," << t.returnPct << "," << t.exitReason << "\n";
+    SaveData::write(base + TRADES_FILE_SUFFIX, trades.str());
     return {base + DAILY_FILE_SUFFIX, base + TRADES_FILE_SUFFIX};
 }
 
@@ -165,10 +170,11 @@ std::string
 PairScanReport::save(const std::string& folder) const
 {
     std::string path = folder + SCAN_FILE;
-    std::ofstream file(path);
+    std::ostringstream file;
     file << SCAN_CSV_HEADER << "\n";
     for (const auto& row : rows)
         file << row.y << "," << row.x << "," << row.test.adf << "," << row.test.verdict() << "," << row.test.beta << ","
              << row.test.halfLifeDays << "," << row.returnCorrelation << "\n";
+    SaveData::write(path, file.str());
     return path;
 }

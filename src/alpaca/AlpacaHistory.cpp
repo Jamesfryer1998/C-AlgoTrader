@@ -10,6 +10,7 @@
 #include <thread>
 #include "AlpacaApi.hpp"
 #include "../util/MarketTime.hpp"
+#include "../util/SaveData.hpp"
 
 namespace
 {
@@ -121,15 +122,18 @@ AlpacaHistory::fetchBars(const std::string& startUtc, const std::string& endUtc,
 bool
 AlpacaHistory::writeCsv(const std::string& path, const std::vector<MarketCondition>& bars)
 {
-    std::ofstream file(path);
-    if (!file)
-        return false;
+    {
+        std::ofstream file(path);
+        if (!file)
+            return false;
 
-    file << MARKET_DATA_CSV_HEADER << "\n";
-    file << std::fixed << std::setprecision(PRICE_DECIMALS);
-    for (const auto& bar : bars)
-        file << bar.DateTime << "," << bar.Ticker << "," << bar.Open << "," << bar.Close << ","
-             << bar.Volume << "," << bar.TimeInterval << "\n";
+        file << MARKET_DATA_CSV_HEADER << "\n";
+        file << std::fixed << std::setprecision(PRICE_DECIMALS);
+        for (const auto& bar : bars)
+            file << bar.DateTime << "," << bar.Ticker << "," << bar.Open << "," << bar.Close << ","
+                 << bar.Volume << "," << bar.TimeInterval << "\n";
+    }
+    SaveData::saved(path);
     return true;
 }
 
@@ -201,6 +205,7 @@ AlpacaHistory::downloadToCsv(const std::string& startDate, const std::string& en
                 doneMonths.insert(monthKey);
                 json progress = {{"feed", feed}, {"adjustment", adjustment}, {"months", doneMonths}};
                 std::ofstream(progressPath) << progress.dump(2) << "\n";
+                SaveData::saved(progressPath);
             }
         }
 
