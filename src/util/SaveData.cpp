@@ -13,8 +13,9 @@ namespace fs = std::filesystem;
 namespace
 {
     const std::string PROTECTED_FOLDER = "live";   // data/live: the live account's records
-    const double BYTES_PER_GIGABYTE = 1024.0 * 1024.0 * 1024.0;
-    const double BYTES_PER_MEGABYTE = 1024.0 * 1024.0;
+    // Gigabytes as macOS (Finder) counts them: 1 GB = 1,000,000,000 bytes of file contents
+    const double BYTES_PER_GIGABYTE = 1e9;
+    const double BYTES_PER_MEGABYTE = 1e6;
 
     std::unique_ptr<SaveData> programData;   // set by configure()
     std::mutex configureLock;
@@ -106,13 +107,17 @@ SaveData::recordSave(const std::string& path)
     std::error_code error;
     std::uintmax_t bytes = fs::file_size(path, error);
     {
+        // A file saved before (e.g. performance.json, rewritten often) only adds what it grew by
         std::lock_guard<std::mutex> guard(lock);
-        estimatedBytes += bytes;
+        auto known = savedSizes.find(path);
+        std::uintmax_t before = known == savedSizes.end() ? 0 : known->second;
+        estimatedBytes = estimatedBytes + bytes > before ? estimatedBytes + bytes - before : 0;
+        savedSizes[path] = bytes;
         if (estimatedBytes <= limitBytes)
             return;
     }
 
-    // Over by our count, which counts a rewritten file twice: measure properly, and trim if really over
+    // Over by our count: measure properly, and trim if really over
     std::uintmax_t actual = bytesUsed();
     {
         std::lock_guard<std::mutex> guard(lock);

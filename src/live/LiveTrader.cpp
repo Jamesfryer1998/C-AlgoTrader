@@ -22,6 +22,10 @@ namespace
     // How often the main thread checks for Ctrl+C and overdue tables
     const std::chrono::milliseconds CHECK_INTERVAL{200};
 
+    // performance.json is rewritten at most this often (a backtest runs many minutes a second); the last
+    // figures are always saved at the end
+    const std::chrono::seconds PERFORMANCE_SAVE_INTERVAL{1};
+
     double millisecondsSince(std::chrono::steady_clock::time_point start)
     {
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -66,6 +70,8 @@ LiveTrader::run()
     startFeed();
     waitUntilFinished();
     stopFeed();
+    savePerformance(true);
+    store->flush();   // finish writing the records before the recap
     session->printSummary(recap(), tickers);
     recap() << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
     recap() << "Records saved in " << recordsDir << std::endl;
@@ -294,7 +300,9 @@ LiveTrader::addToReport(const StockLane& lane, const MarketCondition& bar, doubl
         if (startingEquity <= 0)
             startingEquity = account.equity;
     }
-    savePerformance(bar, row.position, account);
+    savedPositions[bar.Ticker] = row.position.toJson();
+    lastAccount = account;
+    savePerformance(false);
 
     std::lock_guard<std::mutex> guard(reportLock);
     report->addRow(bar, row, screen());
@@ -307,13 +315,20 @@ LiveTrader::addToReport(const StockLane& lane, const MarketCondition& bar, doubl
         report->print(screen());
 }
 
-// data/<records>/performance.json: our estimate, the broker's figures and every position
+// data/<records>/performance.json: our estimate, the broker's figures and every position. At most once a
+// second while running (unless `now`), so a fast backtest isn't held up writing the same file
 void
-LiveTrader::savePerformance(const MarketCondition& bar, const PositionSnapshot& position, const AccountSnapshot& account)
+LiveTrader::savePerformance(bool now)
 {
-    savedPositions[bar.Ticker] = position.toJson();
+    auto time = std::chrono::steady_clock::now();
+    if (!now && time - lastPerformanceSave < PERFORMANCE_SAVE_INTERVAL)
+        return;
+    lastPerformanceSave = time;
+    if (!store)
+        return;
     json performance = {{"estimate", PerformanceTracker::toJson(tracker.summary())},
-                        {"account", {{"equity", account.equity}, {"today_pnl", account.todayPnL()}, {"cash", account.cash}}},
+                        {"account", {{"equity", lastAccount.equity}, {"today_pnl", lastAccount.todayPnL()},
+                                     {"cash", lastAccount.cash}}},
                         {"positions", savedPositions}};
     store->savePerformance(performance);
 }

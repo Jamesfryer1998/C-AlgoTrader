@@ -1,13 +1,16 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <mutex>
 #include <string>
 
 /**
  * SaveData
  *
- * Keeps the data folder under a size limit (config.json "data_limit_gb", 5 GB unless set). Everything that
+ * Keeps the data folder under a size limit (config.json "data_limit_gb", 5 GB unless set). Sizes are file
+ * contents in decimal gigabytes (1 GB = 1,000,000,000 bytes), as Finder shows them; `du` reports a little more
+ * because files take whole disk blocks. Everything that
  * saves or downloads a file into data/ tells it so:
  *
  *   SaveData::saved(path);
@@ -52,5 +55,6 @@ class SaveData
         std::string protectedFolder;   // data/live
         std::uintmax_t limitBytes;
         std::uintmax_t estimatedBytes = 0;   // the last real size plus files saved since
+        std::map<std::string, std::uintmax_t> savedSizes;   // each file saved this run, at its last size
         std::mutex lock;
 };

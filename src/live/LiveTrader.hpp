@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -92,7 +93,7 @@ class LiveTrader
         void updateBook(const StockLane& lane, const MarketCondition& bar);
         void addToReport(const StockLane& lane, const MarketCondition& bar, double decisionMs,
                          const std::string& notes);
-        void savePerformance(const MarketCondition& bar, const PositionSnapshot& position, const AccountSnapshot& account);
+        void savePerformance(bool now);
         RiskEngine::SizingContext sizingContext(const std::string& ticker, float held);
         void collectResult();
 
@@ -128,6 +129,8 @@ class LiveTrader
         Result result;
         std::string lastEquityMinute;
         json savedPositions = json::object();
+        AccountSnapshot lastAccount;
+        std::chrono::steady_clock::time_point lastPerformanceSave;
 
         // Output (the feed's thread adds rows; the main thread prints overdue tables)
         std::mutex reportLock;
