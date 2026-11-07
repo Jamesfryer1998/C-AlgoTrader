@@ -21,6 +21,7 @@ namespace
                      / ("config_" + std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()));
                 fs::remove_all(root);
                 fs::create_directories(root / "config");
+                root = fs::canonical(root);   // macOS: the temp folder is a symlink (/var -> /private/var)
                 previousFolder = fs::current_path();
                 fs::current_path(root);
 
