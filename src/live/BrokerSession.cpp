@@ -145,7 +145,7 @@ BacktestSession::connect()
     simulated.setSlippage(config.value("backtest_slippage_percent", DEFAULT_BACKTEST_SLIPPAGE_PERCENT) / PERCENT);
     simulated.setCommission(BACKTEST_COMMISSION);
     simulated.setStartingCapital(config.value("starting_capital", Defaults::STARTING_CAPITAL));
-    return simulated.connect();
+    return true;   // the simulated broker connects itself when it's created
 }
 
 std::string

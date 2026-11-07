@@ -36,7 +36,6 @@ CSVParser::Read(const std::string& filePath)
             data.push_back(recentLine);
         }
 
-        Log::out() << data.size() << " lines read from file" << std::endl;
     }
 
     csvFile.close();

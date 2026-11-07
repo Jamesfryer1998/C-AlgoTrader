@@ -33,7 +33,8 @@ OrderValidator::setParams(json configData)
     }
 
     Log::out() << "  --> Params set: " 
-                << "maxPositionSize=" << maxPositionSize << ", "
+                << "maxPositionSize=" << (maxPositionSize == NO_SHARE_LIMIT ? std::string("none (sized by the risk engine)")
+                                                                          : std::to_string(static_cast<int>(maxPositionSize))) << ", "
                 << "maxExposure=" << maxExposure << ", "
                 << "slippageTolerance=" << slippageTolerance << std::endl;
 }
