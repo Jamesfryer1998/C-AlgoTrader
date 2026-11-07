@@ -18,7 +18,8 @@ struct LiveOptions
     static constexpr double DEFAULT_BACKTEST_SPEED = 0;   // simulated minutes per second; 0 = as fast as possible
 
     bool showHelp = false;
-    bool quiet = false;   // only the recap: no start-up notes or minute tables
+    bool quiet = false;    // --quiet: no start-up notes or minute tables, just the recap at the end
+    bool silent = false;   // nothing at all (risk_app runs many backtests and prints its own table)
     bool backtest = false;
     std::string backtestDay;   // empty: the latest day saved for every stock
     int backtestDays = 1;

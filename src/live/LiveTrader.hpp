@@ -96,8 +96,11 @@ class LiveTrader
         RiskEngine::SizingContext sizingContext(const std::string& ticker, float held);
         void collectResult();
 
-        // Where messages go: the terminal, or nowhere with --quiet
+        // Where messages go: the terminal, or nowhere with --quiet (or silent)
         std::ostream& screen() const;
+
+        // Where the end-of-session recap goes: the terminal unless silent
+        std::ostream& recap() const;
 
         json config;
         LiveOptions options;

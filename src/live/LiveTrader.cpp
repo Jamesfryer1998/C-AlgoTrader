@@ -41,7 +41,13 @@ LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std
 std::ostream&
 LiveTrader::screen() const
 {
-    return options.quiet ? Log::silent() : std::cout;
+    return options.quiet || options.silent ? Log::silent() : std::cout;
+}
+
+std::ostream&
+LiveTrader::recap() const
+{
+    return options.silent ? Log::silent() : std::cout;
 }
 
 int
@@ -60,9 +66,9 @@ LiveTrader::run()
     startFeed();
     waitUntilFinished();
     stopFeed();
-    session->printSummary(screen(), tickers);
-    screen() << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
-    screen() << "Records saved in " << recordsDir << std::endl;
+    session->printSummary(recap(), tickers);
+    recap() << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
+    recap() << "Records saved in " << recordsDir << std::endl;
     collectResult();
     return 0;
 }
@@ -215,7 +221,7 @@ LiveTrader::waitUntilFinished()
 void
 LiveTrader::stopFeed()
 {
-    screen() << (feedFinished ? "\nBacktest finished." : "\nStopping...") << std::endl;
+    recap() << (feedFinished ? "\nBacktest finished." : "\nStopping...") << std::endl;
     feed->stop();
 
     std::lock_guard<std::mutex> guard(reportLock);

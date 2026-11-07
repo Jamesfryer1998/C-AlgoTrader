@@ -4,6 +4,7 @@
 #include "../src/live/LiveTrader.hpp"
 #include "../src/util/Config.hpp"
 #include "../src/util/DotEnv.hpp"
+#include "../src/util/Log.hpp"
 #include "../src/util/Defaults.hpp"
 #include "../src/util/SaveData.hpp"
 
@@ -35,6 +36,9 @@ int main(int argc, char* argv[])
         LiveOptions::printUsage(std::cout);
         return 0;
     }
+
+    if (options.quiet)
+        Log::verbose = false;   // also hides the broker's and the risk checks' start-up notes
 
     std::signal(SIGINT, onStopSignal);   // Ctrl+C
     std::signal(SIGTERM, onStopSignal);  // systemctl stop / kill

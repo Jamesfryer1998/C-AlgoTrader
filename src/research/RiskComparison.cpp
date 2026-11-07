@@ -27,7 +27,7 @@ RiskComparison::backtestWith(const json& config, const std::string& dataRoot, co
 {
     LiveOptions backtest;
     backtest.backtest = true;
-    backtest.quiet = true;
+    backtest.silent = true;
     backtest.backtestSpeed = 0;   // as fast as possible
     backtest.backtestDay = firstDay;
     backtest.backtestDays = days;
