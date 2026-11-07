@@ -10,6 +10,7 @@
 #include "../backtest/ReplayStream.hpp"
 #include "../util/Defaults.hpp"
 #include "../util/Format.hpp"
+#include "../util/Log.hpp"
 #include "../util/OutputCapture.hpp"
 
 namespace
@@ -37,9 +38,16 @@ LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std
 {
 }
 
+std::ostream&
+LiveTrader::screen() const
+{
+    return options.quiet ? Log::silent() : std::cout;
+}
+
 int
 LiveTrader::run()
 {
+    stopRequested = false;
     if (!loadPortfolio())
         return 1;
     createLanes();
@@ -47,14 +55,15 @@ LiveTrader::run()
         return 1;
     backfillLanes();
     openRecords();
-    session->printMarketHours(std::cout);
+    session->printMarketHours(screen());
 
     startFeed();
     waitUntilFinished();
     stopFeed();
-    session->printSummary(std::cout, tickers);
-    std::cout << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
-    std::cout << "Records saved in " << recordsDir << std::endl;
+    session->printSummary(screen(), tickers);
+    screen() << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
+    screen() << "Records saved in " << recordsDir << std::endl;
+    collectResult();
     return 0;
 }
 
@@ -78,7 +87,7 @@ LiveTrader::loadPortfolio()
     if (!options.replay && testFeed)
     {
         if (portfolio.size() > 1)
-            std::cout << "Test feed: only " << AlpacaApi::TEST_SYMBOL << " streams, so trading it alone with "
+            screen() << "Test feed: only " << AlpacaApi::TEST_SYMBOL << " streams, so trading it alone with "
                       << portfolio.front().ticker << "'s strategies" << std::endl;
         portfolio.resize(1);
         portfolio.front().ticker = AlpacaApi::TEST_SYMBOL;
@@ -124,7 +133,7 @@ LiveTrader::openFeed()
     if (!replay->load())
         return false;
     const auto& days = replay->getDays();
-    std::cout << "\nREPLAY of " << days.front() << (days.size() > 1 ? " to " + days.back() : std::string())
+    screen() << "\nREPLAY of " << days.front() << (days.size() > 1 ? " to " + days.back() : std::string())
               << " (" << replay->minutes() << " minutes) with a simulated broker, "
               << (options.replaySpeed > 0 ? Format::number(options.replaySpeed, 0) + " minutes per second"
                                           : std::string("as fast as possible"))
@@ -151,10 +160,10 @@ LiveTrader::connectBroker()
 void
 LiveTrader::backfillLanes()
 {
-    std::cout << "Trading " << lanes.size() << " stock(s):" << std::endl;
+    screen() << "Trading " << lanes.size() << " stock(s), sized by " << lanes.front()->describeRisk() << ":" << std::endl;
     for (auto& lane : lanes)
     {
-        std::cout << "  " << lane->getTicker() << ": " << lane->strategyNames() << std::endl;
+        screen() << "  " << lane->getTicker() << ": " << lane->strategyNames() << std::endl;
         lane->backfill(feed->history(lane->getTicker(), lane->barsNeeded()));
     }
 }
@@ -197,18 +206,18 @@ LiveTrader::waitUntilFinished()
         std::this_thread::sleep_for(CHECK_INTERVAL);
         std::lock_guard<std::mutex> guard(reportLock);
         if (report->isOverdue(WAIT_FOR_MISSING_BARS))
-            report->print(std::cout);
+            report->print(screen());
     }
 }
 
 void
 LiveTrader::stopFeed()
 {
-    std::cout << (feedFinished ? "\nReplay finished." : "\nStopping...") << std::endl;
+    screen() << (feedFinished ? "\nReplay finished." : "\nStopping...") << std::endl;
     feed->stop();
 
     std::lock_guard<std::mutex> guard(reportLock);
-    report->print(std::cout);
+    report->print(screen());
 }
 
 // ---------- Each bar ----------
@@ -226,14 +235,17 @@ LiveTrader::onBar(const MarketCondition& bar)
 
     auto started = std::chrono::steady_clock::now();
     lane.addBar(bar);                                                         // 1. the new price
-    std::optional<Order> order = lane.decide(oms.heldQuantity(bar.Ticker));   // 2. the strategies vote
+    float held = oms.heldQuantity(bar.Ticker);
+    std::optional<Order> order = lane.decide(held);                           // 2. the strategies vote
     if (order)
-        sendOrder(lane, *order);                                              // 3. risk checks, then the broker
+        order = lane.size(*order, sizingContext(bar.Ticker, held));           // 3. the risk engine sizes it
+    if (order)
+        sendOrder(lane, *order);                                              // 4. risk checks, then the broker
     double decisionMs = millisecondsSince(started);
 
     session->afterDecision();
-    updateBook(lane, bar);                                                    // 4. positions and P&L
-    addToReport(lane, bar, decisionMs, notes.release());                      // 5. the minute's table
+    updateBook(lane, bar);                                                    // 5. positions and P&L
+    addToReport(lane, bar, decisionMs, notes.release());                      // 6. the minute's table
 }
 
 void
@@ -268,17 +280,23 @@ LiveTrader::addToReport(const StockLane& lane, const MarketCondition& bar, doubl
     capital.update(bar.Ticker, row.position.quantity, bar.Close, bar.DateTime);
     row.decisionMs = decisionMs;
     AccountSnapshot account = session->account().account();
+    if (account.available)
+    {
+        equityStats.update(account.equity, bar.DateTime);
+        if (startingEquity <= 0)
+            startingEquity = account.equity;
+    }
     savePerformance(bar, row.position, account);
 
     std::lock_guard<std::mutex> guard(reportLock);
-    report->addRow(bar, row, std::cout);
+    report->addRow(bar, row, screen());
     report->setAccount(account, session->account().headerNote());
     std::istringstream lines(notes);
     for (std::string line; std::getline(lines, line);)
         if (!line.empty())
             report->addEvent(bar.Ticker, line);
     if (report->isComplete())
-        report->print(std::cout);
+        report->print(screen());
 }
 
 // data/<records>/performance.json: our estimate, the broker's figures and every position
@@ -290,4 +308,28 @@ LiveTrader::savePerformance(const MarketCondition& bar, const PositionSnapshot& 
                         {"account", {{"equity", account.equity}, {"today_pnl", account.todayPnL()}, {"cash", account.cash}}},
                         {"positions", savedPositions}};
     store->savePerformance(performance);
+}
+
+// What the risk engine needs to size an order for this stock
+RiskEngine::SizingContext
+LiveTrader::sizingContext(const std::string& ticker, float held)
+{
+    RiskEngine::SizingContext context;
+    context.equity = session->account().account().equity;
+    context.heldQuantity = held;
+    context.otherPositionsValue = capital.current() - capital.valueOf(ticker);
+    return context;
+}
+
+void
+LiveTrader::collectResult()
+{
+    AccountSnapshot account = session->account().account();
+    result.startingEquity = startingEquity;
+    result.endingEquity = account.available ? account.equity : startingEquity;
+    result.maxDrawdown = equityStats.maxDrawdown();
+    result.sharpe = equityStats.sharpe();
+    result.mostCapitalInUse = capital.peak();
+    result.fills = session->fills();
+    result.days = equityStats.days();
 }

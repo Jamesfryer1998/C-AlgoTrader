@@ -10,7 +10,8 @@ target_include_directories(backtester_lib PUBLIC
 )
 
 # Link dependencies
-target_link_libraries(backtester_lib 
+target_link_libraries(backtester_lib
+    risk_lib
     data_access_lib
     broker_lib
     strategy_lib

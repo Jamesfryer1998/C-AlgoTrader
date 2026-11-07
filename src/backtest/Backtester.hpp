@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <iostream>
 #include <vector>
 #include <unistd.h>
@@ -11,6 +13,7 @@
 #include <map>
 #include "../data_access/MarketData.hpp"
 #include "../oms/OrderManagement.hpp"
+#include "../risk/RiskEngine.hpp"
 #include "../strategy_engine/StrategyEngine.hpp"
 #include "../strategy_engine/StrategyFactory.hpp"
 #include "../broker/SimulatedBroker.hpp"
@@ -114,6 +117,7 @@ private:
     StrategyFactory stratFactory;             // Factory for creating strategies
     StrategyEngine stratEngine;               // The strategies and the vote between them
     OrderManagement oms;                      // Risk checks, then the simulated broker
+    std::unique_ptr<RiskEngine> risk;         // How many shares each order is for (config "risk")
     
     // Configuration
     json algoConfig;

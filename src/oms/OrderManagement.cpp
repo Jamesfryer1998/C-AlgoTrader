@@ -5,6 +5,7 @@
 #include <ctime>
 
 #include "OrderManagement.hpp"
+#include "../util/Log.hpp"
 
 namespace
 {
@@ -216,7 +217,7 @@ void OrderManagement::enablePersistence(TradeStore* tradeStore, PerformanceTrack
     for (Position position : store->loadPositions())
         addPosition(position);
 
-    std::cout << "Restored " << trades.size() << " order record(s) (" << replayed << " that changed a position) and "
+    Log::out() << "Restored " << trades.size() << " order record(s) (" << replayed << " that changed a position) and "
               << positions.size() << " position(s) from " << store->getDirectory()
               << ". Next order id: " << latestOrderId << std::endl;
 }

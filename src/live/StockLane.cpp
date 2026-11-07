@@ -1,11 +1,13 @@
 #include "StockLane.hpp"
 
 #include <algorithm>
+#include "../risk/RiskEngineFactory.hpp"
 
 StockLane::StockLane(const PortfolioEntry& entry)
     : ticker(entry.ticker),
       config(entry.config),
-      factory(std::make_unique<StrategyFactory>(config))
+      factory(std::make_unique<StrategyFactory>(config)),
+      risk(RiskEngineFactory::create(config))
 {
     engine.setUp(config, *factory, marketData);
     engine.setPrintStatus(false);   // the live app shows each strategy's levels in its table instead

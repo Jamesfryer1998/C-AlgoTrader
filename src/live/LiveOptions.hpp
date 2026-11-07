@@ -2,6 +2,7 @@
 
 #include <ostream>
 #include <string>
+#include <vector>
 
 /**
  * LiveOptions
@@ -17,6 +18,8 @@ struct LiveOptions
     static constexpr double DEFAULT_REPLAY_SPEED = 10;   // replayed minutes per real second
 
     bool showHelp = false;
+    bool quiet = false;   // only the recap: no start-up notes or minute tables
+    std::vector<std::string> riskEngines;   // risk_app --engines: which to compare (empty: all)
     bool replay = false;
     std::string replayDay;   // empty: the latest day saved for every stock
     int replayDays = 1;

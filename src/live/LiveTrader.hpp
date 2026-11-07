@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 #include "BrokerSession.hpp"
 #include "CapitalUsage.hpp"
+#include "EquityStats.hpp"
 #include "LiveOptions.hpp"
 #include "MinuteReport.hpp"
 #include "StockLane.hpp"
@@ -16,6 +17,7 @@
 #include "../oms/OrderManagement.hpp"
 #include "../oms/PerformanceTracker.hpp"
 #include "../oms/TradeStore.hpp"
+#include "../risk/RiskEngine.hpp"
 #include "../strategy_engine/Portfolio.hpp"
 
 using json = nlohmann::json;
@@ -34,9 +36,10 @@ using json = nlohmann::json;
  *              1. lane.addBar(bar)                      the new price
  *              2. lane.decide(held)                     every strategy proposes BUY / SELL / nothing;
  *                                                       they must agree (StrategyEngine)
- *              3. sendOrder(lane, order)                risk checks, then the broker (OrderManagement)
- *              4. updateBook(lane, bar)                 positions and P&L catch up with the broker
- *              5. addToReport(...)                      one row in this minute's table (MinuteReport)
+ *              3. lane.size(order, ...)                 how many shares (the RiskEngine in config "risk")
+ *              4. sendOrder(lane, order)                risk checks, then the broker (OrderManagement)
+ *              5. updateBook(lane, bar)                 positions and P&L catch up with the broker
+ *              6. addToReport(...)                      one row in this minute's table (MinuteReport)
  *
  * The stocks and their strategies come from "portfolio" in config.json (see Portfolio). One OMS, one trade log
  * and one P&L book cover every stock. Nothing runs on a timer: each bar is decided as soon as it arrives.
@@ -54,6 +57,19 @@ class LiveTrader
 
         // For the SIGINT / SIGTERM handler
         static void requestStop() { stopRequested = true; }
+
+        // How a session went, once run() has returned (e.g. to compare risk engines)
+        struct Result
+        {
+            double startingEquity = 0;
+            double endingEquity = 0;
+            double maxDrawdown = 0;       // fraction
+            double sharpe = 0;            // of daily returns, annualised
+            double mostCapitalInUse = 0;
+            size_t fills = 0;
+            int days = 0;
+        };
+        const Result& getResult() const { return result; }
 
     private:
         // Setting up
@@ -76,6 +92,11 @@ class LiveTrader
         void addToReport(const StockLane& lane, const MarketCondition& bar, double decisionMs,
                          const std::string& notes);
         void savePerformance(const MarketCondition& bar, const PositionSnapshot& position, const AccountSnapshot& account);
+        RiskEngine::SizingContext sizingContext(const std::string& ticker, float held);
+        void collectResult();
+
+        // Where messages go: the terminal, or nowhere with --quiet
+        std::ostream& screen() const;
 
         json config;
         LiveOptions options;
@@ -98,6 +119,9 @@ class LiveTrader
         std::unique_ptr<TradeStore> store;
         PerformanceTracker tracker;
         CapitalUsage capital;       // the most money tied up in positions at once, for the recap
+        EquityStats equityStats;    // drawdown and Sharpe, for the result
+        double startingEquity = 0;
+        Result result;
         std::string lastEquityMinute;
         json savedPositions = json::object();
 

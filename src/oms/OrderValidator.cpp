@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include "OrderValidator.hpp"
 #include "../util/Log.hpp"
 
@@ -7,6 +8,13 @@ namespace
 {
     // slippage_tolerance in config.json is a percentage
     const double PERCENT = 100.0;
+
+    // max_position_size (shares) only limits the FIXED_SIZE risk engine. The other engines size positions in $,
+    // capped by their own max_stock_percent / max_portfolio_percent, and have no share limit unless their
+    // "risk" block sets max_position_size.
+    const std::string RISK = "risk";
+    const std::string FIXED_SIZE = "FIXED_SIZE";
+    const int NO_SHARE_LIMIT = std::numeric_limits<int>::max();
 }
 
 void 
@@ -15,6 +23,9 @@ OrderValidator::setParams(json configData)
     // Check if required keys exist in configData
     try {
         maxPositionSize = configData.at("max_position_size").get<int>();
+        json risk = configData.value(RISK, json::object());
+        if (risk.value("name", FIXED_SIZE) != FIXED_SIZE)
+            maxPositionSize = risk.value("max_position_size", NO_SHARE_LIMIT);
         maxExposure = configData.at("max_exposure").get<double>();
         slippageTolerance = configData.at("slippage_tolerance").get<double>();
     } catch (const json::exception& e) {

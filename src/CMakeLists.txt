@@ -1,6 +1,7 @@
 add_subdirectory(data_access)
 add_subdirectory(util)
 add_subdirectory(oms)
+add_subdirectory(risk)
 add_subdirectory(strategy_engine)
 add_subdirectory(broker)
 add_subdirectory(backtest)

@@ -14,14 +14,27 @@ CapitalUsage::update(const std::string& ticker, double quantity, double price, c
 {
     valueByTicker[ticker] = std::fabs(quantity) * price;
 
-    double total = 0;
+    currentValue = 0;
     for (const auto& [name, value] : valueByTicker)
-        total += value;
-    if (total > peakValue)
+        currentValue += value;
+    if (currentValue > peakValue)
     {
-        peakValue = total;
+        peakValue = currentValue;
         peakAt = dateTime;
     }
+}
+
+double
+CapitalUsage::current() const
+{
+    return currentValue;
+}
+
+double
+CapitalUsage::valueOf(const std::string& ticker) const
+{
+    auto found = valueByTicker.find(ticker);
+    return found == valueByTicker.end() ? 0 : found->second;
 }
 
 std::string

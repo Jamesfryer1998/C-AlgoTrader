@@ -20,6 +20,8 @@ LiveOptions::parse(int argc, char* argv[])
         }
         else if (args.is("--days"))
             options.replayDays = std::max(1, args.integer());
+        else if (args.is("--quiet"))
+            options.quiet = true;
         else if (args.is("--speed"))
             options.replaySpeed = std::max(0.0, args.number());
         else
@@ -40,5 +42,6 @@ Usage: algo_trader_app [options]
                             first, which needs the keys in .env. No day: the latest saved for every stock
   --days 3                  replay this many trading days from that day (default 1)
   --speed 10                replayed minutes per second (default 10; 0 = as fast as possible)
+  --quiet                   no minute tables, just the recap at the end
 )";
 }

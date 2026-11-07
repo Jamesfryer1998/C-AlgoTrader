@@ -4,6 +4,7 @@
 #include <cmath>
 #include <numeric>
 #include <iomanip>
+#include "../risk/RiskEngineFactory.hpp"
 #include "../util/Defaults.hpp"
 
 namespace
@@ -156,6 +157,7 @@ Backtester::runOn(const std::vector<MarketCondition>& bars)
     oms = OrderManagement();
     oms.setUp(algoConfig, &broker);
     oms.setMarketData(marketData);
+    risk = RiskEngineFactory::create(algoConfig);
     initializeBacktest();
 
     // Warm-up bars only build the strategies' history
@@ -206,8 +208,18 @@ Backtester::executeTimeStep(const MarketCondition& bar)
     marketData.addBar(bar, windowBars);
     Log::out() << "Backtester time step: " << bar.DateTime << std::endl;
 
-    // 2. Strategies vote; an agreed order goes through the risk checks to the simulated broker
-    std::optional<Order> order = stratEngine.decide(oms.heldQuantity(bar.Ticker));
+    // 2. Strategies vote; the risk engine sizes an agreed order, which goes through the risk checks to the
+    //    simulated broker
+    float held = oms.heldQuantity(bar.Ticker);
+    std::optional<Order> order = stratEngine.decide(held);
+    if (order)
+    {
+        RiskEngine::SizingContext context;
+        context.equity = broker.getCurrentEquity();
+        context.heldQuantity = held;
+        context.bars = &marketData;
+        order = risk->size(*order, context);
+    }
     if (order)
         oms.sendOrder(*order);
 

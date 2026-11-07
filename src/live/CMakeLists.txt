@@ -4,6 +4,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 add_library(live_lib ${SOURCES})
 
 target_link_libraries(live_lib
+    risk_lib
     alpaca_lib
     backtester_lib
     strategy_lib

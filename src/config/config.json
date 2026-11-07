@@ -92,6 +92,14 @@
             }
         }
     ],
+    "_risk_comment": "How many shares each order is for, the same engine for every stock (see src/risk/RiskEngine.hpp). FIXED_SIZE = every order is \"quantity\" shares, capped by max_position_size (how it traded before). The others size in $ and are capped by max_stock_percent / max_portfolio_percent of equity instead. Compare them on replayed days with: ./build/app/risk_app --replay 2025-11-03 --days 250",
+    "risk": {"name": "FIXED_SIZE", "quantity": 1},
+    "risk_comparison": [
+        {"name": "FIXED_SIZE", "quantity": 1},
+        {"name": "FIXED_FRACTION", "position_percent": 10, "max_stock_percent": 20, "max_portfolio_percent": 100},
+        {"name": "RISK_PER_TRADE", "risk_percent": 0.5, "max_stock_percent": 20, "max_portfolio_percent": 100},
+        {"name": "VOLATILITY_TARGET", "daily_volatility_percent": 0.25, "volatility_bars": 60, "max_stock_percent": 20, "max_portfolio_percent": 100}
+    ],
     "strategies": [
         {
             "name": "RSI",

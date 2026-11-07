@@ -46,6 +46,9 @@ class BrokerSession
         virtual void beforeDecision(const MarketCondition& bar) {}
         virtual void afterDecision() {}
 
+        // Orders filled so far (a replay counts them; Alpaca's aren't tracked here)
+        virtual size_t fills() const { return 0; }
+
         // Printed when the session ends
         virtual void printSummary(std::ostream& out, const std::vector<std::string>& tickers) = 0;
 };
@@ -82,6 +85,7 @@ class ReplaySession : public BrokerSession
         std::string recordsFolder() const override;
         void beforeDecision(const MarketCondition& bar) override;
         void afterDecision() override;
+        size_t fills() const override { return simulated.getFilledOrders().size(); }
         void printSummary(std::ostream& out, const std::vector<std::string>& tickers) override;
 
     private:

@@ -3,6 +3,7 @@ add_executable(backtest_app backtest.cpp)
 add_executable(optimise_app optimise.cpp)
 add_executable(quant_app quant.cpp)
 add_executable(screen_app screen.cpp)
+add_executable(risk_app risk.cpp)
 
 target_link_libraries(algo_trader_app
     live_lib
@@ -33,6 +34,11 @@ target_link_libraries(quant_app
     nlohmann_json)
 
 target_link_libraries(screen_app
+    research_lib
+    util_lib
+    nlohmann_json)
+
+target_link_libraries(risk_app
     research_lib
     util_lib
     nlohmann_json)
