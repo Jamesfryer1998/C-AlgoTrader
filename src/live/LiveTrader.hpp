@@ -68,6 +68,7 @@ class LiveTrader
             double mostCapitalInUse = 0;
             size_t fills = 0;
             int days = 0;
+            std::string firstDay, lastDay;   // a replay's first and last day
         };
         const Result& getResult() const { return result; }
 

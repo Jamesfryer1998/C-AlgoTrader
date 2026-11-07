@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "RiskOptions.hpp"
 #include "../live/LiveTrader.hpp"
 
 using json = nlohmann::json;
@@ -24,11 +25,7 @@ using json = nlohmann::json;
 class RiskComparison
 {
     public:
-        RiskComparison(const json& config, const std::string& dataRoot, const LiveOptions& replay);
-
-        // risk_app's command line: --replay YYYY-MM-DD [--days N] [--engines A,B]. Throws std::invalid_argument.
-        static LiveOptions parse(int argc, char* argv[]);
-        static void printUsage(std::ostream& out);
+        RiskComparison(const json& config, const std::string& dataRoot, const RiskOptions& options);
 
         // Runs every engine; prints progress and the table. 1 if a replay failed.
         int run(std::ostream& out);
@@ -37,12 +34,26 @@ class RiskComparison
         // names (if given) keeps only those engines.
         static std::vector<json> engines(const json& config, const std::vector<std::string>& names);
 
+        // One quiet replay of `days` days from firstDay with this "risk" block (ok = false if it failed)
+        static LiveTrader::Result replayWith(const json& config, const std::string& dataRoot, const json& risk,
+                                             const std::string& firstDay, int days, bool& ok);
+
+        // e.g. "RISK_PER_TRADE 0.50%"
+        static std::string label(const json& config, const json& risk);
+
+        static double returnOf(const LiveTrader::Result& result);
+
+        // A result as a row of the table below (columns: TABLE_COLUMNS)
+        static std::vector<std::string> tableRow(const std::string& name, const LiveTrader::Result& result);
+        static const std::vector<std::string> TABLE_COLUMNS;
+        static const std::vector<bool> TABLE_RIGHT_ALIGNED;
+
     private:
         void printTable(std::ostream& out) const;
 
         json config;
         std::string dataRoot;
-        LiveOptions replay;
+        RiskOptions options;
         std::vector<std::string> labels;
         std::vector<LiveTrader::Result> results;
 };

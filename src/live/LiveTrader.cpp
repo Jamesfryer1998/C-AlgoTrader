@@ -139,6 +139,8 @@ LiveTrader::openFeed()
                                           : std::string("as fast as possible"))
               << ". Nothing is sent to Alpaca." << std::endl;
     session = std::make_unique<ReplaySession>(config, days.front());
+    result.firstDay = days.front();
+    result.lastDay = days.back();
     feed = std::move(replay);
     return true;
 }
