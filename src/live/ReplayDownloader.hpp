@@ -1,5 +1,6 @@
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
@@ -14,8 +15,8 @@ using json = nlohmann::json;
  * Each stock is checked on its own, and only a stock missing a weekday in that range is downloaded (days
  * already saved are skipped by the download itself).
  *
- * Holidays aren't known, so a stock whose only gap is a market holiday gets a quick check against Alpaca
- * each time; nothing is downloaded for it.
+ * Weekdays Alpaca has no bars for (market holidays like Thanksgiving, or a halted stock) are remembered in
+ * the stock's folder (.days_without_bars.json) after a download, so they don't trigger another one.
  */
 class ReplayDownloader
 {
@@ -28,6 +29,13 @@ class ReplayDownloader
     private:
         // Where a stock's minute bars are kept: the folder it already uses, or data/minute/<TICKER>/
         std::string folderFor(const std::string& ticker) const;
+
+        // Days saved for a stock, plus the days already known to have no bars
+        std::set<std::string> coveredDays(const std::string& ticker) const;
+
+        // After a download: remember the past days in `needed` that still have no bars
+        void rememberDaysWithoutBars(const std::string& ticker, const std::vector<std::string>& needed,
+                                     const std::string& today) const;
 
         json config;
         std::string dataRoot;
