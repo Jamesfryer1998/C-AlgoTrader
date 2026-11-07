@@ -53,6 +53,7 @@ LiveTrader::run()
     waitUntilFinished();
     stopFeed();
     session->printSummary(std::cout, tickers);
+    std::cout << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
     std::cout << "Records saved in " << recordsDir << std::endl;
     return 0;
 }
@@ -264,6 +265,7 @@ LiveTrader::addToReport(const StockLane& lane, const MarketCondition& bar, doubl
     row.price = bar.Close;
     row.strategies = lane.decisionLevels();
     row.position = session->account().position(bar.Ticker, bar.Close);
+    capital.update(bar.Ticker, row.position.quantity, bar.Close, bar.DateTime);
     row.decisionMs = decisionMs;
     AccountSnapshot account = session->account().account();
     savePerformance(bar, row.position, account);

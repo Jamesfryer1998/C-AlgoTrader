@@ -8,6 +8,7 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 #include "BrokerSession.hpp"
+#include "CapitalUsage.hpp"
 #include "LiveOptions.hpp"
 #include "MinuteReport.hpp"
 #include "StockLane.hpp"
@@ -96,6 +97,7 @@ class LiveTrader
         std::string recordsDir;
         std::unique_ptr<TradeStore> store;
         PerformanceTracker tracker;
+        CapitalUsage capital;       // the most money tied up in positions at once, for the recap
         std::string lastEquityMinute;
         json savedPositions = json::object();
 
