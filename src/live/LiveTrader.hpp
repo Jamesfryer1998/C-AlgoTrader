@@ -86,6 +86,7 @@ class LiveTrader
         void startFeed();
         void waitUntilFinished();
         void stopFeed();
+        void printResultsHeading() const;
 
         // Each bar, on the feed's thread
         void onBar(const MarketCondition& bar);

@@ -72,6 +72,7 @@ LiveTrader::run()
     stopFeed();
     savePerformance(true);
     store->flush();   // finish writing the records before the recap
+    printResultsHeading();
     session->printSummary(recap(), tickers);
     recap() << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
     recap() << "Records saved in " << recordsDir << std::endl;
@@ -224,10 +225,26 @@ LiveTrader::waitUntilFinished()
     }
 }
 
+// e.g. "=== Backtest results: 2025-11-03 to 2026-01-14 (50 days) ==="
+void
+LiveTrader::printResultsHeading() const
+{
+    if (!options.backtest)
+    {
+        recap() << "\n=== Session results ===" << std::endl;
+        return;
+    }
+    int days = equityStats.days();
+    recap() << "\n=== Backtest results: " << result.firstDay
+            << (result.lastDay != result.firstDay ? " to " + result.lastDay : std::string())
+            << " (" << days << (days == 1 ? " day" : " days") << ") ===" << std::endl;
+}
+
 void
 LiveTrader::stopFeed()
 {
-    recap() << (feedFinished ? "\nBacktest finished." : "\nStopping...") << std::endl;
+    if (!feedFinished)
+        screen() << "\nStopping..." << std::endl;
     feed->stop();
 
     std::lock_guard<std::mutex> guard(reportLock);
