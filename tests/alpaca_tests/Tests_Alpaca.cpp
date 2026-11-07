@@ -176,25 +176,22 @@ TEST(AlpacaStreamTests, ParseRestBarWithoutSymbolUsesOurSymbol)
 
 TEST(AlpacaStreamTests, TestFeedUsesFakeSymbol)
 {
-    json config = {{"ticker", "NVDA"}, {"alpaca", {{"data_feed", "test"}}}};
-    AlpacaStream stream(config);
+    json config = {{"alpaca", {{"data_feed", "test"}}}};
+    AlpacaStream stream(config, {"NVDA"});
     EXPECT_EQ(stream.getSymbol(), "FAKEPACA");
 }
 
 TEST(AlpacaStreamTests, SubscribesToEveryPortfolioTicker)
 {
-    json config = {{"ticker", "NVDA"}, {"alpaca", {{"data_feed", "iex"}}}};
-    AlpacaStream stream(config);
-    EXPECT_EQ(stream.getSymbols(), std::vector<std::string>{"NVDA"});
-
-    stream.setSymbols({"TXN", "DHR", "WMT"});
+    // The portfolio's config has no top-level "ticker": the stream only needs the list
+    json config = {{"alpaca", {{"data_feed", "iex"}}}};
+    AlpacaStream stream(config, {"TXN", "DHR", "WMT"});
     EXPECT_EQ(stream.getSymbols().size(), 3u);
     EXPECT_EQ(stream.getSymbol(), "TXN");
 
     // The test feed only has its fake symbol
-    json test = {{"ticker", "NVDA"}, {"alpaca", {{"data_feed", "test"}}}};
-    AlpacaStream fake(test);
-    fake.setSymbols({"TXN", "DHR"});
+    json test = {{"alpaca", {{"data_feed", "test"}}}};
+    AlpacaStream fake(test, {"TXN", "DHR"});
     EXPECT_EQ(fake.getSymbols(), std::vector<std::string>{"FAKEPACA"});
 }
 

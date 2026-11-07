@@ -129,9 +129,7 @@ LiveTrader::openFeed()
 {
     if (!options.backtest)
     {
-        auto stream = std::make_unique<AlpacaStream>(config);
-        stream->setSymbols(tickers);
-        feed = std::move(stream);
+        feed = std::make_unique<AlpacaStream>(config, tickers);
         return true;
     }
 

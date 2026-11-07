@@ -30,11 +30,10 @@ using json = nlohmann::json;
 class AlpacaStream : public BarFeed
 {
     public:
-        AlpacaStream(const json& config);
+        // Streams every one of `tickers` (the portfolio's stocks). The "test" feed only has FAKEPACA, so it
+        // streams that instead.
+        AlpacaStream(const json& config, const std::vector<std::string>& tickers);
 
-        // Trade several tickers: subscribe to all of these instead of the config's "ticker".
-        // Ignored on the "test" feed, which only has FAKEPACA. Call before start().
-        void setSymbols(const std::vector<std::string>& tickers);
         const std::vector<std::string>& getSymbols() const { return symbols; }
 
         // Download the most recent `count` 1-minute bars of one ticker over REST so strategies have history

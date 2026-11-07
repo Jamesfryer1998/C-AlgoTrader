@@ -27,25 +27,19 @@ namespace
     const char* const UTC_TIME_FORMAT = UTC_TIME_FORMAT;
 }
 
-AlpacaStream::AlpacaStream(const json& config)
+AlpacaStream::AlpacaStream(const json& config, const std::vector<std::string>& tickers)
 {
     json alpaca = config.value("alpaca", json::object());
 
     feed = alpaca.value("data_feed", AlpacaApi::IEX_FEED);
-    symbol = (feed == AlpacaApi::TEST_FEED) ? AlpacaApi::TEST_SYMBOL : config.at("ticker").get<std::string>();
-    symbols = {symbol};
+    if (feed == AlpacaApi::TEST_FEED || tickers.empty())
+        symbols = {AlpacaApi::TEST_SYMBOL};
+    else
+        symbols = tickers;
+    symbol = symbols.front();
 
     streamUrl = alpaca.value("stream_url", AlpacaApi::STREAM_URL + feed);
     dataUrl = alpaca.value("data_url", AlpacaApi::DATA_URL);
-}
-
-void
-AlpacaStream::setSymbols(const std::vector<std::string>& tickers)
-{
-    if (feed == AlpacaApi::TEST_FEED || tickers.empty())
-        return;
-    symbols = tickers;
-    symbol = tickers.front();
 }
 
 std::vector<MarketCondition>
