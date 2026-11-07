@@ -5,21 +5,35 @@ namespace
 {
     json baseConfig()
     {
-        return {{"ticker", "NVDA"}, {"max_position_size", 10},
-                {"strategies", {{{"name", "RSI"}, {"active", 1}, {"period", 21}}}}};
+        return {{"max_position_size", 10}};
     }
 }
 
-TEST(PortfolioTests, NoPortfolioMeansTheSingleTopLevelTicker)
+TEST(PortfolioTests, NoPortfolioIsAnError)
 {
-    auto entries = Portfolio::fromConfig(baseConfig());
-    ASSERT_EQ(entries.size(), 1u);
-    EXPECT_EQ(entries[0].ticker, "NVDA");
-    EXPECT_EQ(entries[0].config["strategies"][0]["period"], 21);
+    // Strategies are only set per stock, so there's nothing to trade without a portfolio
+    EXPECT_THROW(Portfolio::fromConfig(baseConfig()), std::runtime_error);
 
     json empty = baseConfig();
     empty["portfolio"] = json::array();
-    EXPECT_EQ(Portfolio::fromConfig(empty)[0].ticker, "NVDA");
+    EXPECT_THROW(Portfolio::fromConfig(empty), std::runtime_error);
+}
+
+TEST(PortfolioTests, ForTickerFindsTheStocksEntry)
+{
+    json config = baseConfig();
+    config["portfolio"] = {{{"ticker", "KO"}, {"strategy", {{"name", "MEANREV"}, {"lookback_period", 60}}}}};
+
+    PortfolioEntry ko = Portfolio::forTicker(config, "KO");
+    EXPECT_EQ(ko.config["ticker"], "KO");
+    EXPECT_EQ(ko.config["strategies"][0]["lookback_period"], 60);
+    EXPECT_FALSE(ko.config.contains("portfolio"));
+
+    // A stock that isn't in the portfolio has no strategies of its own
+    PortfolioEntry pep = Portfolio::forTicker(config, "PEP");
+    EXPECT_EQ(pep.config["ticker"], "PEP");
+    EXPECT_TRUE(pep.config["strategies"].empty());
+    EXPECT_EQ(pep.config["max_position_size"], 10);
 }
 
 TEST(PortfolioTests, ReadsTheScreensTopPicksFormat)

@@ -32,7 +32,7 @@ class AlpacaStream : public BarFeed
     public:
         AlpacaStream(const json& config);
 
-        // Trade several tickers: subscribe to all of these instead of config/general.json's "ticker".
+        // Trade several tickers: subscribe to all of these instead of the config's "ticker".
         // Ignored on the "test" feed, which only has FAKEPACA. Call before start().
         void setSymbols(const std::vector<std::string>& tickers);
         const std::vector<std::string>& getSymbols() const { return symbols; }

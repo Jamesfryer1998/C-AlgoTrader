@@ -36,7 +36,7 @@ namespace
 StockScreen::StockScreen(const json& baseConfig, const std::string& projectRoot, const std::string& dataRoot,
                          const ScreenOptions& options)
     : options(options),
-      screen(ScreenSettings::load(projectRoot + ConfigFiles::SCREEN, options)),
+      screen(ScreenSettings::load(projectRoot + "/" + ConfigFiles::SCREEN, options)),
       resultsFolder(dataRoot + RESULTS_FOLDER + screen.mode),
       resultsPath(resultsFolder + RESULTS_FILE),
       screener(baseConfig, screen.settings),

@@ -9,7 +9,7 @@
 // research apps' own settings.
 namespace ConfigFiles
 {
-    const std::string FOLDER = "/config/";
+    const std::string FOLDER = "config/";
     const std::string GENERAL = FOLDER + "general.json";     // data folder, capital, Alpaca
     const std::string STRATEGY = FOLDER + "strategy.json";   // the portfolio and each stock's strategies
     const std::string RISK = FOLDER + "risk.json";           // position sizing and order limits

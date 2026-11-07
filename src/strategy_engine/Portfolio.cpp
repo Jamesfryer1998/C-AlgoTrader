@@ -3,6 +3,19 @@
 #include <set>
 #include <stdexcept>
 
+namespace
+{
+    // The whole config as one stock sees it: its own ticker and strategies, no portfolio
+    json stockConfig(const json& config, const std::string& ticker, const json& strategies)
+    {
+        json stock = config;
+        stock.erase("portfolio");
+        stock["ticker"] = ticker;
+        stock["strategies"] = strategies;
+        return stock;
+    }
+}
+
 std::vector<PortfolioEntry>
 Portfolio::fromConfig(const json& config)
 {
@@ -10,13 +23,7 @@ Portfolio::fromConfig(const json& config)
     json portfolio = config.value("portfolio", json::array());
 
     if (!portfolio.is_array() || portfolio.empty())
-    {
-        PortfolioEntry single;
-        single.ticker = config.at("ticker").get<std::string>();
-        single.config = config;
-        entries.push_back(single);
-        return entries;
-    }
+        throw std::runtime_error("there's no \"portfolio\": list each stock with its \"strategy\"");
 
     std::set<std::string> seen;
     for (size_t i = 0; i < portfolio.size(); i++)
@@ -48,11 +55,18 @@ Portfolio::fromConfig(const json& config)
                 s["active"] = 1;
         }
 
-        entry.config = config;
-        entry.config.erase("portfolio");
-        entry.config["ticker"] = entry.ticker;
-        entry.config["strategies"] = strategies;
+        entry.config = stockConfig(config, entry.ticker, strategies);
         entries.push_back(entry);
     }
     return entries;
+}
+
+PortfolioEntry
+Portfolio::forTicker(const json& config, const std::string& ticker)
+{
+    if (!config.value("portfolio", json::array()).empty())
+        for (const auto& entry : fromConfig(config))
+            if (entry.ticker == ticker)
+                return entry;
+    return {ticker, stockConfig(config, ticker, json::array())};
 }

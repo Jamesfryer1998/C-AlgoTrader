@@ -65,7 +65,7 @@ Config::loadJson(const std::string& path)
 string
 Config::formConfigPath(const string& configFile)
 {
-    return getProjectRoot() + configFile;
+    return getProjectRoot() + "/" + configFile;
 }
 
 string

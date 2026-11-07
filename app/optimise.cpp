@@ -12,6 +12,7 @@
 #include "../src/backtest/Optimiser.hpp"
 #include "../src/data_access/CSVParser.hpp"
 #include "../src/data_access/DataStitcher.hpp"
+#include "../src/strategy_engine/Portfolio.hpp"
 #include "../src/util/Config.hpp"
 #include "../src/util/Format.hpp"
 #include "../src/util/DotEnv.hpp"
@@ -26,6 +27,7 @@
  *
  *   ./build/app/optimise_app                         all strategies, all downloaded data since 2016
  *   ./build/app/optimise_app --strategy RSI          one strategy
+ *   ./build/app/optimise_app --ticker KO             another stock (default: the first in the portfolio)
  *   ./build/app/optimise_app --download              fetch any missing data from Alpaca first
  *
  * What to try is set in config/optimisation.json. Results go to data/optimisation/.
@@ -38,6 +40,8 @@ static void printUsage()
     std::cout << "optimise_app - backtest every combination of strategy settings and rank them\n\n"
               << "Options:\n"
               << "  --strategy <RSI|MACD|MEANREV|SCALP|all>  Which strategy to optimise (default: all)\n"
+              << "  --ticker <SYMBOL>                  Which stock (default: the first in the portfolio). Its\n"
+              << "                                     current settings come from its portfolio entry\n"
               << "  --start-date <YYYY-MM-DD>          First day of data (default: 2016-01-01)\n"
               << "  --end-date <YYYY-MM-DD>            Last day of data (default: yesterday)\n"
               << "  --test-months <n>                  Months at the end kept back for testing (default: from optimisation.json)\n"
@@ -103,6 +107,7 @@ static void writeResultsCsv(const std::string& path, const Optimiser& optimiser,
 int main(int argc, char* argv[])
 {
     std::string strategyArg = "all";
+    std::string ticker;
     std::string startDate = AlpacaApi::FIRST_HISTORY_DAY;
     std::string endDate;
     int testMonths = -1;
@@ -116,6 +121,7 @@ int main(int argc, char* argv[])
         auto value = [&]() -> std::string { return i + 1 < argc ? argv[++i] : ""; };
         if (arg == "--help") { printUsage(); return 0; }
         else if (arg == "--strategy") strategyArg = value();
+        else if (arg == "--ticker") ticker = value();
         else if (arg == "--start-date") startDate = value();
         else if (arg == "--end-date") endDate = value();
         else if (arg == "--test-months") testMonths = std::stoi(value());
@@ -148,7 +154,19 @@ int main(int argc, char* argv[])
             strategies.push_back(name);
     if (strategies.empty()) { std::cerr << "Unknown strategy " << strategyArg << std::endl; return 1; }
 
-    std::string ticker = baseConfig.at("ticker");
+    json stockConfig;
+    try
+    {
+        if (ticker.empty())
+            ticker = Portfolio::fromConfig(baseConfig).front().ticker;
+        stockConfig = Portfolio::forTicker(baseConfig, ticker).config;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "ERROR - " << e.what() << " (" << ConfigFiles::STRATEGY << "), or pick a stock with --ticker"
+                  << std::endl;
+        return 1;
+    }
     std::string dataDir = root + "/" + baseConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
     SaveData::configure(dataDir, baseConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
 
@@ -156,7 +174,7 @@ int main(int argc, char* argv[])
     if (download)
     {
         DotEnv::load(root + "/.env");
-        if (AlpacaHistory(baseConfig).downloadToCsv(startDate, endDate, dataDir) < 0)
+        if (AlpacaHistory(stockConfig).downloadToCsv(startDate, endDate, dataDir) < 0)
         {
             std::cerr << "Download failed - check your keys in .env" << std::endl;
             return 1;
@@ -183,7 +201,7 @@ int main(int argc, char* argv[])
               << settings.value("slippage_percent", 0.01) << "% slippage per fill | objective: "
               << settings.value("objective", "sharpe") << " | " << threads << " threads\n" << std::endl;
 
-    Optimiser optimiser(baseConfig, settings);
+    Optimiser optimiser(stockConfig, settings);
 
     fs::create_directories(dataDir + "optimisation");
     std::string stamp = MarketTime::formatUtc(std::time(nullptr)).substr(0, 19);
@@ -210,7 +228,7 @@ int main(int argc, char* argv[])
             });
         double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
 
-        // Current settings in config/strategy.json, for comparison
+        // The stock's current settings in config/strategy.json, for comparison
         Optimiser::Result current;
         current.settings = optimiser.currentSettings(name);
         try

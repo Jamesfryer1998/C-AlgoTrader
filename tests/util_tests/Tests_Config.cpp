@@ -25,7 +25,7 @@ namespace
                 fs::current_path(root);
 
                 write(ConfigFiles::GENERAL, R"({"starting_capital": 50000, "alpaca": {"data_feed": "iex"}})");
-                write(ConfigFiles::STRATEGY, R"({"portfolio": [{"ticker": "KO"}], "strategies": []})");
+                write(ConfigFiles::STRATEGY, R"({"portfolio": [{"ticker": "KO"}]})");
                 write(ConfigFiles::RISK, R"({"risk": {"name": "FIXED_SIZE"}, "max_position_size": 10})");
             }
 
@@ -37,7 +37,7 @@ namespace
 
             void write(const std::string& configFile, const std::string& contents)
             {
-                std::ofstream(root.string() + configFile) << contents;
+                std::ofstream(root / configFile) << contents;
             }
     };
 }
@@ -63,7 +63,7 @@ TEST_F(ConfigTests, ASettingInTwoFilesIsAnError)
 
 TEST_F(ConfigTests, AMissingFileIsAnError)
 {
-    fs::remove(root.string() + ConfigFiles::STRATEGY);
+    fs::remove(root / ConfigFiles::STRATEGY);
     Config config;
     EXPECT_THROW(config.loadConfig(), std::runtime_error);
 }

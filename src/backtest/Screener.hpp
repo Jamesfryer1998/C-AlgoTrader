@@ -67,7 +67,7 @@ class Screener
             double trainTestCorrelation = 0; // across stocks: does a better training Sharpe mean a better test one?
         };
 
-        // baseConfig: the app config (risk limits, current strategy settings); settings: screen.json
+        // baseConfig: the app config (risk limits); strategies start from their built-in settings; settings: screen.json
         Screener(const json& baseConfig, const json& settings);
 
         // Daily bars in the form the strategy tester reads (one bar per day at the close)

@@ -1,5 +1,5 @@
 {
-    "_comment": "Settings for optimise_app. Each strategy lists the values to try for each parameter; every combination is backtested. Strategy parameters not listed here keep the values from config/strategy.json.",
+    "_comment": "Settings for optimise_app. Each strategy lists the values to try for each parameter; every combination is backtested. Strategy parameters not listed here keep the stock's settings from its config/strategy.json portfolio entry (or the strategy's built-in settings).",
     "starting_capital": 100000.0,
     "commission_per_trade": 0.0,
     "slippage_percent": 0.01,

@@ -36,16 +36,17 @@ class Optimiser
             double score = 0;             // objective on the training data
         };
 
-        // baseConfig: the app config (risk limits, current strategy settings)
+        // baseConfig: one stock's config (Portfolio::forTicker): risk limits, and its current "strategies"
         // settings:   optimisation.json
         Optimiser(const json& baseConfig, const json& settings);
 
         // Every combination of the listed values for a strategy (invalid ones, e.g. MACD short >= long,
-        // removed), starting from the strategy's current settings in config/strategy.json. If max_combinations > 0
+        // removed), starting from the stock's current settings for it. If max_combinations > 0
         // and there are more, a fixed random sample of that size is used.
         std::vector<json> parameterGrid(const std::string& strategyName) const;
 
-        // The strategy's current settings from config/strategy.json (forced active)
+        // The stock's current settings for the strategy (forced active), or just its name if the stock doesn't
+        // use it, so the strategy's built-in settings fill in anything the grid doesn't search
         json currentSettings(const std::string& strategyName) const;
 
         // Backtest one strategy setting over bars and return its performance. The first warmupBars bars only

@@ -1,7 +1,6 @@
 {
     "marketDataBasePath": "data/",
     "baseDataFileName": "marketData",
-    "ticker": "NVDA",
     "starting_capital": 100000.0,
     "data_limit_gb": 5.0,
     "alpaca": {

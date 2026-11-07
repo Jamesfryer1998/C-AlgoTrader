@@ -31,7 +31,7 @@ so each setting lives in exactly one of them:
 | File | What's in it |
 |---|---|
 | `general.json` | data folder, starting capital, data size limit, the `"alpaca"` block |
-| `strategy.json` | the `"portfolio"` (each stock and its strategy) and the default `"strategies"` |
+| `strategy.json` | the `"portfolio"`: each stock and its strategies (strategies are only set per stock) |
 | `risk.json` | the `"risk"` engine (position sizing), order limits, and `risk_app`'s comparison and tuning grids |
 | `screen.json` | `screen_app`'s stocks, dates and strategy grids |
 | `optimisation.json` | `optimise_app`'s strategy grids |
@@ -82,9 +82,10 @@ each bar's close with 0.01% slippage against us (`"backtest_slippage_percent"` i
 `data/backtest/<day>/` (fresh each run), so `data/live/` and the paper account are untouched. At the end it
 prints the simulated equity, P&L, fills per stock and the most capital in use.
 
-#### Trading several stocks (`"portfolio"`)
-Add a `"portfolio"` list to `config/strategy.json` and the app trades every stock in it at once, each with
-its own strategy and settings, from a single Alpaca stream:
+#### Stocks and strategies (`"portfolio"`)
+The `"portfolio"` list in `config/strategy.json` is what the app trades: every stock in it at once, each with
+its own strategy and settings, from a single Alpaca stream. There are no default strategies; each stock sets
+its own:
 
 ```json
 "portfolio": [
@@ -97,8 +98,7 @@ its own strategy and settings, from a single Alpaca stream:
 
 The format is the same as `data/screen/minute/top_picks_config.json` from `screen_app`, so the screen's picks
 can be pasted in as they are. Each stock gets its own price history, back-fill and strategies; one OMS, one
-`trades.csv` and one P&L book cover them all, and `max_position_size` applies per stock. Without a portfolio
-the app trades the top-level `"ticker"` with the top-level `"strategies"`, as before.
+`trades.csv` and one P&L book cover them all, and `max_position_size` applies per stock.
 
 #### Saved state and P&L
 While running, the app saves its state to `data/live/` (`data/live_dry_run/` for dry runs). The files are only written while running and only read once at start-up, so they never slow down a decision:
