@@ -93,7 +93,8 @@
         }
     ],
     "_risk_comment": "How many shares each order is for, the same engine for every stock (see src/risk/RiskEngine.hpp). FIXED_SIZE = every order is \"quantity\" shares, capped by max_position_size (how it traded before). The others size in $ and are capped by max_stock_percent / max_portfolio_percent of equity instead. Compare them with: ./build/app/risk_app --replay 2025-11-03 --days 120. Tune them (grids in risk_tuning) and save the best here with: ./build/app/risk_app --tune --replay 2025-11-03 --days 120 --test-days 60 --save",
-    "risk": {"name": "FIXED_SIZE", "quantity": 1},
+    "_risk_tuned": "Chosen by risk_app --tune on 2026-11-07: training +41.0% (drawdown 4.4%), test +5.7% (drawdown 7.1%); one share per order made +0.9% and +0.2%",
+    "risk": {"name": "VOLATILITY_TARGET", "daily_volatility_percent": 1.0, "max_stock_percent": 40, "volatility_bars": 60},
     "risk_comparison": [
         {"name": "FIXED_SIZE", "quantity": 1},
         {"name": "FIXED_FRACTION", "position_percent": 10, "max_stock_percent": 20, "max_portfolio_percent": 100},
