@@ -3,6 +3,7 @@ its process id (as the C++ trader does) and says which signal it got."""
 
 import json
 import stat
+import subprocess
 import time
 from pathlib import Path
 
@@ -73,10 +74,18 @@ def live_status(control):
     return records.status(control.project.live_records)
 
 
+def what_happened(control) -> str:
+    """For a failed check: what the stand-in trader printed and last wrote, and what ps says about it."""
+    pid = int(live_status(control).get("pid") or 0)
+    ps = subprocess.run(["ps", "-p", str(pid), "-o", "args="], capture_output=True, text=True).stdout if pid else ""
+    return (f"status.json: {live_status(control)}\nps: {ps!r}\n"
+            f"trader.log: {records.log_tail(control.project.live_records, 20)}")
+
+
 def test_start_then_stop(control):
     assert control.running_pid() is None
     assert control.start() == "Starting"
-    assert wait_for(lambda: control.running_pid() is not None)
+    assert wait_for(lambda: control.running_pid() is not None), what_happened(control)
     assert control.start() == "Already running"
     assert "trading" in records.log_tail(control.project.live_records, 5)
 
@@ -88,7 +97,7 @@ def test_start_then_stop(control):
 
 def test_flatten_sends_its_own_signal(control):
     control.start()
-    assert wait_for(lambda: control.running_pid() is not None)
+    assert wait_for(lambda: control.running_pid() is not None), what_happened(control)
     assert control.flatten() == "Closing every position, then stopping"
     assert wait_for(lambda: live_status(control).get("state") == "stopped")
     assert live_status(control)["note"] == "flattened"    # it got SIGUSR1
