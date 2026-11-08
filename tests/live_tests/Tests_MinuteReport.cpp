@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <sstream>
 #include "../../src/live/MinuteReport.hpp"
+#include "../../src/oms/OrderManagement.hpp"
+#include "../../src/oms/PerformanceTracker.hpp"
 
 namespace
 {
@@ -125,4 +127,21 @@ TEST(PositionSnapshotTests, DescribesAPositionOrFlat)
     EXPECT_EQ(shortTwo.describe(), "-2 @ 100.00");
     EXPECT_EQ(shortTwo.describeValue(98), "-$196.00");
     EXPECT_EQ(shortTwo.describePnL(), "+$4.00 (+2.00%)");
+}
+
+TEST(DryRunAccountMonitorTests, PositionsComeFromOurOwnRecords)
+{
+    OrderManagement oms;
+    Position ko10("KO", 10, 60.0f);
+    oms.addPosition(ko10);
+    PerformanceTracker tracker(100000);
+    DryRunAccountMonitor monitor(oms, tracker);
+
+    PositionSnapshot ko = monitor.position("KO", 61.0);
+    EXPECT_DOUBLE_EQ(ko.quantity, 10);
+    EXPECT_DOUBLE_EQ(ko.unrealisedPnL, 10.0);              // up $1 a share
+    EXPECT_NEAR(ko.unrealisedFraction, 10.0 / 600, 1e-12);
+    EXPECT_FALSE(monitor.position("PEP", 150).isOpen());
+    EXPECT_FALSE(monitor.account().available);              // no real account behind a dry run
+    EXPECT_EQ(monitor.headerNote(), "dry run estimate +$0.00");
 }

@@ -50,3 +50,29 @@ TEST(CommandLineTests, BadOrMissingValuesSayWhichOption)
         EXPECT_THROW(args.rejectOption(), std::invalid_argument);
     });
 }
+
+TEST(CommandLineTests, ListsOfNumbers)
+{
+    withArgs({"--weights", "0.5,0.3,,0.2"}, [](CommandLine& args) {
+        args.next();
+        EXPECT_EQ(args.numbers(), (std::vector<double>{0.5, 0.3, 0.2}));
+    });
+    withArgs({"--weights", "0.5,half"}, [](CommandLine& args) {
+        args.next();
+        EXPECT_THROW(args.numbers(), std::invalid_argument);
+    });
+}
+
+TEST(CommandLineTests, NumbersMustBeWholeNumbers)
+{
+    // "2.5x" and "abc" aren't numbers, and 99999999999 is too big for an int
+    for (const char* value : {"2.5x", "abc"})
+        withArgs({"--speed", value}, [](CommandLine& args) {
+            args.next();
+            EXPECT_THROW(args.number(), std::invalid_argument);
+        });
+    withArgs({"--top", "99999999999"}, [](CommandLine& args) {
+        args.next();
+        EXPECT_THROW(args.integer(), std::invalid_argument);
+    });
+}

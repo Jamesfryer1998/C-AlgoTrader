@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <fstream>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -226,6 +227,19 @@ TEST(ScreenerTests, SummaryPicksAndCsv)
     EXPECT_EQ(read[1].parameters, rows[1].parameters);   // JSON with commas and quotes survives the CSV
     EXPECT_FALSE(read[4].found);
     std::remove(path.c_str());
+
+    // The top picks: ranked, one line each, parameters kept whole
+    std::string picksPath = (std::filesystem::temp_directory_path() / "screen_test_top_picks.csv").string();
+    ASSERT_TRUE(Screener::writeTopPicksCsv(picksPath, held));
+    std::ifstream picks(picksPath);
+    std::vector<std::string> lines;
+    for (std::string line; std::getline(picks, line);)
+        lines.push_back(line);
+    ASSERT_EQ(lines.size(), held.size() + 1);
+    EXPECT_EQ(lines[0].rfind("rank,symbol,strategy,parameters,", 0), 0u);
+    EXPECT_EQ(lines[1].rfind("1,B,", 0), 0u);
+    EXPECT_EQ(lines[2].rfind("2,", 0), 0u);
+    std::remove(picksPath.c_str());
 }
 
 TEST(ScreenerTests, TopPicksNeedBothPeriodsAndOnePerStock)

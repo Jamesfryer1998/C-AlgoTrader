@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -36,4 +37,26 @@ TEST(LiveOptionsTests, CapitalMustBeAboveZeroAndOnlyForBacktests)
     EXPECT_THROW(parse({"--backtest", "--capital", "0"}), std::invalid_argument);
     EXPECT_THROW(parse({"--backtest", "--capital", "-5"}), std::invalid_argument);
     EXPECT_THROW(parse({"--capital", "25000"}), std::invalid_argument);   // live uses Alpaca's own money
+}
+
+TEST(LiveOptionsTests, EveryOption)
+{
+    LiveOptions options = parse({"--backtest", "--speed", "10", "--quiet", "--verbose"});
+    EXPECT_TRUE(options.backtest);
+    EXPECT_TRUE(options.backtestDay.empty());   // no day: the latest saved one
+    EXPECT_DOUBLE_EQ(options.backtestSpeed, 10);
+    EXPECT_TRUE(options.quiet);
+    EXPECT_TRUE(options.verbose);
+
+    EXPECT_DOUBLE_EQ(parse({"--backtest", "--speed", "-3"}).backtestSpeed, 0);   // as fast as possible
+    EXPECT_TRUE(parse({"--help"}).showHelp);
+    EXPECT_THROW(parse({"--bakctest"}), std::invalid_argument);
+}
+
+TEST(LiveOptionsTests, UsageListsTheOptions)
+{
+    std::ostringstream usage;
+    LiveOptions::printUsage(usage);
+    for (const char* option : {"--backtest", "--days", "--speed", "--capital", "--quiet", "--verbose"})
+        EXPECT_NE(usage.str().find(option), std::string::npos) << option;
 }

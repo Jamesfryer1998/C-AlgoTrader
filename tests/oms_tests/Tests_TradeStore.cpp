@@ -384,3 +384,90 @@ TEST_F(TradeStoreTests, NoFakeAdjustmentWhileAnOrderIsFilling)
     EXPECT_FLOAT_EQ(broker.lastPositionBefore, 1);
     EXPECT_TRUE(oms.getPositions().empty());   // closed in our book straight away
 }
+
+// A dry run, as AlpacaBroker does it: orders are accepted but never sent, so it always reports holding nothing
+class DryRunBroker : public FakeBroker
+{
+    public:
+        bool reportsRealPositions() const override { return false; }
+        Position getLatestPosition(std::string ticker) override { return Position(ticker, 0, 0); }
+};
+
+TEST_F(TradeStoreTests, ADryRunKeepsItsOwnPositions)
+{
+    // Our book must not be "corrected" to the dry run's nothing: the strategies, the risk engine and
+    // max_position_size all go by it
+    DryRunBroker broker;
+    OrderManagement oms;
+    oms.setUp(omsConfig(10), &broker);
+    MarketData data = barsAt(100);
+    oms.setMarketData(data);
+
+    Order first = order(OrderType::BUY, 5, 100), second = order(OrderType::BUY, 5, 100), third = order(OrderType::BUY, 5, 100);
+    oms.sendOrder(first);
+    EXPECT_FLOAT_EQ(oms.heldQuantity("NVDA"), 5);
+    oms.sendOrder(second);
+    EXPECT_FLOAT_EQ(oms.heldQuantity("NVDA"), 10);
+    oms.sendOrder(third);                              // 15 would be over max_position_size
+    EXPECT_FLOAT_EQ(oms.heldQuantity("NVDA"), 10);
+    EXPECT_EQ(broker.ordersSeen, 2);
+}
+
+TEST_F(TradeStoreTests, OurBookAveragesAddsAndStartsAfreshWhenFlipping)
+{
+    DryRunBroker broker;
+    OrderManagement oms;
+    oms.setUp(omsConfig(), &broker);
+
+    MarketData at100 = barsAt(100), at110 = barsAt(110), at90 = barsAt(90);
+    oms.setMarketData(at100);
+    Order first = order(OrderType::BUY, 2, 100);
+    oms.sendOrder(first);
+    oms.setMarketData(at110);
+    Order more = order(OrderType::BUY, 2, 110);
+    oms.sendOrder(more);
+    ASSERT_EQ(oms.getPositions().size(), 1u);
+    EXPECT_FLOAT_EQ(oms.getPositions()[0].getQuantity(), 4);
+    EXPECT_FLOAT_EQ(oms.getPositions()[0].getAvgPrice(), 105);   // (2 x 100 + 2 x 110) / 4
+
+    // Sell 6 of 4: now short 2, a new position at the sale price
+    oms.setMarketData(at90);
+    Order flip = order(OrderType::SELL, 6, 90);
+    oms.sendOrder(flip);
+    ASSERT_EQ(oms.getPositions().size(), 1u);
+    EXPECT_FLOAT_EQ(oms.getPositions()[0].getQuantity(), -2);
+    EXPECT_FLOAT_EQ(oms.getPositions()[0].getAvgPrice(), 90);
+
+    // Buying 2 back closes it: no position left
+    Order close = order(OrderType::BUY, 2, 90);
+    oms.sendOrder(close);
+    EXPECT_TRUE(oms.getPositions().empty());
+}
+
+TEST_F(TradeStoreTests, BadLinesAreSkippedNotFatal)
+{
+    fs::create_directories(dir);
+    {
+        TradeStore store(dir);
+        TradeRecord good;
+        good.ourId = 1;
+        good.ticker = "NVDA";
+        good.side = "buy";
+        good.type = "BUY";
+        good.quantity = 2;
+        good.price = 100;
+        good.status = "sent";
+        store.appendTrade(good);
+        store.flush();
+    }
+    std::ofstream(dir + "/trades.csv", std::ios::app) << "this,is,not,a,trade\n" << "x,2026-10-26 10:00:00,,RSI,NVDA,buy,BUY,simple,lots,100,0,0,sent,,,,0,\n";
+    std::ofstream(dir + "/positions.csv") << "ticker,quantity,avg_price\nNVDA,2,100\nNVDA,lots,100\nshort line\n";
+
+    TradeStore store(dir);
+    std::vector<TradeRecord> trades = store.loadTrades();
+    ASSERT_EQ(trades.size(), 1u);
+    EXPECT_EQ(trades[0].ourId, 1);
+    std::vector<Position> positions = store.loadPositions();
+    ASSERT_EQ(positions.size(), 1u);
+    EXPECT_FLOAT_EQ(positions[0].getQuantity(), 2);
+}

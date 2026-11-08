@@ -35,7 +35,10 @@ namespace Format
 
     std::string signedNumber(double value, int decimals)
     {
-        return (value >= 0 ? "+" : "") + number(value, decimals);
+        // The sign of what's shown: -0.0001 shown to 2 decimals is "+0.00", not "+-0.00" or "-0.00"
+        std::string text = number(std::fabs(value), decimals);
+        bool showsZero = text.find_first_not_of("0.") == std::string::npos;
+        return (value < 0 && !showsZero ? "-" : "+") + text;
     }
 
     std::string dollars(double value, int decimals)
@@ -45,7 +48,9 @@ namespace Format
 
     std::string dollarChange(double value, int decimals)
     {
-        return (value < 0 ? "-$" : "+$") + withThousandsSeparators(number(std::fabs(value), decimals));
+        std::string amount = number(std::fabs(value), decimals);
+        bool showsZero = amount.find_first_not_of("0.") == std::string::npos;
+        return (value < 0 && !showsZero ? "-$" : "+$") + withThousandsSeparators(amount);
     }
 
     std::string percent(double fraction, int decimals)
