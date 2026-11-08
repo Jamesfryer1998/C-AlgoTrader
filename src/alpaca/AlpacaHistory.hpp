@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
@@ -30,7 +31,8 @@ using json = nlohmann::json;
 class AlpacaHistory
 {
     public:
-        AlpacaHistory(const json& config);
+        // client: how it talks to Alpaca (none: a real AlpacaClient; tests pass a fake)
+        explicit AlpacaHistory(const json& config, std::shared_ptr<AlpacaClient> client = nullptr);
 
         // Download every trading day from startDate to endDate (YYYY-MM-DD, inclusive) into dataDir.
         // Days that already have a file are skipped unless overwrite is true.
@@ -63,5 +65,5 @@ class AlpacaHistory
         // Download one calendar month (clipped to the requested range). Returns bars written or -1.
         int downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const std::string& startDate,
                           const std::string& endDate, const std::string& dataDir, bool overwrite);
-        AlpacaClient client;
+        std::shared_ptr<AlpacaClient> client;
 };

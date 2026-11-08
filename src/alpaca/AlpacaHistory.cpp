@@ -41,7 +41,8 @@ namespace
     const size_t MONTH_LENGTH = 7;                  // "2026-10"
 }
 
-AlpacaHistory::AlpacaHistory(const json& config)
+AlpacaHistory::AlpacaHistory(const json& config, std::shared_ptr<AlpacaClient> client)
+    : client(client ? client : std::make_shared<AlpacaClient>())
 {
     json alpaca = config.value("alpaca", json::object());
     symbol = config.at("ticker").get<std::string>();
@@ -94,7 +95,7 @@ AlpacaHistory::fetchBars(const std::string& startUtc, const std::string& endUtc,
         if (!pageToken.empty())
             url += "&page_token=" + pageToken;
 
-        HttpResult result = client.getWhenFree(url, MAX_ATTEMPTS, FIRST_RETRY_WAIT);
+        HttpResult result = client->getWhenFree(url, MAX_ATTEMPTS, FIRST_RETRY_WAIT);
 
         if (!result.ok() || !result.body.is_object())
         {

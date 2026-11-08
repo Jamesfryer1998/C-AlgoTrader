@@ -23,7 +23,8 @@ using json = nlohmann::json;
 class AlpacaDailyBars
 {
     public:
-        AlpacaDailyBars(const json& config, const std::string& dataDir);
+        // client: how it talks to Alpaca (none: a real AlpacaClient; tests pass a fake)
+        AlpacaDailyBars(const json& config, const std::string& dataDir, std::shared_ptr<AlpacaClient> client = nullptr);
 
         // Daily bars from startDate to endDate (YYYY-MM-DD; empty endDate = up to yesterday).
         // Downloads and refreshes the cached CSV unless offline is true; if the download fails the cached
@@ -45,7 +46,7 @@ class AlpacaDailyBars
         bool download(const std::string& symbol, const std::string& startDate, const std::string& endDate,
                       std::vector<quant::DailyBar>& bars);
 
-        AlpacaClient client;
+        std::shared_ptr<AlpacaClient> client;
         std::string dataUrl;
         std::string feed;
         std::string dataDir;
