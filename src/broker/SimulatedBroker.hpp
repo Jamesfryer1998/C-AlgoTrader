@@ -1,5 +1,6 @@
 #pragma once
 
+#include "RegulatoryFees.hpp"
 #include "BrokerBase.hpp"
 #include "../data_access/MarketData.hpp"
 #include "../util/Log.hpp"
@@ -52,6 +53,13 @@ class SimulatedBroker : public BrokerBase {
         size_t getPendingOrdersCount() const { return pendingOrders.size(); }
         double getSlippagePercentage() const { return slippagePercentage; }
         double getCommissionPerTrade() const { return commissionPerTrade; }
+
+        // Fees on sells (SEC and FINRA): none unless set
+        void setRegulatoryFees(const RegulatoryFees& fees) { regulatoryFees = fees; }
+        double getRegulatoryFeesPaid() const { return regulatoryFeesPaid; }
+
+        // Commission plus regulatory fees paid on each of getFilledOrders(), in the same order
+        const std::vector<double>& getFillFees() const { return fillFees; }
         
         // How slippage is applied to each fill:
         //   Random  - uniformly random between -slippage and +slippage (the original behaviour)
@@ -125,6 +133,9 @@ class SimulatedBroker : public BrokerBase {
         double startingCapital;
         double slippagePercentage;
         double commissionPerTrade;
+        RegulatoryFees regulatoryFees;
+        double regulatoryFeesPaid = 0;
+        std::vector<double> fillFees;
         
         // Simulation state
         int step;

@@ -3,6 +3,7 @@
     "starting_capital": 100000.0,
     "commission_per_trade": 0.0,
     "slippage_percent": 0.01,
+    "regulatory_fees": {"sec_fee_per_million": 20.60, "finra_taf_per_share": 0.000166, "finra_taf_max": 8.30},
     "objective": "sharpe",
     "min_closed_trades": 30,
     "test_months": 12,

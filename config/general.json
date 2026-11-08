@@ -3,6 +3,8 @@
     "baseDataFileName": "marketData",
     "starting_capital": 100000.0,
     "data_limit_gb": 5.0,
+    "_regulatory_fees_comment": "Fees Alpaca passes on when selling (it charges no commission on stocks): the SEC fee in $ per $1 million sold ($20.60 since 4 April 2026) and FINRA's TAF in $ per share sold, at most finra_taf_max a trade (2025 rates). Charged on every simulated sell.",
+    "regulatory_fees": {"sec_fee_per_million": 20.60, "finra_taf_per_share": 0.000166, "finra_taf_max": 8.30},
     "alpaca": {
         "data_feed": "iex",
         "trading_url": "https://paper-api.alpaca.markets",

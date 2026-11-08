@@ -781,3 +781,38 @@ TEST(SimulatedBrokerSeveralStocksTests, EachStockUsesItsOwnPrice)
     // Equity values each stock at its own last price: cash + 2 x 51
     EXPECT_NEAR(broker.getCurrentEquity(), broker.getCurrentCash() + 2 * 51, 1e-3);
 }
+
+TEST(RegulatoryFeesTests, SecFeeOnValueAndFinraFeeOnSharesUpToItsCap)
+{
+    RegulatoryFees fees(json::object());   // today's rates
+    // $10,000 sold as 100 shares: SEC 10,000 x 20.60 / 1,000,000 = $0.206, FINRA 100 x 0.000166 = $0.0166
+    EXPECT_NEAR(fees.onSale(100, 100), 0.206 + 0.0166, 1e-9);
+    // 100,000 shares: FINRA would be $16.60, capped at $8.30
+    EXPECT_NEAR(fees.onSale(100000, 1), 2.06 + 8.30, 1e-9);
+
+    EXPECT_DOUBLE_EQ(RegulatoryFees().onSale(100, 100), 0);   // the broker's default: none
+    RegulatoryFees noSecFee(json{{"sec_fee_per_million", 0}});
+    EXPECT_NEAR(noSecFee.onSale(100, 100), 0.0166, 1e-9);
+}
+
+TEST_F(SimulatedBrokerTests, RegulatoryFeesAreChargedOnSellsOnly)
+{
+    broker->setSlippage(0);
+    broker->setCommission(0);
+    broker->setRegulatoryFees(RegulatoryFees(json::object()));
+    double startingCash = broker->getCurrentCash();
+
+    broker->placeOrder(createBuyOrder("AAPL", 100.0f));
+    executeStep();
+    double bought = broker->getFilledOrders().back().getPrice() * 100;
+    EXPECT_DOUBLE_EQ(broker->getFillFees().back(), 0);
+    EXPECT_NEAR(broker->getCurrentCash(), startingCash - bought, 1e-6);
+
+    broker->placeOrder(createSellOrder("AAPL", 100.0f));
+    executeStep();
+    double price = broker->getFilledOrders().back().getPrice();
+    double expectedFee = 100 * price * 20.60 / 1e6 + 100 * 0.000166;
+    EXPECT_NEAR(broker->getFillFees().back(), expectedFee, 1e-6);
+    EXPECT_NEAR(broker->getRegulatoryFeesPaid(), expectedFee, 1e-6);
+    EXPECT_NEAR(broker->getCurrentCash(), startingCash - bought + price * 100 - expectedFee, 1e-3);
+}

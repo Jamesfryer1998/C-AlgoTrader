@@ -65,6 +65,7 @@ void StrategyTester::useCosts(const TradingCosts& costs) {
     setStartingCapital(costs.startingCapital);
     setCommissionPerTrade(costs.commissionPerTrade);
     setSlippagePercentage(costs.slippageFraction());
+    broker.setRegulatoryFees(costs.regulatoryFees);
     broker.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
 }
 
@@ -243,10 +244,10 @@ void
 StrategyTester::recordNewFills()
 {
     const std::vector<Order>& fills = broker.getFilledOrders();
+    const std::vector<double>& fees = broker.getFillFees();
     for (; fillsRecorded < fills.size(); fillsRecorded++) {
         const Order& fill = fills[fillsRecorded];
-        tracker.recordFill(fill.getTicker(), fill.isBuy(), fill.getQuantity(), fill.getPrice(),
-                           broker.getCommissionPerTrade());
+        tracker.recordFill(fill.getTicker(), fill.isBuy(), fill.getQuantity(), fill.getPrice(), fees[fillsRecorded]);
     }
 }
 

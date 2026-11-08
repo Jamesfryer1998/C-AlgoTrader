@@ -249,8 +249,11 @@ SimulatedBroker::executeOrder(Order& order)
         return false;
     }
     
-    // Apply commission cost
-    currentCash -= commissionPerTrade;
+    // Commission on every fill; the regulators' fees on sells
+    double regulatoryFee = order.isBuy() ? 0.0 : regulatoryFees.onSale(order.getQuantity(), executionPrice);
+    currentCash -= commissionPerTrade + regulatoryFee;
+    regulatoryFeesPaid += regulatoryFee;
+    fillFees.push_back(commissionPerTrade + regulatoryFee);
     
     // Update positions based on order
     updatePositions(order, executionPrice);

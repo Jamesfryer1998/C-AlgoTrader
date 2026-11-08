@@ -158,6 +158,7 @@ BacktestSession::connect()
     simulated.setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
     simulated.setSlippage(config.value("backtest_slippage_percent", DEFAULT_BACKTEST_SLIPPAGE_PERCENT) / PERCENT);
     simulated.setCommission(BACKTEST_COMMISSION);
+    simulated.setRegulatoryFees(RegulatoryFees::fromConfig(config));
     simulated.setStartingCapital(config.value("starting_capital", Defaults::STARTING_CAPITAL));
     return true;   // the simulated broker connects itself when it's created
 }
@@ -174,12 +175,12 @@ BacktestSession::describeMode() const
     return "BACKTEST with a simulated broker: nothing is sent to Alpaca";
 }
 
-// e.g. "simulated, $100,000.00 to start, 0.01% slippage a fill"
+// e.g. "simulated, $100,000.00 to start, 0.01% slippage a fill, SEC and FINRA fees on sells"
 std::string
 BacktestSession::describeAccount() const
 {
     return "simulated, " + Format::dollars(simulated.getStartingCapital()) + " to start, "
-         + Format::number(simulated.getSlippagePercentage() * PERCENT, 2) + "% slippage a fill";
+         + Format::number(simulated.getSlippagePercentage() * PERCENT, 2) + "% slippage a fill, SEC and FINRA fees on sells";
 }
 
 // The simulated broker prices this bar's orders off its close
@@ -203,7 +204,8 @@ BacktestSession::printSummary(std::ostream& out, const std::vector<std::string>&
     double start = simulated.getStartingCapital(), equity = simulated.getCurrentEquity();
     out << "Simulated equity " << Format::dollars(equity) << " (" << Format::dollarChange(equity - start) << ", "
         << Format::percentChange(equity / start - 1.0, SUMMARY_PERCENT_DECIMALS) << ") from " << Format::dollars(start)
-        << ", " << simulated.getFilledOrders().size() << " fills" << std::endl;
+        << ", " << simulated.getFilledOrders().size() << " fills, "
+        << Format::dollars(simulated.getRegulatoryFeesPaid()) << " in SEC and FINRA fees" << std::endl;
     for (const auto& ticker : tickers)
     {
         int fills = 0;

@@ -85,7 +85,8 @@ bars instead of Alpaca's stream, with a simulated broker filling the orders and 
 
 Nothing is sent to Alpaca. Bars for the chosen days (and the few days before, which the strategies warm up on)
 that aren't saved yet are downloaded first into `data/minute/<TICKER>/`, using the keys in `.env`. Fills are at
-each bar's close with 0.01% slippage against us (`"backtest_slippage_percent"` in config/general.json). Records go to
+each bar's close with 0.01% slippage against us (`"backtest_slippage_percent"` in config/general.json), and every
+sell pays the SEC and FINRA fees Alpaca passes on (`"regulatory_fees"`, same file; Alpaca charges no commission). Records go to
 `data/backtest/<day>/` (fresh each run), so `data/live/` and the paper account are untouched. At the end it
 prints the simulated equity, P&L, fills per stock and the most capital in use.
 
