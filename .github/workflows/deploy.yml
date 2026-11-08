@@ -1,0 +1,41 @@
+name: Deploy
+
+# Runs after CI passes on main. The job executes ON the home server via a self-hosted
+# GitHub Actions runner labelled `algo-trader` (see deploy/README.md for the one-off setup).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DASHBOARD_PORT: 8050   # as bound in deploy/systemd/algo-trader-dashboard.service
+
+jobs:
+  deploy:
+    # Deploy after CI passes on a push to main, or when run by hand from the Actions tab
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
+    runs-on: [self-hosted, algo-trader]
+    environment: production
+    # The first deploy also compiles gtest, json and IXWebSocket; later ones only what changed
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Build, deploy and restart the dashboard
+        run: bash deploy/deploy.sh "$GITHUB_WORKSPACE"
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 15); do
+            if curl -fsS "http://127.0.0.1:${DASHBOARD_PORT}/" > /dev/null; then echo "dashboard is up"; exit 0; fi
+            sleep 2
+          done
+          echo "dashboard did not come up"; sudo journalctl -u algo-trader-dashboard -n 50 --no-pager; exit 1

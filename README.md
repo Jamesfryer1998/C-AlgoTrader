@@ -160,6 +160,28 @@ Builds, runs the tests, then runs `algo_trader_app --backtest` with whatever fol
 By default history comes from Alpaca's `sip` feed (all US exchanges, free for data older than 15 minutes).
 Set `"history_feed": "iex"` in the `"alpaca"` config block to match the free live stream instead.
 
+### Dashboard
+A web page over the trader's records, with Start, Stop and Flatten: live P&L, positions, the tape of orders,
+strategy levels, backtest vs live for a traded day, and the history of every day.
+
+```sh
+# First time
+conda create -n algotrader python=3.13 -y
+conda activate algotrader
+python -m pip install -r dashboard/requirements.txt
+
+./run_dashboard.sh        # then open http://127.0.0.1:8050 (this computer only)
+python -m pytest -q dashboard/tests
+```
+The trader doesn't need it: every app still runs from the command line, and a trader started from the
+dashboard keeps running if the dashboard is closed.
+
+### CI and the home server
+GitHub Actions builds and tests everything on every push (`.github/workflows/ci.yml`). Once CI passes on
+`main`, `.github/workflows/deploy.yml` deploys to the home server's container through a self-hosted runner:
+it builds the apps there and restarts the dashboard (port 8050). One-off server setup:
+[deploy/README.md](deploy/README.md).
+
 ---
 
 ### **Data Reader**  

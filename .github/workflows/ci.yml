@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# a newer push to the same branch cancels the older run
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trader:
+    name: C++ build and tests
+    # The same Ubuntu and GCC 13 as the home server's container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        # OpenSSL for the Alpaca WebSocket's TLS on Linux (gtest, json and IXWebSocket are fetched by CMake)
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libssl-dev
+
+      - name: Configure
+        run: cmake -B build
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure -j "$(nproc)"
+
+  dashboard:
+    name: Dashboard tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: dashboard/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r dashboard/requirements.txt
+
+      - name: Tests
+        run: python -m pytest -q dashboard/tests
