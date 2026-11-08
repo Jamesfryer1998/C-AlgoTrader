@@ -77,7 +77,7 @@ def live_status(control):
 def what_happened(control) -> str:
     """For a failed check: what the stand-in trader printed and last wrote, and what ps says about it."""
     pid = int(live_status(control).get("pid") or 0)
-    ps = subprocess.run(["ps", "-p", str(pid), "-o", "args="], capture_output=True, text=True).stdout if pid else ""
+    ps = subprocess.run(["ps", "-ww", "-p", str(pid), "-o", "args="], capture_output=True, text=True).stdout if pid else ""
     return (f"status.json: {live_status(control)}\nps: {ps!r}\n"
             f"trader.log: {records.log_tail(control.project.live_records, 20)}")
 

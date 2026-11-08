@@ -36,7 +36,8 @@ def is_trader_process(pid: int) -> bool:
     except (ProcessLookupError, PermissionError):
         return False
     try:
-        command = subprocess.run(["ps", "-p", str(pid), "-o", "args="], capture_output=True, text=True,
+        # -ww: the full command line (without a terminal, ps cuts it at 80 characters, before the program's name)
+        command = subprocess.run(["ps", "-ww", "-p", str(pid), "-o", "args="], capture_output=True, text=True,
                                  timeout=5).stdout
     except (OSError, subprocess.SubprocessError):
         return True   # can't tell: alive is the safer answer before sending it a signal
