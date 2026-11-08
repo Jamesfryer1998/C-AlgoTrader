@@ -26,6 +26,4 @@ fi
 
 echo "✅ All builds and tests successful!"
 
-echo "\n===========================================C++============================================\n"
-
 ./build/app/algo_trader_app

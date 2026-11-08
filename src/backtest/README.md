@@ -1,6 +1,11 @@
 # Backtesting System
 
-This module provides backtesting functionality for the algo trading system.
+Two ways to test on past data live here:
+
+- **BacktestStream**: feeds saved 1-minute bars to the live app (`algo_trader_app --backtest`), so the whole
+  portfolio runs through the live code with a simulated broker. This is "the backtest".
+- **StrategyTester**: one stock with one strategy setup, as fast as possible, for `screen_app` and
+  `optimise_app` (via Screener and Optimiser), which run thousands of them. The rest of this file is about it.
 
 ## Design
 
@@ -16,19 +21,19 @@ When using this backtesting system, it's important to understand that strategies
 2. As the simulation progresses, more historical data becomes available
 3. Strategies won't see "future" data points
 
-For example, an RSI strategy with a period of 14 will need at least 14 data points before it can make a proper calculation. The backtester will automatically accumulate data as time advances.
+For example, an RSI strategy with a period of 14 will need at least 14 data points before it can make a proper calculation. The tester will automatically accumulate data as time advances.
 
 ### Key Components
 
-1. **BacktestMarketDataAdapter**: 
+1. **TesterMarketDataAdapter**: 
    - Wraps a MarketData instance
    - Manages the time sequence for backtesting
    - Updates the MarketData instance with accumulated data points as time advances
    - Handles data loading and indexing without affecting the core MarketData implementation
 
-2. **Backtester**:
+2. **StrategyTester**:
    - Coordinates the overall backtesting process
-   - Manages the BacktestMarketDataAdapter
+   - Manages the TesterMarketDataAdapter
    - Controls simulation flow (time steps, execution)
    - Calculates performance metrics
 
@@ -47,25 +52,25 @@ For example, an RSI strategy with a period of 14 will need at least 14 data poin
 ## Usage
 
 ```cpp
-// Create a backtester with a configuration
-Backtester backtester(algoConfig);
+// Create a tester with a configuration
+StrategyTester tester(algoConfig);
 
-// Configure the backtester
-backtester.setStartingCapital(100000.0);
-backtester.setCommissionPerTrade(1.0);
-backtester.setSlippagePercentage(0.001);
-backtester.setDateRange("2023-01-01", "2023-12-31");
+// Configure the tester
+tester.setStartingCapital(100000.0);
+tester.setCommissionPerTrade(1.0);
+tester.setSlippagePercentage(0.001);
+tester.setDateRange("2023-01-01", "2023-12-31");
 
 // Run the backtest
-backtester.run();
+tester.run();
 
 // Get the results
-const PerformanceMetrics& metrics = backtester.getPerformanceMetrics();
+const PerformanceMetrics& metrics = tester.getPerformanceMetrics();
 ```
 
 ## How it Works
 
-1. The Backtester loads historical market data and initializes the adapter.
+1. The StrategyTester loads historical market data and initializes the adapter.
 2. The adapter feeds one data point at a time to MarketData as the simulation runs.
 3. For each time step:
    - Adapter advances to the next data point and updates MarketData

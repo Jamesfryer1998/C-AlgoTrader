@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "../util/Defaults.hpp"
+#include "../util/MarketTime.hpp"
 
 using json = nlohmann::json;
 
@@ -39,7 +41,7 @@ struct PerformanceSummary
  * PerformanceTracker
  *
  * One place that works out P&L and risk metrics from fills and prices, used by both
- * the backtester and live trading.
+ * the strategy tester, the backtest and live trading.
  *
  *   recordFill()  every time an order is filled (or, live, sent)
  *   markPrice()   with the latest price of a ticker
@@ -54,9 +56,9 @@ struct PerformanceSummary
 class PerformanceTracker
 {
     public:
-        static constexpr double MINUTE_BARS_PER_YEAR = 252.0 * 390.0;
+        static constexpr double MINUTE_BARS_PER_YEAR = MarketTime::TRADING_DAYS_PER_YEAR * MarketTime::MINUTES_PER_SESSION;
 
-        PerformanceTracker(double startingCapital = 100000.0, double periodsPerYear = MINUTE_BARS_PER_YEAR);
+        PerformanceTracker(double startingCapital = Defaults::STARTING_CAPITAL, double periodsPerYear = MINUTE_BARS_PER_YEAR);
 
         void recordFill(const std::string& ticker, bool isBuy, double quantity, double price, double commission = 0.0);
         void markPrice(const std::string& ticker, double price);
@@ -64,6 +66,9 @@ class PerformanceTracker
 
         double getEquity() const;
         double getPositionQuantity(const std::string& ticker) const;
+
+        // Each closed (or reduced) position of one stock as a return on what it cost: 0.01 = +1%. Oldest first.
+        const std::vector<double>& closedTradeReturns(const std::string& ticker) const;
         PerformanceSummary summary() const;
 
         static json toJson(const PerformanceSummary& summary);
@@ -85,5 +90,6 @@ class PerformanceTracker
 
         std::map<std::string, Holding> holdings;
         std::vector<double> closedTradePnL;
+        std::map<std::string, std::vector<double>> closedReturnsByTicker;
         std::vector<double> equityCurve;
 };

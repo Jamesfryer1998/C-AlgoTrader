@@ -1,16 +1,23 @@
 #include "DotEnv.hpp"
+#include "Log.hpp"
 
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 
+namespace
+{
+    const char* const SPACES = " \t\r\n";
+    const char COMMENT = '#';
+    const std::string EXPORT_PREFIX = "export ";   // "export KEY=value" works too
+}
+
 static std::string trim(const std::string& text)
 {
-    const char* spaces = " \t\r\n";
-    size_t start = text.find_first_not_of(spaces);
+    size_t start = text.find_first_not_of(SPACES);
     if (start == std::string::npos)
         return "";
-    size_t end = text.find_last_not_of(spaces);
+    size_t end = text.find_last_not_of(SPACES);
     return text.substr(start, end - start + 1);
 }
 
@@ -18,11 +25,11 @@ bool
 DotEnv::parseLine(const std::string& rawLine, std::string& key, std::string& value)
 {
     std::string line = trim(rawLine);
-    if (line.empty() || line[0] == '#')
+    if (line.empty() || line[0] == COMMENT)
         return false;
 
-    if (line.rfind("export ", 0) == 0) // allow "export KEY=value"
-        line = trim(line.substr(7));
+    if (line.rfind(EXPORT_PREFIX, 0) == 0)
+        line = trim(line.substr(EXPORT_PREFIX.size()));
 
     size_t equals = line.find('=');
     if (equals == std::string::npos || equals == 0)
@@ -57,6 +64,6 @@ DotEnv::load(const std::string& filePath)
             loaded++;
     }
 
-    std::cout << "Loaded " << loaded << " setting(s) from " << filePath << std::endl;
+    Log::detail() << "Loaded " << loaded << " setting(s) from " << filePath << std::endl;
     return loaded;
 }

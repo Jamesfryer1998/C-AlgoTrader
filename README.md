@@ -23,6 +23,19 @@ cmake ..
 make -j4
 ```
 
+### Config
+
+Settings are in `config/` in the project root (next to `data/`). The app reads the first three as one config,
+so each setting lives in exactly one of them:
+
+| File | What's in it |
+|---|---|
+| `general.json` | data folder, starting capital, data size limit, the `"alpaca"` block |
+| `strategy.json` | the `"portfolio"`: each stock and its strategies (strategies are only set per stock) |
+| `risk.json` | the `"risk"` engine (position sizing), order limits, and `risk_app`'s comparison and tuning grids |
+| `screen.json` | `screen_app`'s stocks, dates and strategy grids |
+| `optimisation.json` | `optimise_app`'s strategy grids |
+
 ### To Run (live, Alpaca)
 The trading app now streams real-time 1-minute bars from Alpaca and sends orders to Alpaca's API.
 No CSV files or broker desktop app are needed.
@@ -40,7 +53,7 @@ No CSV files or broker desktop app are needed.
    ```
    Stop it with `Ctrl+C`.
 
-Settings live in the `"alpaca"` block of `src/config/config.json`:
+Settings live in the `"alpaca"` block of `config/general.json`:
 
 | Key | Meaning |
 |---|---|
@@ -50,7 +63,50 @@ Settings live in the `"alpaca"` block of `src/config/config.json`:
 
 At start-up the app back-fills exactly the bars the active strategies need (the largest of: RSI `period`, MEANREV `lookback_period`/`moving_average_period`, MACD `5 × (long_period + signal_period)`) and keeps that many in memory, so every strategy decides from the first live bar.
 
+It then prints one summary of what it's about to do: the mode (paper, real money, dry run or backtest), the
+account's cash and buying power, when the market opens or closes, where the bars come from, the risk engine and
+its settings, the records restored from the last run, and a table of each stock's strategy, stop, target,
+settings and back-filled bars. Add `--verbose` to also see each step (config files read, connections made,
+bars back-filled).
+
 Outside US market hours, set `"data_feed": "test"` to see bars flowing.
+
+#### Backtest: run the whole app on past days
+Run the same app, with the same portfolio, strategies, risk engine, OMS and per-minute table, on saved 1-minute
+bars instead of Alpaca's stream, with a simulated broker filling the orders and running stop losses / take profits:
+
+```sh
+./build/app/algo_trader_app --backtest                     # the latest day saved for every portfolio stock
+./build/app/algo_trader_app --backtest 2026-10-15 --days 3 # three trading days from 15 Oct
+./build/app/algo_trader_app --backtest 2026-10-01 --days 31 --capital 25000   # starting with $25,000
+./build/app/algo_trader_app --backtest --speed 60          # 60 minutes a second, to watch it (default 0: as fast as possible)
+./build/app/algo_trader_app --backtest 2025-11-03 --days 250 --quiet   # just the recap
+```
+
+Nothing is sent to Alpaca. Bars for the chosen days (and the few days before, which the strategies warm up on)
+that aren't saved yet are downloaded first into `data/minute/<TICKER>/`, using the keys in `.env`. Fills are at
+each bar's close with 0.01% slippage against us (`"backtest_slippage_percent"` in config/general.json), and every
+sell pays the SEC and FINRA fees Alpaca passes on (`"regulatory_fees"`, same file; Alpaca charges no commission). Records go to
+`data/backtest/<day>/` (fresh each run), so `data/live/` and the paper account are untouched. At the end it
+prints the simulated equity, P&L, fills per stock and the most capital in use.
+
+#### Stocks and strategies (`"portfolio"`)
+The `"portfolio"` list in `config/strategy.json` is what the app trades: every stock in it at once, each with
+its own strategy and settings, from a single Alpaca stream. There are no default strategies; each stock sets
+its own:
+
+```json
+"portfolio": [
+    {"ticker": "TXN", "strategy": {"name": "MEANREV", "lookback_period": 60, "moving_average_period": 60,
+                                   "entry_threshold": 3.0, "exit_threshold": 0.0, "stop_loss": 1, "take_profit": 2}},
+    {"ticker": "WMT", "strategies": [{"name": "RSI", "period": 45, "overbought_threshold": 80,
+                                      "oversold_threshold": 25, "stop_loss": 5, "take_profit": 5}]}
+]
+```
+
+The format is the same as `data/screen/minute/top_picks_config.json` from `screen_app`, so the screen's picks
+can be pasted in as they are. Each stock gets its own price history, back-fill and strategies; one OMS, one
+`trades.csv` and one P&L book cover them all, and `max_position_size` applies per stock.
 
 #### Saved state and P&L
 While running, the app saves its state to `data/live/` (`data/live_dry_run/` for dry runs). The files are only written while running and only read once at start-up, so they never slow down a decision:
@@ -92,102 +148,17 @@ See [doc/realtime_data_and_brokers.md](doc/realtime_data_and_brokers.md) for why
 On macOS the WebSocket library uses Apple's built-in TLS, so there is nothing extra to install.
 On Linux install OpenSSL headers first (`sudo apt install libssl-dev`).
 
-### To Run Backtester
+### To build, test and backtest in one go
 ```sh
 # Run from the project root directory
-./build_run_backtest.sh --start-date 2026-10-01 --end-date 2026-10-28 --download
+./build_run_backtest.sh 2026-10-01 --days 20
 ```
-`--download` fetches any days in the range that aren't already in `data/` from Alpaca first
-(uses the keys in `.env`). Use `--download-only` to just fetch data. One CSV per trading day is saved as
-`data/marketData_<TICKER>_<YYYY-MM-DD>.csv`, in New York exchange time, regular hours only.
+Builds, runs the tests, then runs `algo_trader_app --backtest` with whatever follows (here 20 trading days from
+1 Oct 2026). Missing days are downloaded first. One CSV per trading day is saved as
+`data/minute/<TICKER>/marketData_<TICKER>_<YYYY-MM-DD>.csv`, in New York exchange time, regular hours only.
 
 By default history comes from Alpaca's `sip` feed (all US exchanges, free for data older than 15 minutes).
 Set `"history_feed": "iex"` in the `"alpaca"` config block to match the free live stream instead.
-
-### Optimising strategy settings
-`optimise_app` backtests every combination of strategy settings listed in `src/config/optimisation.json`
-over years of 1-minute data, in parallel, and ranks them.
-
-```sh
-# 1. Download the history once (about 10 years of NVDA, ~60 MB; re-running only fetches what's new)
-./build/app/optimise_app --download --strategy RSI --max-combinations 1
-
-# 2. Optimise all three strategies (RSI, MACD, MEANREV)
-./build/app/optimise_app
-
-# Or just one, or a quicker random sample of settings
-./build/app/optimise_app --strategy MACD --max-combinations 200
-```
-
-How it avoids fooling itself:
-- The last `test_months` (default 12) are **held back**. Every setting is ranked on the older data only;
-  the top 10 are then run on the held-back year as a check. Settings are never chosen using the test year.
-- If the best training setting has a negative Sharpe on the test year, it says so: that usually means it
-  fitted noise in the past rather than finding a real edge.
-- Costs match Alpaca: $0 commission plus 0.01% slippage against you on every fill (`optimisation.json`).
-- Settings need at least `min_closed_trades` (default 30) on the training data to be ranked.
-
-Output (in `data/optimisation/`):
-- `<STRATEGY>_<time>.csv` - every setting tried with training and test results, plus your current
-  `config.json` settings as `current_config` for comparison
-- `best_<time>.json` - the best training setting per strategy, ready to copy into `config.json`
-
-Edit the value lists in `src/config/optimisation.json` to search different ranges (no rebuild needed).
-`"objective"` can be `sharpe` (default), `total_return` or `return_over_drawdown`.
-
-Returns look tiny (fractions of a percent) because every order is 1 share against $100k of capital;
-compare settings by Sharpe ratio, which doesn't depend on trade size.
-
-### Running Tests
-```sh
-# From the build directory
-ctest
-# or
-make test
-```
-Individual test executables are located in subdirectories:
-```
-./build/tests/data_access_tests/data_access_tests
-./build/tests/oms_tests/oms_tests
-./build/tests/strategy_tests/strategy_tests
-./build/tests/broker_tests/broker_tests
-./build/tests/backtest_tests/backtest_tests
-./build/tests/util_tests/util_tests
-./build/tests/alpaca_tests/alpaca_tests
-./build/tests/regression_tests/regression_tests
-```
-
-`regression_tests` runs the whole backtest and the live decision path on a fixed price series and checks the
-results haven't changed. If you change behaviour on purpose (e.g. tune a strategy), it prints the new values
-on a `REGRESSION VALUES` line; copy them into `tests/regression_tests/Tests_Regression.cpp`.
-
-### To Debug Crash
-```sh
-lldb ./build/app/algo_trader_app
-run
-bt
-```
-
-## **Architecture**  
-
-### **System Overview**  
-<details>
-  <summary>View Diagram</summary>
-
-  ![](./doc/system_overview.drawio.png)  
-
-</details>  
-
-The **System Overview** provides a high-level architecture of the trading platform. It includes:  
-- **Live Data** (Alpaca WebSocket pushes a 1-minute bar the moment each minute closes, `src/alpaca/AlpacaStream`)  
-- **Historical Data** (downloaded from Alpaca into CSV files in `data/`, used by the backtester)  
-- **C++ Backend** (Processes data, runs strategies, and manages orders)  
-- **Broker API Integration** (Alpaca REST API executes trades, `src/alpaca/AlpacaBroker`)  
-
-Live flow, all in one process:
-```
-Alpaca WebSocket --(bar)--> MarketData --> Strategies (RSI/MACD/MEANREV) --(signal)--> OMS --> Alpaca REST order
-```
 
 ---
 
@@ -215,7 +186,7 @@ The **Data Reader** is responsible for:
 </details>  
 
 The **Data Flow** diagram illustrates how data moves through the system when **backtesting**:  
-1. **`backtest_app --download` fetches 1-minute bars from Alpaca** and saves one CSV per day in `data/`  
+1. **`algo_trader_app --backtest` downloads any missing 1-minute bars from Alpaca** (one CSV per day in `data/minute/<TICKER>/`)  
 2. **C++ reads the CSV** and processes market conditions  
 3. **Strategies analyze the data** and generate trading signals  
 4. **Orders are sent to the OMS**, which manages execution via the simulated broker  
@@ -250,9 +221,25 @@ The **Order Management System (OMS)** handles:
 
 The **Strategy Engine** is the core of trade decision-making:  
 - Receives **market data** and analyzes trading conditions  
-- Runs **trading strategies** (e.g., Moving Average Crossover, RSI)  
+- Runs **trading strategies**: RSI, MACD, MEANREV (mean reversion to a moving average) and SCALP (below)  
 - Generates **trade signals** (buy/sell orders)  
 - Sends orders to the OMS for execution  
+
+**SCALP** is a VWAP fade scalper for 1-minute bars. It tracks today's volume-weighted average price (VWAP, from
+the 09:30 open) and bands `entry_threshold` standard deviations either side of it. When the price stretches
+outside a band it trades back towards the VWAP (sell above, buy below), and closes when the price is back
+within `exit_threshold` standard deviations of the VWAP, after `max_hold_bars` bars at most, or at 15:55,
+whichever comes first, so it is always flat overnight. No new trades for `warmup_minutes` after the open or
+after 15:45. Each entry has a tight `stop_loss` / `take_profit` in % (e.g. 0.3 / 1) that the broker manages;
+SCALP follows the real position, so a trade the broker's stop closed isn't "exited" again.
+
+```json
+{"name": "SCALP", "active": 1, "entry_threshold": 2.0, "exit_threshold": 0.0, "max_hold_bars": 10,
+ "warmup_minutes": 15, "stop_loss": 0.3, "take_profit": 1.0}
+```
+
+It is in the optimiser's and the minute screen's grids. Trade it on its own for a stock in the portfolio
+(not alongside another strategy on the same ticker), and expect costs to matter: it trades often for small moves.
 
 ---
 
@@ -264,8 +251,11 @@ The **Strategy Engine** is the core of trade decision-making:
 
 </details>  
 
-The **Backtest Engine** allows testing strategies on historical data:  
-- **Simulates market conditions** by feeding past data to strategies  
-- **Executes trades** as if they were placed in real-time  
-- **Evaluates strategy performance** using metrics like win/loss ratio, Sharpe ratio, and drawdown  
-- Helps refine trading algorithms before live deployment
+There are two ways to test on past data:
+- **Backtest** (`algo_trader_app --backtest`): the live app itself on saved bars, with every stock sharing one
+  simulated account. Closest to live trading; `risk_app` uses it to compare and tune the risk engines.
+- **StrategyTester** (`src/backtest/StrategyTester`): one stock with one strategy setup, as fast as possible.
+  `screen_app` and `optimise_app` run thousands of these to pick stocks and strategy settings.
+
+Both feed past bars to the strategies, execute trades through the simulated broker and report win rate,
+Sharpe ratio and drawdown.

@@ -8,22 +8,29 @@
 #include <sstream>
 #include <thread>
 #include "../src/alpaca/AlpacaHistory.hpp"
+#include "../src/backtest/MinuteBars.hpp"
 #include "../src/backtest/Optimiser.hpp"
 #include "../src/data_access/CSVParser.hpp"
 #include "../src/data_access/DataStitcher.hpp"
+#include "../src/strategy_engine/Portfolio.hpp"
 #include "../src/util/Config.hpp"
+#include "../src/util/Format.hpp"
 #include "../src/util/DotEnv.hpp"
 #include "../src/util/Log.hpp"
 #include "../src/util/MarketTime.hpp"
+#include "../src/alpaca/AlpacaApi.hpp"
+#include "../src/util/Defaults.hpp"
+#include "../src/util/SaveData.hpp"
 
 /*
  * optimise_app - find the best settings for each strategy
  *
  *   ./build/app/optimise_app                         all strategies, all downloaded data since 2016
  *   ./build/app/optimise_app --strategy RSI          one strategy
+ *   ./build/app/optimise_app --ticker KO             another stock (default: the first in the portfolio)
  *   ./build/app/optimise_app --download              fetch any missing data from Alpaca first
  *
- * What to try is set in src/config/optimisation.json. Results go to data/optimisation/.
+ * What to try is set in config/optimisation.json. Results go to data/optimisation/.
  */
 
 namespace fs = std::filesystem;
@@ -32,7 +39,9 @@ static void printUsage()
 {
     std::cout << "optimise_app - backtest every combination of strategy settings and rank them\n\n"
               << "Options:\n"
-              << "  --strategy <RSI|MACD|MEANREV|all>  Which strategy to optimise (default: all)\n"
+              << "  --strategy <RSI|MACD|MEANREV|SCALP|all>  Which strategy to optimise (default: all)\n"
+              << "  --ticker <SYMBOL>                  Which stock (default: the first in the portfolio). Its\n"
+              << "                                     current settings come from its portfolio entry\n"
               << "  --start-date <YYYY-MM-DD>          First day of data (default: 2016-01-01)\n"
               << "  --end-date <YYYY-MM-DD>            Last day of data (default: yesterday)\n"
               << "  --test-months <n>                  Months at the end kept back for testing (default: from optimisation.json)\n"
@@ -40,60 +49,6 @@ static void printUsage()
               << "  --threads <n>                      Backtests run at once (default: all CPU cores)\n"
               << "  --download                         Download missing data from Alpaca first (uses .env keys)\n"
               << "  --help\n";
-}
-
-// Load every daily CSV in the range, keeping only rows from each file's own day (so old multi-day
-// Yahoo files sharing the naming scheme can't mix in), sorted oldest first.
-static std::vector<MarketCondition> loadBars(const std::string& dataDir, const std::string& ticker,
-                                             const std::string& start, const std::string& end, int threads)
-{
-    DataStitcher stitcher(dataDir, ticker);
-    std::vector<std::string> files = stitcher.findFilesInRange(start, end);
-    std::sort(files.begin(), files.end());
-
-    std::atomic<size_t> next{0};
-    std::mutex mutex;
-    std::vector<std::vector<MarketCondition>> perFile(files.size());
-
-    std::vector<std::thread> pool;
-    for (int t = 0; t < std::max(1, threads); t++)
-    {
-        pool.emplace_back([&]() {
-            while (true)
-            {
-                size_t i = next.fetch_add(1);
-                if (i >= files.size())
-                    return;
-                std::string fileDay = files[i].substr(files[i].size() - 14, 10);   // ..._YYYY-MM-DD.csv
-                try
-                {
-                    CSVParser parser;
-                    parser.Read(files[i]);
-                    for (const auto& bar : parser.GetData())
-                        if (MarketTime::datePart(bar.DateTime) == fileDay)
-                            perFile[i].push_back(bar);
-                }
-                catch (const std::exception& e)
-                {
-                    std::lock_guard<std::mutex> lock(mutex);
-                    std::cerr << "WARNING - skipping " << files[i] << ": " << e.what() << std::endl;
-                }
-            }
-        });
-    }
-    for (auto& thread : pool)
-        thread.join();
-
-    std::vector<MarketCondition> bars;
-    for (auto& fileBars : perFile)
-        bars.insert(bars.end(), fileBars.begin(), fileBars.end());
-    std::stable_sort(bars.begin(), bars.end(), [](const MarketCondition& a, const MarketCondition& b) {
-        return a.DateTime < b.DateTime;
-    });
-    bars.erase(std::unique(bars.begin(), bars.end(), [](const MarketCondition& a, const MarketCondition& b) {
-        return a.DateTime == b.DateTime;
-    }), bars.end());
-    return bars;
 }
 
 static std::string describe(const json& parameters)
@@ -105,13 +60,6 @@ static std::string describe(const json& parameters)
         text += (text.empty() ? "" : " ") + key + "=" + v;
     }
     return text;
-}
-
-static std::string fmt(double value, int decimals = 2)
-{
-    std::ostringstream out;
-    out << std::fixed << std::setprecision(decimals) << value;
-    return out.str();
 }
 
 static void writeResultsCsv(const std::string& path, const Optimiser& optimiser,
@@ -159,7 +107,8 @@ static void writeResultsCsv(const std::string& path, const Optimiser& optimiser,
 int main(int argc, char* argv[])
 {
     std::string strategyArg = "all";
-    std::string startDate = "2016-01-01";
+    std::string ticker;
+    std::string startDate = AlpacaApi::FIRST_HISTORY_DAY;
     std::string endDate;
     int testMonths = -1;
     long maxCombinations = -1;
@@ -172,6 +121,7 @@ int main(int argc, char* argv[])
         auto value = [&]() -> std::string { return i + 1 < argc ? argv[++i] : ""; };
         if (arg == "--help") { printUsage(); return 0; }
         else if (arg == "--strategy") strategyArg = value();
+        else if (arg == "--ticker") ticker = value();
         else if (arg == "--start-date") startDate = value();
         else if (arg == "--end-date") endDate = value();
         else if (arg == "--test-months") testMonths = std::stoi(value());
@@ -191,8 +141,8 @@ int main(int argc, char* argv[])
     json baseConfig = config.loadConfig();
     json settings;
     {
-        std::ifstream file(root + "/src/config/optimisation.json");
-        if (!file) { std::cerr << "Missing src/config/optimisation.json" << std::endl; return 1; }
+        std::ifstream file(config.formConfigPath(ConfigFiles::OPTIMISATION));
+        if (!file) { std::cerr << "Missing " << ConfigFiles::OPTIMISATION << std::endl; return 1; }
         settings = json::parse(file, nullptr, true, true);
     }
     if (testMonths >= 0) settings["test_months"] = testMonths;
@@ -204,14 +154,27 @@ int main(int argc, char* argv[])
             strategies.push_back(name);
     if (strategies.empty()) { std::cerr << "Unknown strategy " << strategyArg << std::endl; return 1; }
 
-    std::string ticker = baseConfig.at("ticker");
-    std::string dataDir = root + "/" + baseConfig.value("marketDataBasePath", "data/");
+    json stockConfig;
+    try
+    {
+        if (ticker.empty())
+            ticker = Portfolio::fromConfig(baseConfig).front().ticker;
+        stockConfig = Portfolio::forTicker(baseConfig, ticker).config;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "ERROR - " << e.what() << " (" << ConfigFiles::STRATEGY << "), or pick a stock with --ticker"
+                  << std::endl;
+        return 1;
+    }
+    std::string dataDir = root + "/" + baseConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
+    SaveData::configure(dataDir, baseConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
 
     // ---- Data ----
     if (download)
     {
         DotEnv::load(root + "/.env");
-        if (AlpacaHistory(baseConfig).downloadToCsv(startDate, endDate, dataDir) < 0)
+        if (AlpacaHistory(stockConfig).downloadToCsv(startDate, endDate, dataDir) < 0)
         {
             std::cerr << "Download failed - check your keys in .env" << std::endl;
             return 1;
@@ -219,7 +182,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "Loading " << ticker << " bars " << startDate << " to " << endDate << " from " << dataDir << "..." << std::endl;
-    std::vector<MarketCondition> bars = loadBars(dataDir, ticker, startDate, endDate, threads);
+    std::vector<MarketCondition> bars = MinuteBars::load(dataDir, ticker, startDate, endDate, threads);
     if (bars.empty())
     {
         std::cerr << "No data found. Download it first:\n  ./build/app/optimise_app --download\n";
@@ -238,7 +201,7 @@ int main(int argc, char* argv[])
               << settings.value("slippage_percent", 0.01) << "% slippage per fill | objective: "
               << settings.value("objective", "sharpe") << " | " << threads << " threads\n" << std::endl;
 
-    Optimiser optimiser(baseConfig, settings);
+    Optimiser optimiser(stockConfig, settings);
 
     fs::create_directories(dataDir + "optimisation");
     std::string stamp = MarketTime::formatUtc(std::time(nullptr)).substr(0, 19);
@@ -260,12 +223,12 @@ int main(int argc, char* argv[])
                 {
                     lastShown = percent;
                     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-                    std::cout << "  " << done << "/" << total << " (" << percent << "%) " << fmt(seconds, 0) << "s" << std::endl;
+                    std::cout << "  " << done << "/" << total << " (" << percent << "%) " << Format::number(seconds, 0) << "s" << std::endl;
                 }
             });
         double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
 
-        // Current config.json settings, for comparison
+        // The stock's current settings in config/strategy.json, for comparison
         Optimiser::Result current;
         current.settings = optimiser.currentSettings(name);
         try
@@ -277,18 +240,18 @@ int main(int argc, char* argv[])
         }
         catch (const std::exception& e)
         {
-            std::cout << "  (current config.json settings for " << name << " can't run: " << e.what() << ")" << std::endl;
+            std::cout << "  (current settings for " << name << " can't run: " << e.what() << ")" << std::endl;
         }
 
-        std::cout << "Done in " << fmt(seconds, 0) << "s\n\n"
+        std::cout << "Done in " << Format::number(seconds, 0) << "s\n\n"
                   << std::left << std::setw(5) << "Rank" << std::setw(16) << "Train Sharpe" << std::setw(15) << "Train return"
                   << std::setw(14) << "Train trades" << std::setw(15) << "Test Sharpe" << std::setw(14) << "Test return"
                   << "Settings" << std::endl;
         auto line = [&](const std::string& rank, const Optimiser::Result& r) {
-            std::cout << std::left << std::setw(5) << rank << std::setw(16) << fmt(r.train.sharpeRatio)
-                      << std::setw(15) << (fmt(r.train.roiPercent, 3) + "%") << std::setw(14) << r.train.closedTrades
-                      << std::setw(15) << (r.tested ? fmt(r.test.sharpeRatio) : "-")
-                      << std::setw(14) << (r.tested ? fmt(r.test.roiPercent, 3) + "%" : "-")
+            std::cout << std::left << std::setw(5) << rank << std::setw(16) << Format::number(r.train.sharpeRatio)
+                      << std::setw(15) << (Format::number(r.train.roiPercent, 3) + "%") << std::setw(14) << r.train.closedTrades
+                      << std::setw(15) << (r.tested ? Format::number(r.test.sharpeRatio) : "-")
+                      << std::setw(14) << (r.tested ? Format::number(r.test.roiPercent, 3) + "%" : "-")
                       << describe(optimiser.searchedParameters(r.settings)) << std::endl;
         };
         for (size_t i = 0; i < results.size() && i < 10; i++)
@@ -308,7 +271,7 @@ int main(int argc, char* argv[])
             };
             std::cout << "\nBest on training data: " << describe(optimiser.searchedParameters(top.settings)) << "\n";
             if (top.tested && top.test.sharpeRatio < 0)
-                std::cout << "WARNING: its Sharpe ratio on the test data was negative (" << fmt(top.test.sharpeRatio)
+                std::cout << "WARNING: its Sharpe ratio on the test data was negative (" << Format::number(top.test.sharpeRatio)
                           << "), so it probably fits the past rather than finding a real edge." << std::endl;
         }
         else
@@ -321,6 +284,6 @@ int main(int argc, char* argv[])
 
     std::string bestPath = dataDir + "optimisation/best_" + stamp + ".json";
     std::ofstream(bestPath) << best.dump(2) << "\n";
-    std::cout << "Best settings per strategy (copy into src/config/config.json if you want them): " << bestPath << std::endl;
+    std::cout << "Best settings per strategy (copy into config/strategy.json if you want them): " << bestPath << std::endl;
     return 0;
 }

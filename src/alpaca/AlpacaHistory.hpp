@@ -11,13 +11,13 @@ using json = nlohmann::json;
 /**
  * AlpacaHistory
  *
- * Downloads historical 1-minute bars from Alpaca and saves them as CSV files the backtester reads.
+ * Downloads historical 1-minute bars from Alpaca and saves them as CSV files the strategy tester reads.
  *
  *   data/marketData_NVDA_2026-10-28.csv   one file per trading day, New York exchange time
  *   Datetime,Ticker,Open,Close,Volume,TimeInterval
  *   2026-10-28 09:30:00,NVDA,181.90,181.72,7189234,1m
  *
- * Config (src/config/config.json -> "alpaca"):
+ * Config (config/general.json -> "alpaca"):
  *   "history_feed": "sip" -> all US exchanges. Free on the Basic plan for anything older than 15 minutes.
  *                   "iex" -> IEX only (matches the free live stream, much lower volumes)
  *   "history_adjustment": "split" (default) -> prices adjusted for stock splits, so NVDA's 10-for-1 split in
@@ -42,10 +42,13 @@ class AlpacaHistory
         // Handles Alpaca's paging. Sets ok=false if a request failed.
         std::vector<MarketCondition> fetchBars(const std::string& startUtc, const std::string& endUtc, bool& ok);
 
+        // Only print errors (no per-month progress), e.g. when downloading 100 stocks
+        void setQuiet(bool value) { quiet = value; }
+
         // Path of the CSV for one day, e.g. <dataDir>/marketData_NVDA_2026-10-28.csv
         std::string csvPath(const std::string& dataDir, const std::string& date) const;
 
-        // Write bars to a CSV in the backtester's format
+        // Write bars to a CSV in the market data format
         static bool writeCsv(const std::string& path, const std::vector<MarketCondition>& bars);
 
     private:
@@ -55,6 +58,7 @@ class AlpacaHistory
         std::string fileBaseName;
         std::string adjustment;
         bool regularHoursOnly;
+        bool quiet = false;
 
         // Download one calendar month (clipped to the requested range). Returns bars written or -1.
         int downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const std::string& startDate,

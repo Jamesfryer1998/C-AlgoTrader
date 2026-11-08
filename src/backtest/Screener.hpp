@@ -1,0 +1,137 @@
+#pragma once
+
+#include <functional>
+#include <map>
+#include <string>
+#include <vector>
+#include <nlohmann/json.hpp>
+#include "Optimiser.hpp"
+#include "../data_access/MarketCondition.hpp"
+#include "../oms/PerformanceTracker.hpp"
+#include "../quant/DailyBars.hpp"
+
+using json = nlohmann::json;
+
+/**
+ * Screener
+ *
+ * Which stock / strategy combinations look worth trading? For every stock in a list and every strategy
+ * (RSI, MACD, MEANREV), on 1-minute bars (the live app's bars) or daily bars:
+ *
+ *   1. Training years (before test_start): backtest every setting in the strategy's grid and pick the one
+ *      with the best Sharpe (needing at least min_closed_trades trades). This is the optimiser's search.
+ *   2. Test years (from test_start): run only that pick, on data it was never tuned on, and compare it with
+ *      simply buying and holding the stock over the same days.
+ *
+ * The test years never influence a choice, so they show what tuning-then-trading would really have done.
+ * Strategies start the test years warmed up (the end of the training years is fed in as history first).
+ *
+ * Settings: config/screen.json (stock list, costs, and a "minute" and a "daily" section with the dates and
+ * the grid for each strategy). The section in use is merged over the common settings before it gets here,
+ * with "bars_per_year" set so Sharpe ratios are annualised for that bar size.
+ */
+class Screener
+{
+    public:
+        struct Row
+        {
+            std::string symbol;
+            std::string strategy;
+            bool found = false;              // some setting traded enough on the training years to be ranked
+            json parameters;                 // the searched parameters of the pick, e.g. {"period":21,...}
+            int combinations = 0;
+            int trainDays = 0, testDays = 0;
+            std::string testStart, testEnd;
+
+            PerformanceSummary train;        // the pick on the training years
+            PerformanceSummary test;         // the same setting on the test years
+            double testReturnOnMaxPosition = 0;   // test P&L / (max_position_size shares at the first test price)
+
+            double buyHoldReturn = 0;        // buy and hold over the test days
+            double buyHoldSharpe = 0;
+            double buyHoldMaxDrawdown = 0;   // fraction, positive
+
+            bool beatsBuyHold() const { return found && test.sharpeRatio > buyHoldSharpe; }
+        };
+
+        // One line per strategy, over all stocks
+        struct StrategySummary
+        {
+            std::string strategy;
+            int stocks = 0;
+            int found = 0;                   // stocks where a setting could be picked
+            int positiveTest = 0;            // ...and it made money (Sharpe > 0) on the test years
+            int beatBuyHold = 0;             // ...and had a better Sharpe than buy and hold
+            double medianTrainSharpe = 0;
+            double medianTestSharpe = 0;
+            double trainTestCorrelation = 0; // across stocks: does a better training Sharpe mean a better test one?
+        };
+
+        // baseConfig: the app config (risk limits); strategies start from their built-in settings; settings: screen.json
+        Screener(const json& baseConfig, const json& settings);
+
+        // Daily bars in the form the strategy tester reads (one bar per day at the close)
+        static std::vector<MarketCondition> toBars(const std::string& symbol, const std::vector<quant::DailyBar>& daily);
+
+        // Screen one stock with every strategy in `strategies`, on bars of any size (oldest first; the size must
+        // match "bars_per_year"). Rows come back in the same order.
+        // onProgress(strategy, done, total) reports backtests finished for the current strategy.
+        std::vector<Row> screenStock(const std::string& symbol, const std::vector<MarketCondition>& bars,
+                                     const std::vector<std::string>& strategies, int threads,
+                                     const std::function<void(const std::string&, size_t, size_t)>& onProgress = nullptr) const;
+
+        // Same, from daily bars
+        std::vector<Row> screenStock(const std::string& symbol, const std::vector<quant::DailyBar>& daily,
+                                     const std::vector<std::string>& strategies, int threads,
+                                     const std::function<void(const std::string&, size_t, size_t)>& onProgress = nullptr) const;
+
+        // Trading days covered by bars (distinct dates)
+        static int countDays(const std::vector<MarketCondition>& bars);
+
+        static std::vector<StrategySummary> summarise(const std::vector<Row>& rows, const std::vector<std::string>& strategies);
+
+        // The n combinations with the best training Sharpe (what you'd pick knowing only the past)
+        static std::vector<Row> bestOnTraining(const std::vector<Row>& rows, size_t n);
+
+        // A combination "held up" if its Sharpe was at least this in training and test, it beat buy and hold
+        // on the test years and made enough test trades to mean something
+        static constexpr double HELD_UP_SHARPE = 0.5;
+        static constexpr int HELD_UP_TEST_TRADES = 3;
+        static constexpr int PICK_TEST_TRADES = 5;   // picks to trade need a few more
+
+        static std::vector<Row> goodInBothPeriods(const std::vector<Row>& rows, int minTestTrades = HELD_UP_TEST_TRADES);
+
+        // The n to take forward: held up with at least minTestTrades test trades, ranked by the weaker of the
+        // two Sharpe ratios so both periods must be good, and at most one strategy per stock. May return fewer than n.
+        static std::vector<Row> topPicks(const std::vector<Row>& rows, size_t n, int minTestTrades = PICK_TEST_TRADES);
+
+        // Each pick's value at the end of every day over its whole history (training and test) with its chosen
+        // setting, as if max_position_size shares at the first price were the capital: value = that capital + P&L
+        // so far. These act like daily prices, so MonteCarloRisk can measure the risk of trading the picks together.
+        // Names are "STOCK STRATEGY". bars: each stock's bars (any size) by symbol.
+        quant::PriceTable dailyValues(const std::vector<Row>& picks,
+                                     const std::map<std::string, std::vector<MarketCondition>>& bars) const;
+        quant::PriceTable dailyValues(const std::vector<Row>& picks,
+                                     const std::map<std::string, std::vector<quant::DailyBar>>& daily) const;
+
+        // The full strategy settings of a pick (its searched parameters on top of the rest), ready for config/strategy.json
+        json strategySettings(const Row& pick) const;
+
+        // Save / load results (so a long screen can be resumed)
+        static bool writeCsv(const std::string& path, const std::vector<Row>& rows);
+        // The top picks, ranked: rank, symbol, strategy, parameters and their Sharpe ratios
+        static bool writeTopPicksCsv(const std::string& path, const std::vector<Row>& picks);
+        static std::vector<Row> readCsv(const std::string& path);
+
+        // "period 21, oversold_threshold 35, ..." from the searched parameters
+        static std::string describe(const json& parameters);
+
+        const json& getSettings() const { return settings; }
+        Optimiser& getOptimiser() { return optimiser; }
+
+    private:
+        json baseConfig;
+        json settings;
+        double maxPosition;   // max_position_size from config/risk.json
+        Optimiser optimiser;
+};

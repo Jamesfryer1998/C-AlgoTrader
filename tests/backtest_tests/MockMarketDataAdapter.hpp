@@ -3,12 +3,12 @@
 #include <memory>
 #include <vector>
 #include "../../src/data_access/MarketData.hpp"
-#include "../../src/backtest/BacktestMarketDataAdapter.hpp"
+#include "../../src/backtest/TesterMarketDataAdapter.hpp"
 
 /**
  * MockMarketDataAdapter
  * 
- * A test helper class that combines MarketData and BacktestMarketDataAdapter
+ * A test helper class that combines MarketData and TesterMarketDataAdapter
  * to make it easier to set up test data for backtesting.
  */
 class MockMarketDataAdapter {
@@ -103,10 +103,10 @@ public:
     }
     
     /**
-     * Get the underlying BacktestMarketDataAdapter
-     * @return Reference to the underlying BacktestMarketDataAdapter
+     * Get the underlying TesterMarketDataAdapter
+     * @return Reference to the underlying TesterMarketDataAdapter
      */
-    BacktestMarketDataAdapter& getAdapter() {
+    TesterMarketDataAdapter& getAdapter() {
         return adapter;
     }
     
@@ -149,5 +149,5 @@ public:
     
 private:
     std::unique_ptr<MarketData> marketData;
-    BacktestMarketDataAdapter adapter;
+    TesterMarketDataAdapter adapter;
 };

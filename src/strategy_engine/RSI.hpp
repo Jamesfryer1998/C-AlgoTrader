@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StrategyBase.hpp"
+#include "../util/Format.hpp"
 #include "../util/Log.hpp"
 #include <cmath>
 #include <iomanip>
@@ -16,9 +17,15 @@
  */
 class RSI : public StrategyBase {
     public:
+        static constexpr const char* NAME = "RSI";
+        static constexpr float NEUTRAL = 50.0f;    // no gains or losses to go on
+        static constexpr float MAXIMUM = 100.0f;   // only gains
+        static constexpr float HUNDREDTHS = 100.0f;   // RSI is rounded to 2 decimal places
+
         RSI(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
-        void execute() override
+    protected:
+        void decide() override
         {
             std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
@@ -28,15 +35,16 @@ class RSI : public StrategyBase {
             ready = true;
 
             if (rsi > _strategyAttribute.overbought_threshold)
-                signal(OrderType::SELL);
+                propose(OrderType::SELL);
             else if (rsi < _strategyAttribute.oversold_threshold)
-                signal(OrderType::BUY);
+                propose(OrderType::BUY);
             else
                 return;
 
             logDecision();
         }
 
+    public:
         void validate() override
         {
             if(!_strategyAttribute.period)
@@ -52,7 +60,7 @@ class RSI : public StrategyBase {
         float calculateRSI(const std::vector<float>& closes)
         {
             if (closes.size() <= 1)
-                return 50.0f;   // neutral
+                return NEUTRAL;
 
             float gainSum = 0.0f;
             float lossSum = 0.0f;
@@ -68,13 +76,13 @@ class RSI : public StrategyBase {
             float avgLoss = lossSum / (closes.size() - 1);
 
             if (avgLoss == 0.0f && avgGain == 0.0f)
-                return 50.0f;    // no movement
+                return NEUTRAL;
             if (avgLoss == 0.0f)
-                return 100.0f;   // only gains
+                return MAXIMUM;
 
             float rs = avgGain / avgLoss;
-            float value = 100.0f - (100.0f / (1.0f + rs));
-            return std::round(value * 100) / 100;
+            float value = MAXIMUM - (MAXIMUM / (1.0f + rs));
+            return std::round(value * HUNDREDTHS) / HUNDREDTHS;
         }
 
         int barsNeeded() const override { return _strategyAttribute.period; }
@@ -94,20 +102,29 @@ class RSI : public StrategyBase {
             return out.str();
         }
 
+        DecisionLevels decisionLevels() const override
+        {
+            DecisionLevels levels;
+            levels.label = "RSI(" + std::to_string(_strategyAttribute.period) + ")";
+            if (!ready)
+                return levels;
+            levels.ready = true;
+            levels.lower = Format::number(_strategyAttribute.oversold_threshold);
+            levels.current = Format::number(rsi);
+            levels.upper = Format::number(_strategyAttribute.overbought_threshold);
+            levels.state = rsi < _strategyAttribute.oversold_threshold ? "in BUY zone"
+                    : rsi > _strategyAttribute.overbought_threshold ? "in SELL zone" : "";
+            return levels;
+        }
+
     private:
         void logDecision()
         {
-            const MarketCondition& bar = currentBar();
-            Log::out() << "\n==== RSI SIGNAL ====" << std::endl
-                       << "Date: " << bar.DateTime << std::endl
-                       << "Ticker: " << bar.Ticker << std::endl
-                       << "Price:  $" << std::fixed << std::setprecision(2) << bar.Close << std::endl
-                       << "Quantity:  " << std::fixed << std::setprecision(2) << order.getQuantity() << std::endl
-                       << "RSI:    " << std::fixed << std::setprecision(2) << rsi << std::endl
-                       << "Action: " << order.getTypeAsString() << std::endl
-                       << "===================\n" << std::endl;
+            Log::out() << "RSI " << proposed().getTypeAsString() << " | RSI " << std::fixed << std::setprecision(2) << rsi
+                       << " (oversold " << _strategyAttribute.oversold_threshold << ", overbought "
+                       << _strategyAttribute.overbought_threshold << ")" << std::endl;
         }
 
-        float rsi = 50.0f;
+        float rsi = NEUTRAL;
         bool ready = false;
 };

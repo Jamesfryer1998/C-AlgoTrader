@@ -1,4 +1,4 @@
-file(GLOB SOURCES *.cpp)
+file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 add_executable(oms_tests ${SOURCES})
 
 target_link_libraries(oms_tests 

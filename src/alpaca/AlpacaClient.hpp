@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <ctime>
 #include <string>
 #include <ixwebsocket/IXHttpClient.h>
 #include <nlohmann/json.hpp>
@@ -22,6 +24,9 @@ struct HttpResult
     std::string error;      // Network error or Alpaca's error message
 
     bool ok() const { return status >= 200 && status < 300; }
+
+    // Rate limited (429), no connection (0) or a server error: worth asking again shortly
+    bool isBusy() const { return status == 429 || status == 0 || status >= 500; }
 };
 
 class AlpacaClient
@@ -34,7 +39,12 @@ class AlpacaClient
         const std::string& getSecretKey() const { return secretKey; }
 
         HttpResult get(const std::string& url);
+
+        // GET, asking again while Alpaca is busy and waiting a little longer each time
+        // (firstWait, then 2 x firstWait, ...). Gives up after maxAttempts requests.
+        HttpResult getWhenFree(const std::string& url, int maxAttempts, std::chrono::seconds firstWait);
         HttpResult post(const std::string& url, const json& body);
+        HttpResult del(const std::string& url);   // HTTP DELETE, e.g. cancel an order
 
     private:
         HttpResult toResult(const ix::HttpResponsePtr& response);

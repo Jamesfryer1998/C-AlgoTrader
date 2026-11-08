@@ -4,6 +4,11 @@
 #include <cmath>
 #include <numeric>
 
+namespace
+{
+    const double PERCENT = 100.0;
+}
+
 PerformanceTracker::PerformanceTracker(double capital, double barsPerYear)
 : startingCapital(capital),
   periodsPerYear(barsPerYear),
@@ -41,6 +46,8 @@ PerformanceTracker::recordFill(const std::string& ticker, bool isBuy, double qua
     double pnl = closingQty * (price - holding.avgPrice) * direction;
     realisedPnL += pnl;
     closedTradePnL.push_back(pnl);
+    if (holding.avgPrice > 0)
+        closedReturnsByTicker[ticker].push_back((price - holding.avgPrice) / holding.avgPrice * direction);
 
     holding.quantity += (signedQty > 0 ? closingQty : -closingQty);
     double remaining = quantity - closingQty;
@@ -56,6 +63,14 @@ PerformanceTracker::recordFill(const std::string& ticker, bool isBuy, double qua
         holding.quantity = 0;
         holding.avgPrice = 0;
     }
+}
+
+const std::vector<double>&
+PerformanceTracker::closedTradeReturns(const std::string& ticker) const
+{
+    static const std::vector<double> NONE;
+    auto found = closedReturnsByTicker.find(ticker);
+    return found == closedReturnsByTicker.end() ? NONE : found->second;
 }
 
 void
@@ -103,7 +118,7 @@ PerformanceTracker::summary() const
         s.unrealisedPnL += holding.quantity * (holding.lastPrice - holding.avgPrice);
 
     s.totalPnL = s.equity - startingCapital;
-    s.roiPercent = startingCapital != 0 ? s.totalPnL / startingCapital * 100.0 : 0.0;
+    s.roiPercent = startingCapital != 0 ? s.totalPnL / startingCapital * PERCENT : 0.0;
 
     // Trade statistics (each closing fill counts as one trade)
     double grossProfit = 0, grossLoss = 0;
@@ -114,7 +129,7 @@ PerformanceTracker::summary() const
         // exactly break-even counts as neither a win nor a loss
     }
     s.closedTrades = static_cast<int>(closedTradePnL.size());
-    s.winRatePercent = s.closedTrades ? 100.0 * s.winningTrades / s.closedTrades : 0.0;
+    s.winRatePercent = s.closedTrades ? PERCENT * s.winningTrades / s.closedTrades : 0.0;
     s.avgWin = s.winningTrades ? grossProfit / s.winningTrades : 0.0;
     s.avgLoss = s.losingTrades ? -grossLoss / s.losingTrades : 0.0;
     s.profitFactor = grossLoss > 0 ? grossProfit / grossLoss : 0.0;
@@ -127,7 +142,7 @@ PerformanceTracker::summary() const
     {
         peak = std::max(peak, equity);
         if (peak > 0)
-            s.maxDrawdownPercent = std::max(s.maxDrawdownPercent, (peak - equity) / peak * 100.0);
+            s.maxDrawdownPercent = std::max(s.maxDrawdownPercent, (peak - equity) / peak * PERCENT);
         if (previous != 0)
             returns.push_back((equity - previous) / previous);
         previous = equity;
@@ -147,7 +162,7 @@ PerformanceTracker::summary() const
     if (!equityCurve.empty() && startingCapital > 0 && s.equity > 0)
     {
         double years = equityCurve.size() / periodsPerYear;
-        s.annualisedReturnPercent = (std::pow(s.equity / startingCapital, 1.0 / years) - 1.0) * 100.0;
+        s.annualisedReturnPercent = (std::pow(s.equity / startingCapital, 1.0 / years) - 1.0) * PERCENT;
     }
 
     return s;

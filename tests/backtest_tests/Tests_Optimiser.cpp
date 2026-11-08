@@ -53,7 +53,7 @@ TEST(OptimiserTests, GridIsEveryCombinationOnTopOfCurrentSettings)
     for (const auto& s : grid)
     {
         EXPECT_EQ(s["active"], 1);
-        EXPECT_EQ(s["stop_loss"], 10);   // not searched: kept from config.json
+        EXPECT_EQ(s["stop_loss"], 10);   // not searched: kept from the stock's current settings
     }
 }
 

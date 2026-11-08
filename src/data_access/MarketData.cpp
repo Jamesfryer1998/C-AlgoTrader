@@ -8,6 +8,13 @@
 #include "MarketData.hpp"
 #include "../util/Config.hpp"
 #include "../util/DateTimeConversion.hpp"
+#include "../util/Defaults.hpp"
+
+namespace
+{
+    const std::string DATA_FOLDER = "/data";
+    const char* const DATE_FORMAT = "%Y-%m-%d";
+}
 
 MarketData::MarketData() 
 {
@@ -66,15 +73,13 @@ MarketData::processParallel(json configData, int numThreads, const std::string& 
     // Get ticker and date range from config
     std::string ticker = configData["ticker"];
     
-    // Default to last 7 days if not specified
+    // Default to the last few days if not specified
     std::string endDate = DateTimeConversion().timeNowToDate();
-    
-    // Calculate start date (7 days before end date)
     auto now = std::chrono::system_clock::now();
-    auto startTime = now - std::chrono::hours(24 * 7);
+    auto startTime = now - std::chrono::days(Defaults::BACKTEST_DAYS);
     auto startTimeT = std::chrono::system_clock::to_time_t(startTime);
     std::stringstream ss;
-    ss << std::put_time(std::localtime(&startTimeT), "%Y-%m-%d");
+    ss << std::put_time(std::localtime(&startTimeT), DATE_FORMAT);
     std::string startDate = ss.str();
     
     // Check if date range is specified in config
@@ -83,7 +88,7 @@ MarketData::processParallel(json configData, int numThreads, const std::string& 
         endDate = configData["backtest_end_date"];
     }
 
-    // A range passed in (e.g. from backtest_app --start-date/--end-date) wins
+    // A range passed in (setDateRange) wins
     if (!requestedStart.empty() && !requestedEnd.empty()) {
         startDate = requestedStart;
         endDate = requestedEnd;
@@ -203,7 +208,7 @@ MarketData::generateFilePath(json configData)
     string fileBaseName = configData["baseDataFileName"];
     string ticker = configData["ticker"];
     string date = DateTimeConversion().timeNowToDate();
-    string filePath = projectRoot + fileBasePath + fileBaseName + "_" + ticker + "_" + date + ".csv";
+    string filePath = projectRoot + fileBasePath + fileBaseName + "_" + ticker + "_" + date + CSV_EXTENSION;
     return filePath;
 }
 
@@ -217,7 +222,7 @@ MarketData::getProjectRoot()
 string
 MarketData::getDataDirectory()
 {
-    return getProjectRoot() + "/data";
+    return getProjectRoot() + DATA_FOLDER;
 }
 
 float

@@ -164,12 +164,12 @@ TEST_F(TradeStoreTests, EveryAttemptIsRecordedSentRejectedAndBlocked)
     oms.enablePersistence(&store, &tracker);
 
     Order first = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(first);                       // sent
+    oms.sendOrder(first);                       // sent
     broker.rejectNext = true;
     Order second = order(OrderType::SELL, 1, 100);
-    oms.onNewOrder(second);                      // rejected by the broker
+    oms.sendOrder(second);                      // rejected by the broker
     Order third = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(third);                       // blocked: 2 held + 2 > max 3
+    oms.sendOrder(third);                       // blocked: 2 held + 2 > max 3
     store.flush();
 
     std::vector<TradeRecord> trades = store.loadTrades();
@@ -210,10 +210,10 @@ TEST_F(TradeStoreTests, RestartContinuesIdsAndPositions)
         oms.setMarketData(data);
         oms.enablePersistence(&store, &tracker);
         Order o = order(OrderType::BUY, 2, 100);
-        oms.onNewOrder(o);
+        oms.sendOrder(o);
         broker.rejectNext = true;
         Order r = order(OrderType::BUY, 1, 100);
-        oms.onNewOrder(r);
+        oms.sendOrder(r);
     }
 
     TradeStore store(dir);
@@ -240,7 +240,7 @@ TEST_F(TradeStoreTests, BrokerSideExitIsRecordedAsAnAdjustment)
     oms.enablePersistence(&store, &tracker);
 
     Order o = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(o);
+    oms.sendOrder(o);
 
     // The broker's take profit sells everything without us sending an order
     broker.heldQuantity = 0;
@@ -297,7 +297,7 @@ TEST_F(TradeStoreTests, FailedPositionRequestIsNotMistakenForFlat)
     oms.enablePersistence(&store, &tracker);
 
     Order o = order(OrderType::BUY, 2, 100);
-    oms.onNewOrder(o);
+    oms.sendOrder(o);
     store.flush();
     size_t tradesBefore = store.loadTrades().size();
 
@@ -318,4 +318,69 @@ TEST_F(TradeStoreTests, FailedPositionRequestIsNotMistakenForFlat)
     EXPECT_DOUBLE_EQ(tracker.getPositionQuantity("NVDA"), 2);   // unchanged
     EXPECT_EQ(store.loadTrades().size(), tradesBefore);           // no fake "sell" recorded
     ASSERT_EQ(oms.getPositions().size(), 1u);
+}
+
+// Alpaca fills a market order a moment after accepting it. Until then its position doesn't include the
+// order, and our records must not be "corrected" to match (that logged a fake opposite trade, then
+// another undoing it a minute later).
+namespace
+{
+    class SlowFillBroker : public FakeBroker
+    {
+        public:
+            bool pending = false;
+            float filled = 0;   // what the broker reports until the order fills
+            float lastPositionBefore = 99;
+            int placeOrder(Order order) override
+            {
+                lastPositionBefore = order.getPositionBefore();
+                float before = heldQuantity;
+                int ok = FakeBroker::placeOrder(order);
+                filled = before;   // not filled yet
+                pending = ok != 0;
+                return ok;
+            }
+            Position getLatestPosition(std::string ticker) override
+            {
+                return Position(ticker, pending ? filled : heldQuantity, 100);
+            }
+            bool hasPendingOrder(const std::string&) override { return pending; }
+    };
+}
+
+TEST_F(TradeStoreTests, NoFakeAdjustmentWhileAnOrderIsFilling)
+{
+    TradeStore store(dir);
+    PerformanceTracker tracker(100000);
+    SlowFillBroker broker;
+    OrderManagement oms;
+    MarketData data = barsAt(100);
+    oms.setUp(omsConfig(), &broker);
+    oms.setMarketData(data);
+    oms.enablePersistence(&store, &tracker);
+
+    Order buy = order(OrderType::BUY, 1, 100);
+    oms.sendOrder(buy);
+    EXPECT_FLOAT_EQ(broker.lastPositionBefore, 0);   // the broker was told we held nothing
+
+    // Still filling: our book already counts it, and nothing was "adjusted"
+    oms.syncPosition("NVDA");
+    ASSERT_EQ(oms.getPositions().size(), 1u);
+    EXPECT_FLOAT_EQ(oms.getPositions()[0].getQuantity(), 1);
+    EXPECT_DOUBLE_EQ(tracker.getPositionQuantity("NVDA"), 1);
+
+    // Filled: the broker now agrees, still no adjustment
+    broker.pending = false;
+    oms.syncPosition("NVDA");
+    store.flush();
+    std::vector<TradeRecord> trades = store.loadTrades();
+    for (const auto& t : trades)
+        EXPECT_NE(t.status, "adjustment") << t.note;
+    EXPECT_FLOAT_EQ(oms.getPositions()[0].getQuantity(), 1);
+
+    // The next order sees the position, so a SELL is an exit
+    Order sell = order(OrderType::SELL, 1, 101);
+    oms.sendOrder(sell);
+    EXPECT_FLOAT_EQ(broker.lastPositionBefore, 1);
+    EXPECT_TRUE(oms.getPositions().empty());   // closed in our book straight away
 }

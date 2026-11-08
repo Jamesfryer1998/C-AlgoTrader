@@ -730,3 +730,89 @@ TEST_F(SimulatedBrokerTests, IntegrationWithMultipleOrdersAndMarketMovements)
     EXPECT_GE(actualPnL, expectedMinPnL);
     EXPECT_LE(actualPnL, expectedMaxPnL);
 }
+// The live app's backtest: several stocks' bars arrive one after another through one feed
+TEST(SimulatedBrokerSeveralStocksTests, EachStockUsesItsOwnPrice)
+{
+    MarketData feed;
+    SimulatedBroker broker(feed);
+    broker.followLatestBar(true);
+    broker.allowSeveralStocks(true);
+    broker.setSlippage(0);
+    broker.setCommission(0);
+
+    auto bar = [&](const std::string& ticker, float price, const std::string& time) {
+        feed.addBar(MarketCondition(time, ticker, price, price, 100, "1m"), 5);
+    };
+
+    // AAA at 100: buy with a 10% stop loss (90)
+    bar("AAA", 100, "2026-03-02 09:30:00");
+    Order buy(OrderType::BUY, "AAA", 1, 100);
+    buy.setStopLoss(10);
+    buy.setTakeProfit(10);
+    broker.placeOrder(buy);
+    EXPECT_TRUE(broker.hasPendingOrder("AAA"));
+    EXPECT_FALSE(broker.hasPendingOrder("BBB"));
+    broker.nextStep();
+    EXPECT_FALSE(broker.hasPendingOrder("AAA"));
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("AAA").getQuantity(), 1);
+
+    // BBB's bar at 50 must not trip AAA's stop at 90, and AAA keeps its own price
+    bar("BBB", 50, "2026-03-02 09:30:00");
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("AAA").getQuantity(), 1);
+    EXPECT_FLOAT_EQ(broker.getLatestPrice("AAA"), 100);
+    EXPECT_FLOAT_EQ(broker.getLatestPrice("BBB"), 50);
+
+    // A BBB order placed on AAA's bar waits for BBB's own bar
+    bar("AAA", 99, "2026-03-02 09:31:00");
+    broker.placeOrder(Order(OrderType::BUY, "BBB", 2, 50));
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("BBB").getQuantity(), 0);
+    bar("BBB", 51, "2026-03-02 09:31:00");
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("BBB").getQuantity(), 2);
+    EXPECT_NEAR(broker.getLatestPosition("BBB").getAvgPrice(), 51, 1e-4);
+
+    // AAA's own bar below 90: its stop loss fires
+    bar("AAA", 85, "2026-03-02 09:32:00");
+    broker.nextStep();
+    EXPECT_FLOAT_EQ(broker.getLatestPosition("AAA").getQuantity(), 0);
+
+    // Equity values each stock at its own last price: cash + 2 x 51
+    EXPECT_NEAR(broker.getCurrentEquity(), broker.getCurrentCash() + 2 * 51, 1e-3);
+}
+
+TEST(RegulatoryFeesTests, SecFeeOnValueAndFinraFeeOnSharesUpToItsCap)
+{
+    RegulatoryFees fees(json::object());   // today's rates
+    // $10,000 sold as 100 shares: SEC 10,000 x 20.60 / 1,000,000 = $0.206, FINRA 100 x 0.000166 = $0.0166
+    EXPECT_NEAR(fees.onSale(100, 100), 0.206 + 0.0166, 1e-9);
+    // 100,000 shares: FINRA would be $16.60, capped at $8.30
+    EXPECT_NEAR(fees.onSale(100000, 1), 2.06 + 8.30, 1e-9);
+
+    EXPECT_DOUBLE_EQ(RegulatoryFees().onSale(100, 100), 0);   // the broker's default: none
+    RegulatoryFees noSecFee(json{{"sec_fee_per_million", 0}});
+    EXPECT_NEAR(noSecFee.onSale(100, 100), 0.0166, 1e-9);
+}
+
+TEST_F(SimulatedBrokerTests, RegulatoryFeesAreChargedOnSellsOnly)
+{
+    broker->setSlippage(0);
+    broker->setCommission(0);
+    broker->setRegulatoryFees(RegulatoryFees(json::object()));
+    double startingCash = broker->getCurrentCash();
+
+    broker->placeOrder(createBuyOrder("AAPL", 100.0f));
+    executeStep();
+    double bought = broker->getFilledOrders().back().getPrice() * 100;
+    EXPECT_DOUBLE_EQ(broker->getFillFees().back(), 0);
+    EXPECT_NEAR(broker->getCurrentCash(), startingCash - bought, 1e-6);
+
+    broker->placeOrder(createSellOrder("AAPL", 100.0f));
+    executeStep();
+    double price = broker->getFilledOrders().back().getPrice();
+    double expectedFee = 100 * price * 20.60 / 1e6 + 100 * 0.000166;
+    EXPECT_NEAR(broker->getFillFees().back(), expectedFee, 1e-6);
+    EXPECT_NEAR(broker->getRegulatoryFeesPaid(), expectedFee, 1e-6);
+    EXPECT_NEAR(broker->getCurrentCash(), startingCash - bought + price * 100 - expectedFee, 1e-3);
+}

@@ -6,8 +6,27 @@
 #include <mutex>
 #include <random>
 #include <thread>
-#include "Backtester.hpp"
+#include "StrategyTester.hpp"
+#include "../strategy_engine/MACD.hpp"
+#include "../strategy_engine/MEANREV.hpp"
+#include "../strategy_engine/RSI.hpp"
+#include "../strategy_engine/SCALP.hpp"
 #include "../util/MarketTime.hpp"
+
+namespace
+{
+    // Defaults for settings missing from optimisation.json / screen.json
+    const int DEFAULT_MIN_CLOSED_TRADES = 30;   // fewer trades than this and a backtest's Sharpe means little
+    const size_t DEFAULT_TOP_N_TO_TEST = 10;    // the best settings on training that are run on the test period
+
+    // "objective": what makes one setting better than another
+    const std::string SHARPE = "sharpe";
+    const std::string TOTAL_RETURN = "total_return";
+    const std::string RETURN_OVER_DRAWDOWN = "return_over_drawdown";
+
+    // max_combinations picks the same random sample every run
+    const unsigned SAMPLE_SEED = 12345;
+}
 
 Optimiser::Optimiser(const json& base, const json& optimisationSettings)
 : baseConfig(base),
@@ -34,11 +53,11 @@ bool
 Optimiser::isValid(const json& s)
 {
     std::string name = s.value("name", "");
-    if (name == "MACD")
+    if (name == MACD::NAME)
         return s.value("short_period", 0) < s.value("long_period", 0);
-    if (name == "RSI")
+    if (name == RSI::NAME)
         return s.value("oversold_threshold", 0.0) < s.value("overbought_threshold", 0.0);
-    if (name == "MEANREV")
+    if (name == MEANREV::NAME || name == SCALP::NAME)
         return s.value("exit_threshold", 0.0) < s.value("entry_threshold", 0.0);
     return true;
 }
@@ -71,7 +90,7 @@ Optimiser::parameterGrid(const std::string& strategyName) const
     size_t maxCombinations = settings.value("max_combinations", 0);
     if (maxCombinations > 0 && grid.size() > maxCombinations)
     {
-        std::mt19937 random(12345);
+        std::mt19937 random(SAMPLE_SEED);
         std::shuffle(grid.begin(), grid.end(), random);
         grid.resize(maxCombinations);
     }
@@ -92,28 +111,26 @@ Optimiser::searchedParameters(const json& strategySettings) const
 }
 
 PerformanceSummary
-Optimiser::evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars) const
+Optimiser::evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars, size_t warmupBars) const
 {
     json config = baseConfig;
     config["strategies"] = json::array({strategySettings});
 
-    Backtester backtester(config);
-    backtester.setStartingCapital(settings.value("starting_capital", 100000.0));
-    backtester.setCommissionPerTrade(settings.value("commission_per_trade", 0.0));
-    backtester.setSlippagePercentage(settings.value("slippage_percent", 0.01) / 100.0);
-    backtester.getBroker().setSlippageMode(SimulatedBroker::SlippageMode::Adverse);
-    backtester.keepEquityCurve(false);
-    backtester.runOn(bars);
-    return backtester.getSummary();
+    StrategyTester tester(config);
+    tester.useCosts(TradingCosts(settings));
+    tester.keepEquityCurve(false);
+    tester.setWarmupBars(warmupBars);
+    tester.runOn(bars);
+    return tester.getSummary();
 }
 
 double
 Optimiser::objective(const PerformanceSummary& s) const
 {
-    std::string goal = settings.value("objective", "sharpe");
-    if (goal == "total_return")
+    std::string goal = settings.value("objective", SHARPE);
+    if (goal == TOTAL_RETURN)
         return s.roiPercent;
-    if (goal == "return_over_drawdown")
+    if (goal == RETURN_OVER_DRAWDOWN)
         return s.maxDrawdownPercent > 0 ? s.roiPercent / s.maxDrawdownPercent : s.roiPercent;
     return s.sharpeRatio;
 }
@@ -123,11 +140,12 @@ Optimiser::search(const std::vector<json>& candidates,
                   const std::vector<MarketCondition>& train,
                   const std::vector<MarketCondition>& test,
                   int threads,
-                  const std::function<void(size_t, size_t)>& onProgress) const
+                  const std::function<void(size_t, size_t)>& onProgress,
+                  size_t testWarmupBars) const
 {
     std::vector<Result> results(candidates.size());
-    int minTrades = settings.value("min_closed_trades", 30);
-    size_t topN = settings.value("top_n_to_test", 10);
+    int minTrades = settings.value("min_closed_trades", DEFAULT_MIN_CLOSED_TRADES);
+    size_t topN = settings.value("top_n_to_test", DEFAULT_TOP_N_TO_TEST);
     threads = std::max(1, threads);
 
     // Each worker takes the next untried candidate until there are none left.
@@ -146,7 +164,7 @@ Optimiser::search(const std::vector<json>& candidates,
                 Result& result = results[indices[i]];
                 if (onTest)
                 {
-                    result.test = evaluate(result.settings, test);
+                    result.test = evaluate(result.settings, test, testWarmupBars);
                     result.tested = true;
                 }
                 else
@@ -190,7 +208,7 @@ Optimiser::search(const std::vector<json>& candidates,
     // 3. The top ones on the test data
     std::vector<size_t> top;
     for (size_t i = 0; i < results.size() && top.size() < topN; i++)
-        if (results[i].eligible && !test.empty())
+        if (results[i].eligible && test.size() > testWarmupBars)
             top.push_back(i);
     runAll(top, true);
 
@@ -210,12 +228,7 @@ Optimiser::splitByMonths(const std::vector<MarketCondition>& bars, int testMonth
     }
 
     // Test period starts testMonths calendar months before the last bar's month ends
-    std::string last = bars.back().DateTime;   // "YYYY-MM-DD HH:MM:SS"
-    int year = std::stoi(last.substr(0, 4));
-    int month = std::stoi(last.substr(5, 2)) + 1 - testMonths;
-    while (month <= 0) { month += 12; year--; }
-    char cutoff[32];
-    std::snprintf(cutoff, sizeof(cutoff), "%04d-%02d-01", year, month);
+    std::string cutoff = MarketTime::monthsBefore(MarketTime::firstOfMonth(bars.back().DateTime), testMonths - 1);
 
     for (const auto& bar : bars)
         (bar.DateTime < cutoff ? train : test).push_back(bar);

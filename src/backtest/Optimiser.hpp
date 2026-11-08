@@ -13,7 +13,7 @@ using json = nlohmann::json;
  * Optimiser
  *
  * Searches for the best settings for a strategy by backtesting every combination of the values listed
- * in src/config/optimisation.json, in parallel.
+ * in config/optimisation.json, in parallel.
  *
  * To avoid fooling ourselves with settings that only fit the past by luck ("overfitting"), the data is
  * split in two:
@@ -36,28 +36,34 @@ class Optimiser
             double score = 0;             // objective on the training data
         };
 
-        // baseConfig: config.json (risk limits, current strategy settings)
+        // baseConfig: one stock's config (Portfolio::forTicker): risk limits, and its current "strategies"
         // settings:   optimisation.json
         Optimiser(const json& baseConfig, const json& settings);
 
         // Every combination of the listed values for a strategy (invalid ones, e.g. MACD short >= long,
-        // removed), starting from the strategy's current settings in config.json. If max_combinations > 0
+        // removed), starting from the stock's current settings for it. If max_combinations > 0
         // and there are more, a fixed random sample of that size is used.
         std::vector<json> parameterGrid(const std::string& strategyName) const;
 
-        // The strategy's current settings from config.json (forced active)
+        // The stock's current settings for the strategy (forced active), or just its name if the stock doesn't
+        // use it, so the strategy's built-in settings fill in anything the grid doesn't search
         json currentSettings(const std::string& strategyName) const;
 
-        // Backtest one strategy setting over bars and return its performance
-        PerformanceSummary evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars) const;
+        // Backtest one strategy setting over bars and return its performance. The first warmupBars bars only
+        // fill the strategy's history (see StrategyTester::setWarmupBars).
+        PerformanceSummary evaluate(const json& strategySettings, const std::vector<MarketCondition>& bars,
+                                    size_t warmupBars = 0) const;
 
         // Run every setting on the training bars using `threads` threads, then the top ones on the test bars.
         // Results come back best first. onProgress(done, total) is called as runs finish.
+        // testWarmupBars: how many bars at the start of `test` are history only (e.g. the end of the training
+        // period, so strategies start the test period warmed up).
         std::vector<Result> search(const std::vector<json>& candidates,
                                    const std::vector<MarketCondition>& train,
                                    const std::vector<MarketCondition>& test,
                                    int threads,
-                                   const std::function<void(size_t, size_t)>& onProgress = nullptr) const;
+                                   const std::function<void(size_t, size_t)>& onProgress = nullptr,
+                                   size_t testWarmupBars = 0) const;
 
         // The number we rank by (higher is better), from optimisation.json "objective"
         double objective(const PerformanceSummary& summary) const;

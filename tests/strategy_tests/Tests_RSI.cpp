@@ -62,7 +62,7 @@ TEST_F(RSITests, CanSupplyWithData)
     RSI rsi{strats[0].get()->_strategyAttribute};
     GenerateMarketData();
 
-    rsi.supplyData(marketData);
+    rsi.onBar(marketData, 0);
 
     EXPECT_EQ(rsi.getData().getData().size(), 20);
 }
@@ -73,9 +73,7 @@ TEST_F(RSITests, ExecuteWorksCorreclty)
     RSI rsi{strats[0].get()->_strategyAttribute};
     GenerateMarketData();
 
-    rsi.supplyData(marketData);
-
-    EXPECT_NO_THROW(rsi.execute());
+    EXPECT_NO_THROW(rsi.onBar(marketData, 0));
 }
 
 TEST_F(RSITests, ExecuteGenerateABuyOrder)
@@ -84,11 +82,10 @@ TEST_F(RSITests, ExecuteGenerateABuyOrder)
     RSI rsi{strats[0].get()->_strategyAttribute};
     GenerateMarketDataForBuy();
 
-    rsi.supplyData(marketData);
-    rsi.execute();
+    std::optional<Order> order = rsi.onBar(marketData, 0);
     
-    EXPECT_TRUE(rsi.NewOrder);
-    EXPECT_EQ("BUY", rsi.order.getTypeAsString());
+    ASSERT_TRUE(order);
+    EXPECT_EQ("BUY", order->getTypeAsString());
 }
 
 TEST_F(RSITests, ExecuteGenerateASellOrder)
@@ -97,11 +94,10 @@ TEST_F(RSITests, ExecuteGenerateASellOrder)
     RSI rsi{strats[0].get()->_strategyAttribute};
     GenerateMarketDataForSell();
 
-    rsi.supplyData(marketData);
-    rsi.execute();
+    std::optional<Order> order = rsi.onBar(marketData, 0);
     
-    EXPECT_TRUE(rsi.NewOrder);
-    EXPECT_EQ("SELL", rsi.order.getTypeAsString());
+    ASSERT_TRUE(order);
+    EXPECT_EQ("SELL", order->getTypeAsString());
 }
 
 TEST_F(RSITests, ExecuteGenerateAHold)
@@ -110,11 +106,10 @@ TEST_F(RSITests, ExecuteGenerateAHold)
     RSI rsi{strats[0].get()->_strategyAttribute};
     GenerateMarketDataForHold();
 
-    rsi.supplyData(marketData);
-    rsi.execute();
+    std::optional<Order> order = rsi.onBar(marketData, 0);
     
     // We do not generate a order for a HOLD
-    EXPECT_FALSE(rsi.NewOrder);
+    EXPECT_FALSE(order);
 }
 
 
@@ -289,8 +284,7 @@ TEST_F(RSITests, StatusShowsRsiBetweenItsThresholds)
     EXPECT_EQ(rsi.status(), "");   // nothing computed yet
 
     GenerateMarketDataForBuy();
-    rsi.supplyData(marketData);
-    rsi.execute();
+    std::optional<Order> order = rsi.onBar(marketData, 0);
 
     std::string line = rsi.status();
     EXPECT_EQ(line.rfind("RSI(", 0), 0u) << line;

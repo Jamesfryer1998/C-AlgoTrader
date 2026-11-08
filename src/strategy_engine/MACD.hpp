@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StrategyBase.hpp"
+#include "../util/Format.hpp"
 #include "../util/Log.hpp"
 #include <iomanip>
 #include <sstream>
@@ -23,14 +24,26 @@
  */
 class MACD : public StrategyBase {
     public:
+        static constexpr const char* NAME = "MACD";
+
+        // signal_type: trade when the MACD crosses its signal line, or when it crosses zero
+        static constexpr const char* CROSSOVER = "crossover";
+        static constexpr const char* ZERO_CROSS = "zero_cross";
+
+        // Bars needed: this many times the slowest average, so the averages have settled
+        static constexpr int WARMUP_MULTIPLE = 5;
+
+        // MACD values are small (price differences), so show more decimals
+        static constexpr int DECIMALS = 4;
+
         MACD(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
         struct Values { double macd = 0, signal = 0, previousMacd = 0, previousSignal = 0; };
 
-        // A long window so the moving averages have settled
-        int barsNeeded() const override { return 5 * (_strategyAttribute.long_period + _strategyAttribute.signal_period); }
+        int barsNeeded() const override { return WARMUP_MULTIPLE * (_strategyAttribute.long_period + _strategyAttribute.signal_period); }
 
-        void execute() override
+    protected:
+        void decide() override
         {
             std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
@@ -41,22 +54,23 @@ class MACD : public StrategyBase {
             last = v;
             ready = true;
 
-            bool zeroCross = _strategyAttribute.signal_type == "zero_cross";
+            bool zeroCross = _strategyAttribute.signal_type == ZERO_CROSS;
             double lineNow  = zeroCross ? 0.0 : v.signal;
             double lineThen = zeroCross ? 0.0 : v.previousSignal;
 
             if (v.previousMacd <= lineThen && v.macd > lineNow)
-                signal(OrderType::BUY);
+                propose(OrderType::BUY);
             else if (v.previousMacd >= lineThen && v.macd < lineNow)
-                signal(OrderType::SELL);
+                propose(OrderType::SELL);
             else
                 return;
 
-            Log::out() << "MACD " << order.getTypeAsString() << " | MACD " << std::fixed << std::setprecision(4) << v.macd
+            Log::out() << "MACD " << proposed().getTypeAsString() << " | MACD " << std::fixed << std::setprecision(4) << v.macd
                        << " signal " << v.signal << " histogram " << (v.macd - v.signal)
                        << " (" << _strategyAttribute.signal_type << ")" << std::endl;
         }
 
+    public:
         // MACD and signal line for the newest bar and the one before it
         static Values calculate(const std::vector<float>& closes, int shortPeriod, int longPeriod, int signalPeriod)
         {
@@ -87,7 +101,7 @@ class MACD : public StrategyBase {
         {
             if (!ready)
                 return "";
-            bool zeroCross = _strategyAttribute.signal_type == "zero_cross";
+            bool zeroCross = _strategyAttribute.signal_type == ZERO_CROSS;
             double line = zeroCross ? 0.0 : last.signal;
             double gap = last.macd - line;
             std::ostringstream out;
@@ -103,6 +117,24 @@ class MACD : public StrategyBase {
             return out.str();
         }
 
+        // MACD against the line it must cross (the signal line, or 0 for zero_cross): the line sits in the
+        // column it would be crossed from, Upper while MACD is below it (BUY on crossing up), Lower while above
+        DecisionLevels decisionLevels() const override
+        {
+            DecisionLevels levels;
+            levels.label = "MACD(" + std::to_string(_strategyAttribute.short_period) + "/" +
+                      std::to_string(_strategyAttribute.long_period) + "/" + std::to_string(_strategyAttribute.signal_period) + ")";
+            if (!ready)
+                return levels;
+            bool zeroCross = _strategyAttribute.signal_type == ZERO_CROSS;
+            double line = zeroCross ? 0.0 : last.signal;
+            levels.ready = true;
+            levels.current = Format::number(last.macd, DECIMALS);
+            (last.macd >= line ? levels.lower : levels.upper) = Format::number(line, DECIMALS);
+            levels.state = std::string(last.macd >= line ? "above " : "below ") + (zeroCross ? "0" : "signal line");
+            return levels;
+        }
+
         void validate() override
         {
             if(_strategyAttribute.short_period <= 0)
@@ -113,8 +145,8 @@ class MACD : public StrategyBase {
                 throw std::runtime_error("MACD signal_period not set");
             if(_strategyAttribute.short_period >= _strategyAttribute.long_period)
                 throw std::runtime_error("MACD short_period must be less than long_period");
-            if(_strategyAttribute.signal_type != "crossover" && _strategyAttribute.signal_type != "zero_cross")
-                throw std::runtime_error("MACD signal_type must be \"crossover\" or \"zero_cross\"");
+            if(_strategyAttribute.signal_type != CROSSOVER && _strategyAttribute.signal_type != ZERO_CROSS)
+                throw std::runtime_error(std::string("MACD signal_type must be \"") + CROSSOVER + "\" or \"" + ZERO_CROSS + "\"");
         }
 
     private:

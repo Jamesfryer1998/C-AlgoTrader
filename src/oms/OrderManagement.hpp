@@ -22,7 +22,12 @@ class OrderManagement
         void removeOrder(int id);
         void addOrder(Order &order);
         void removePosition(int id);
-        void onNewOrder(Order& order);
+        // Risk checks, then the broker. The order is recorded (trades.csv, P&L) whether sent, rejected or blocked.
+        // setMarketData must point at the order's stock first (the checks compare it with the last close).
+        void sendOrder(Order& order);
+
+        // What we hold in a stock now (+ long, - short), by our own records
+        float heldQuantity(const string& ticker) const;
         void syncPosition(const string& ticker);
         void addPosition(Position &position);
         vector<Order> getOrders(){ return orders; };
@@ -39,9 +44,15 @@ class OrderManagement
         // Loads anything saved by a previous run straight away. Backtests don't call this.
         void enablePersistence(TradeStore* tradeStore, PerformanceTracker* performanceTracker);
 
+        // What enablePersistence reloaded from the last run
+        size_t getRestoredOrders() const { return restoredOrders; }
+        size_t getRestoredPositions() const { return restoredPositions; }
+
         BrokerBase* broker;
         vector<Order> orders;
         int latestOrderId = 1;
+        size_t restoredOrders = 0;
+        size_t restoredPositions = 0;
         const MarketData* marketData = nullptr; // owned by the caller, not copied
         int latestPositionId = 1;
         OrderValidator validator;
@@ -51,6 +62,7 @@ class OrderManagement
         TradeRecord makeRecord(const Order& order, int ourId) const;
         void saveTrade(const TradeRecord& trade);
         void reconcileWithBroker(const string& ticker, const Position& brokerPosition);
+        void applyToPositions(const Order& order);
 
         TradeStore* store = nullptr;
         PerformanceTracker* tracker = nullptr;

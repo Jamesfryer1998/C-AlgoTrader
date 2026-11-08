@@ -1,7 +1,21 @@
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include "OrderValidator.hpp"
 #include "../util/Log.hpp"
+
+namespace
+{
+    // slippage_tolerance in config/risk.json is a percentage
+    const double PERCENT = 100.0;
+
+    // max_position_size (shares) only limits the FIXED_SIZE risk engine. The other engines size positions in $,
+    // capped by their own max_stock_percent / max_portfolio_percent, and have no share limit unless their
+    // "risk" block sets max_position_size.
+    const std::string RISK = "risk";
+    const std::string FIXED_SIZE = "FIXED_SIZE";
+    const int NO_SHARE_LIMIT = std::numeric_limits<int>::max();
+}
 
 void 
 OrderValidator::setParams(json configData)
@@ -9,14 +23,18 @@ OrderValidator::setParams(json configData)
     // Check if required keys exist in configData
     try {
         maxPositionSize = configData.at("max_position_size").get<int>();
+        json risk = configData.value(RISK, json::object());
+        if (risk.value("name", FIXED_SIZE) != FIXED_SIZE)
+            maxPositionSize = risk.value("max_position_size", NO_SHARE_LIMIT);
         maxExposure = configData.at("max_exposure").get<double>();
         slippageTolerance = configData.at("slippage_tolerance").get<double>();
     } catch (const json::exception& e) {
         throw std::runtime_error("Error: Invalid config data - " + std::string(e.what()));
     }
 
-    Log::out() << "  --> Params set: " 
-                << "maxPositionSize=" << maxPositionSize << ", "
+    Log::detail() << "  --> Params set: " 
+                << "maxPositionSize=" << (maxPositionSize == NO_SHARE_LIMIT ? std::string("none (sized by the risk engine)")
+                                                                          : std::to_string(static_cast<int>(maxPositionSize))) << ", "
                 << "maxExposure=" << maxExposure << ", "
                 << "slippageTolerance=" << slippageTolerance << std::endl;
 }
@@ -69,7 +87,7 @@ bool OrderValidator::isValidPrice(const Order& order, const MarketData& marketDa
     double lastClose = marketData.getLastClosePrice();
 
     // Calculate allowed price range based on slippage tolerance
-    double allowedSlippage = (slippageTolerance / 100.0) * lastClose;
+    double allowedSlippage = (slippageTolerance / PERCENT) * lastClose;
     
     if (order.isBuy()) {
         return orderPrice <= lastClose + allowedSlippage;
@@ -156,7 +174,7 @@ bool OrderValidator::checkSlippage(const Order& order, const MarketData& marketD
     double orderPrice = order.getPrice();
     double lastClose = marketData.getLastClosePrice();
     
-    double slippage = std::abs(orderPrice - lastClose) / ((orderPrice + lastClose) / 2) * 100.0;
+    double slippage = std::abs(orderPrice - lastClose) / ((orderPrice + lastClose) / 2) * PERCENT;
 
     return slippage <= slippageTolerance;
 }

@@ -1,7 +1,9 @@
 #pragma once
 
+#include "RegulatoryFees.hpp"
 #include "BrokerBase.hpp"
 #include "../data_access/MarketData.hpp"
+#include "../util/Log.hpp"
 #include <map>
 #include <memory>
 #include <string>
@@ -22,6 +24,15 @@ class SimulatedBroker : public BrokerBase {
         int disconnect() override;
         int placeOrder(Order order) override;
         float getLatestPrice(std::string ticker) override;
+
+        // An order placed for this ticker that hasn't been filled yet (fills happen in nextStep)
+        bool hasPendingOrder(const std::string& ticker) override
+        {
+            for (const auto& order : pendingOrders)
+                if (order.getTicker() == ticker)
+                    return true;
+            return false;
+        }
         Position getLatestPosition(std::string ticker) override;
         
         // Simulation specific methods
@@ -42,6 +53,13 @@ class SimulatedBroker : public BrokerBase {
         size_t getPendingOrdersCount() const { return pendingOrders.size(); }
         double getSlippagePercentage() const { return slippagePercentage; }
         double getCommissionPerTrade() const { return commissionPerTrade; }
+
+        // Fees on sells (SEC and FINRA): none unless set
+        void setRegulatoryFees(const RegulatoryFees& fees) { regulatoryFees = fees; }
+        double getRegulatoryFeesPaid() const { return regulatoryFeesPaid; }
+
+        // Commission plus regulatory fees paid on each of getFilledOrders(), in the same order
+        const std::vector<double>& getFillFees() const { return fillFees; }
         
         // How slippage is applied to each fill:
         //   Random  - uniformly random between -slippage and +slippage (the original behaviour)
@@ -50,8 +68,13 @@ class SimulatedBroker : public BrokerBase {
         void setSlippageMode(SlippageMode mode) { slippageMode = mode; }
 
         // true: each step uses the newest bar in MarketData (for a rolling window of bars, as the
-        // Backtester and live trading use). false: step N uses bar N (the original behaviour).
+        // StrategyTester and live trading use). false: step N uses bar N (the original behaviour).
         void followLatestBar(bool follow) { useLatestBar = follow; }
+
+        // Several stocks in one simulation, their bars arriving one after another (the live app's backtest
+        // mode): an order fills, and a position's stop loss / take profit is checked, only on its own
+        // stock's bar, and each stock is valued at its own last price.
+        void allowSeveralStocks(bool several) { severalStocks = several; }
 
         // Custom order handling
         void setSlippage(double slippagePerc);
@@ -92,6 +115,12 @@ class SimulatedBroker : public BrokerBase {
         SlippageMode slippageMode = SlippageMode::Random;
         bool useLatestBar = false;
 
+        // Step-by-step notes (set-up, each step, position changes): only with enableDetailedLogging.
+        // Fills, and stop loss / take profit hits, always go to Log::out().
+        std::ostream& detailLog() const { return detailedLogging ? Log::out() : Log::silent(); }
+        bool severalStocks = false;
+        std::map<std::string, float> latestPrices;   // each stock's last close (several stocks in one simulation)
+
         // Positions and portfolio
         std::vector<Position> positionHistory;
         std::map<std::string, Position> positionsByTicker;
@@ -104,6 +133,9 @@ class SimulatedBroker : public BrokerBase {
         double startingCapital;
         double slippagePercentage;
         double commissionPerTrade;
+        RegulatoryFees regulatoryFees;
+        double regulatoryFeesPaid = 0;
+        std::vector<double> fillFees;
         
         // Simulation state
         int step;

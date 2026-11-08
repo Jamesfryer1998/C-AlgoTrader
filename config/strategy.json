@@ -1,0 +1,81 @@
+{
+    "_portfolio_comment": "Stocks traded live, each with its own strategy. From screen_app's top 5 (data/screen/minute/top_picks_config.json, 2026-11-04). Strategies are only set here, per stock. META SCALP from a SCALP-only minute screen (2026-11-05): test Sharpe 2.90 (2.10 at 3x costs) vs 0.33 buy and hold.",
+    "portfolio": [
+        {
+            "ticker": "TXN",
+            "strategy": {
+                "active": 1,
+                "entry_threshold": 3.0,
+                "exit_threshold": 0.0,
+                "lookback_period": 60,
+                "moving_average_period": 60,
+                "name": "MEANREV",
+                "stop_loss": 1,
+                "take_profit": 2
+            }
+        },
+        {
+            "ticker": "DHR",
+            "strategy": {
+                "active": 1,
+                "entry_threshold": 3.0,
+                "exit_threshold": 0.0,
+                "lookback_period": 60,
+                "moving_average_period": 20,
+                "name": "MEANREV",
+                "stop_loss": 5,
+                "take_profit": 5
+            }
+        },
+        {
+            "ticker": "WMT",
+            "strategy": {
+                "active": 1,
+                "name": "RSI",
+                "overbought_threshold": 80,
+                "oversold_threshold": 25,
+                "period": 45,
+                "stop_loss": 5,
+                "take_profit": 5
+            }
+        },
+        {
+            "ticker": "SBUX",
+            "strategy": {
+                "active": 1,
+                "name": "RSI",
+                "overbought_threshold": 80,
+                "oversold_threshold": 25,
+                "period": 45,
+                "stop_loss": 2,
+                "take_profit": 5
+            }
+        },
+        {
+            "ticker": "MDT",
+            "strategy": {
+                "active": 1,
+                "entry_threshold": 3.0,
+                "exit_threshold": 0.5,
+                "lookback_period": 120,
+                "moving_average_period": 120,
+                "name": "MEANREV",
+                "stop_loss": 5,
+                "take_profit": 1
+            }
+        },
+        {
+            "ticker": "META",
+            "strategy": {
+                "active": 1,
+                "name": "SCALP",
+                "entry_threshold": 2.5,
+                "exit_threshold": 0.0,
+                "max_hold_bars": 30,
+                "warmup_minutes": 15,
+                "stop_loss": 1.0,
+                "take_profit": 1.0
+            }
+        }
+    ]
+}

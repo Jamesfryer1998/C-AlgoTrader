@@ -109,3 +109,18 @@ TEST(PerformanceTrackerTests, SharpeIsAnnualisedByBarsPerYear)
     EXPECT_GT(dailySharpe, 0);
     EXPECT_NEAR(minute.summary().sharpeRatio / dailySharpe, std::sqrt(390.0), 1e-6);
 }
+
+TEST(PerformanceTrackerTests, ClosedTradeReturnsArePerStock)
+{
+    PerformanceTracker tracker(10000);
+    tracker.recordFill("KO", true, 10, 100);    // long 10 @ 100
+    tracker.recordFill("KO", false, 10, 102);   // closed at 102: +2%
+    tracker.recordFill("PEP", false, 5, 50);    // short 5 @ 50
+    tracker.recordFill("PEP", true, 5, 51);     // closed at 51: -2%
+
+    ASSERT_EQ(tracker.closedTradeReturns("KO").size(), 1u);
+    EXPECT_NEAR(tracker.closedTradeReturns("KO")[0], 0.02, 1e-12);
+    ASSERT_EQ(tracker.closedTradeReturns("PEP").size(), 1u);
+    EXPECT_NEAR(tracker.closedTradeReturns("PEP")[0], -0.02, 1e-12);
+    EXPECT_TRUE(tracker.closedTradeReturns("AAPL").empty());
+}

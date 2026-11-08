@@ -3,6 +3,13 @@
 #include <map>
 #include <chrono>
 #include <iomanip>
+#include "../util/SaveData.hpp"
+
+namespace
+{
+    // The date in a file name, e.g. marketData_NVDA_2025-03-31.csv
+    const std::regex DATE_IN_FILE_NAME(".*_(\\d{4}-\\d{2}-\\d{2})\\.csv");
+}
 
 DataStitcher::DataStitcher(const std::string& dataDir, const std::string& ticker)
     : dataDirectory(dataDir), tickerSymbol(ticker) {
@@ -53,7 +60,7 @@ DataStitcher::findFilesInRange(const std::string& startDate, const std::string& 
     std::vector<std::string> matchingFiles;
     
     for (const auto& entry : fs::directory_iterator(dataDirectory)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".csv") {
+        if (entry.is_regular_file() && entry.path().extension() == CSV_EXTENSION) {
             std::string filename = entry.path().filename().string();
             
             // Check if this file matches our ticker
@@ -159,7 +166,7 @@ DataStitcher::saveStitchedData(const std::vector<MarketCondition>& data, const s
     }
     
     // Write header
-    outFile << "Datetime,Ticker,Open,Close,Volume,TimeInterval" << std::endl;
+    outFile << MARKET_DATA_CSV_HEADER << std::endl;
     
     // Write data
     for (const auto& condition : data) {
@@ -172,6 +179,7 @@ DataStitcher::saveStitchedData(const std::vector<MarketCondition>& data, const s
     }
     
     outFile.close();
+    SaveData::saved(outputFilePath);
     std::cout << "Saved stitched data to: " << outputFilePath << std::endl;
     
     return true;
@@ -184,11 +192,9 @@ DataStitcher::isDateInRange(const std::string& dateToCheck, const std::string& s
 
 std::string 
 DataStitcher::extractDateFromFilename(const std::string& filename) {
-    // Example filename: marketData_NVDA_2025-03-31.csv
-    std::regex pattern(".*_(\\d{4}-\\d{2}-\\d{2})\\.csv");
     std::smatch matches;
     
-    if (std::regex_search(filename, matches, pattern) && matches.size() > 1) {
+    if (std::regex_search(filename, matches, DATE_IN_FILE_NAME) && matches.size() > 1) {
         return matches[1].str();
     }
     

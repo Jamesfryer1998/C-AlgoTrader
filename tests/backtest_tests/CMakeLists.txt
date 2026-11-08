@@ -1,8 +1,9 @@
-file(GLOB SOURCES *.cpp)
+file(GLOB SOURCES CONFIGURE_DEPENDS *.cpp)
 add_executable(backtest_tests ${SOURCES})
 
 target_link_libraries(backtest_tests 
-    backtester_lib
+    backtest_lib
+    quant_lib
     broker_lib
     strategy_lib
     oms_lib

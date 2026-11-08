@@ -2,6 +2,7 @@
 
 #include <ctime>
 #include <string>
+#include <vector>
 
 /**
  * MarketTime
@@ -14,7 +15,19 @@
  */
 namespace MarketTime
 {
-    // "2026-10-29T14:31:00Z" (fractional seconds ignored) -> seconds since epoch. Returns -1 if unparseable.
+    constexpr std::time_t SECONDS_PER_HOUR = 60 * 60;
+    constexpr std::time_t SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
+
+    // Regular trading hours in New York, as minutes since midnight
+    constexpr int OPEN_MINUTE = 9 * 60 + 30;   // 09:30
+    constexpr int CLOSE_MINUTE = 16 * 60;      // 16:00
+    constexpr int MINUTES_PER_SESSION = CLOSE_MINUTE - OPEN_MINUTE;   // 390
+    constexpr int TRADING_DAYS_PER_YEAR = 252;
+
+    constexpr size_t DATE_LENGTH = 10;         // "YYYY-MM-DD"
+
+    // "2026-10-29T14:31:00Z" or "2026-10-29T10:31:00-04:00" (fractional seconds ignored) -> seconds since
+    // epoch. Returns -1 if unparseable.
     std::time_t parseUtc(const std::string& rfc3339);
 
     // "2026-10-29" -> midnight UTC of that date. Returns -1 if unparseable.
@@ -31,6 +44,32 @@ namespace MarketTime
 
     // "YYYY-MM-DD" of a "YYYY-MM-DD HH:MM:SS" string
     std::string datePart(const std::string& dateTime);
+
+    // "YYYY-MM-01" of the month a "YYYY-MM-DD..." falls in
+    std::string firstOfMonth(const std::string& date);
+
+    // "YYYY-MM-DD" moved back by whole months (day capped at 28 so it always exists)
+    std::string monthsBefore(const std::string& date, int months);
+
+    // Is "YYYY-MM-DD" a Monday to Friday?
+    bool isWeekday(const std::string& date);
+
+    // "YYYY-MM-DD" moved by n weekdays (negative = back), e.g. Friday + 1 = Monday. Holidays aren't known.
+    std::string addWeekdays(const std::string& date, int n);
+
+    // Every weekday from first to last ("YYYY-MM-DD", inclusive)
+    std::vector<std::string> weekdaysBetween(const std::string& first, const std::string& last);
+
+    // When regular hours next open, and when they close after that (or today's close if open now).
+    // Weekdays only: market holidays aren't known here (Alpaca's clock knows them; this is the fallback).
+    std::time_t nextRegularOpen(std::time_t utc);
+    std::time_t regularCloseAfter(std::time_t utc);
+
+    // "HH:MM" of a "YYYY-MM-DD HH:MM:SS" as minutes since midnight (-1 if unreadable)
+    int minuteOfDay(const std::string& dateTime);
+
+    // Minutes since midnight -> "HH:MM"
+    std::string clock(int minute);
 
     // Is a New York "YYYY-MM-DD HH:MM:SS" inside regular hours 09:30-15:59?
     bool isRegularSession(const std::string& newYorkDateTime);

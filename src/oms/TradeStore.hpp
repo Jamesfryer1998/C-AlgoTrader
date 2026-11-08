@@ -25,6 +25,20 @@ using json = nlohmann::json;
  *                        filled a stop loss / take profit by itself, so we record the difference
  *            dry_run     dry run, printed instead of sent
  */
+// A trade's status in trades.csv (see above)
+namespace TradeStatus
+{
+    inline const std::string SENT = "sent";
+    inline const std::string REJECTED = "rejected";
+    inline const std::string BLOCKED = "blocked";
+    inline const std::string ADJUSTMENT = "adjustment";
+    inline const std::string DRY_RUN = "dry_run";
+}
+
+// A trade's side
+inline const std::string BUY_SIDE = "buy";
+inline const std::string SELL_SIDE = "sell";
+
 struct TradeRecord
 {
     int ourId = 0;                // our order number, also inside client_order_id
@@ -46,10 +60,11 @@ struct TradeRecord
     double roundTripMs = 0;       // time to send the order and get the broker's reply
     std::string note;             // reason for blocked / rejected / adjustment
 
-    bool isBuy() const { return side == "buy"; }
+    bool isBuy() const { return side == BUY_SIDE; }
 
     // Did this line change our position? (sent orders, dry runs and adjustments do; blocked/rejected don't)
-    bool changedPosition() const { return status == "sent" || status == "adjustment" || status == "dry_run"; }
+    bool changedPosition() const { return status == TradeStatus::SENT || status == TradeStatus::ADJUSTMENT
+                                         || status == TradeStatus::DRY_RUN; }
 };
 
 /**
@@ -84,6 +99,9 @@ class TradeStore
         std::vector<Position> loadPositions() const;
 
         const std::string& getDirectory() const { return directory; }
+
+        // Start afresh: delete the files a store keeps in `directory` (e.g. before a backtest)
+        static void removeFiles(const std::string& directory);
 
     private:
         void enqueue(std::function<void()> job);

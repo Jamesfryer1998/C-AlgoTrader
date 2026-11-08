@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StrategyBase.hpp"
+#include "../util/Format.hpp"
 #include "../util/Log.hpp"
 #include <cmath>
 #include <iomanip>
@@ -22,6 +23,9 @@
  */
 class MEANREV : public StrategyBase {
     public:
+        static constexpr const char* NAME = "MEANREV";
+        static constexpr int MIN_LOOKBACK = 2;   // a standard deviation needs at least two prices
+
         MEANREV(StrategyAttribute strategyAttribute) : StrategyBase(strategyAttribute) {}
 
         int barsNeeded() const override
@@ -29,7 +33,8 @@ class MEANREV : public StrategyBase {
             return std::max(_strategyAttribute.lookback_period, _strategyAttribute.moving_average_period);
         }
 
-        void execute() override
+    protected:
+        void decide() override
         {
             std::vector<float> closes = recentCloses(barsNeeded());
             if (closes.empty())
@@ -43,17 +48,18 @@ class MEANREV : public StrategyBase {
             double entry = _strategyAttribute.entry_threshold;
             double exit = _strategyAttribute.exit_threshold;
 
-            if (state == 0 && z <= -entry)      { signal(OrderType::BUY);  state = +1; }
-            else if (state == 0 && z >= entry)  { signal(OrderType::SELL); state = -1; }
-            else if (state > 0 && z >= -exit)   { signal(OrderType::SELL); state = 0; }
-            else if (state < 0 && z <= exit)    { signal(OrderType::BUY);  state = 0; }
+            if (state == 0 && z <= -entry)      { propose(OrderType::BUY);  state = +1; }
+            else if (state == 0 && z >= entry)  { propose(OrderType::SELL); state = -1; }
+            else if (state > 0 && z >= -exit)   { propose(OrderType::SELL); state = 0; }
+            else if (state < 0 && z <= exit)    { propose(OrderType::BUY);  state = 0; }
             else
                 return;
 
-            Log::out() << "MEANREV " << order.getTypeAsString() << " | z-score " << std::fixed << std::setprecision(2) << z
+            Log::out() << "MEANREV " << proposed().getTypeAsString() << " | z-score " << std::fixed << std::setprecision(2) << z
                        << " (entry " << entry << ", exit " << exit << ")" << std::endl;
         }
 
+    public:
         // z-score of the newest close. closes must hold at least max(maPeriod, sdPeriod) values.
         static double zScore(const std::vector<float>& closes, int maPeriod, int sdPeriod,
                              double* meanOut = nullptr, double* sdOut = nullptr)
@@ -80,8 +86,8 @@ class MEANREV : public StrategyBase {
 
         void validate() override
         {
-            if(_strategyAttribute.lookback_period < 2)
-                throw std::runtime_error("MEANREV lookback_period must be at least 2");
+            if(_strategyAttribute.lookback_period < MIN_LOOKBACK)
+                throw std::runtime_error("MEANREV lookback_period must be at least " + std::to_string(MIN_LOOKBACK));
             if(_strategyAttribute.moving_average_period < 1)
                 throw std::runtime_error("MEANREV moving_average_period not set");
             if(_strategyAttribute.entry_threshold <= 0)
@@ -91,6 +97,36 @@ class MEANREV : public StrategyBase {
         }
 
         int getState() const { return state; }
+
+        DecisionLevels decisionLevels() const override
+        {
+            DecisionLevels levels;
+            levels.label = "MEANREV(" + std::to_string(_strategyAttribute.moving_average_period) + "/" +
+                      std::to_string(_strategyAttribute.lookback_period) + ")";
+            if (!ready)
+                return levels;
+            levels.ready = true;
+            levels.current = Format::number(lastClose);
+            double entry = _strategyAttribute.entry_threshold, exit = _strategyAttribute.exit_threshold;
+            std::string z = "z " + Format::signedNumber(lastZ);
+            if (state == 0)
+            {
+                levels.lower = Format::number(lastMean - entry * lastSd);
+                levels.upper = Format::number(lastMean + entry * lastSd);
+                levels.state = "flat, " + z;
+            }
+            else if (state > 0)
+            {
+                levels.upper = "exit " + Format::number(lastMean - exit * lastSd);   // long: sells once the price is back up here
+                levels.state = "long, " + z;
+            }
+            else
+            {
+                levels.lower = "exit " + Format::number(lastMean + exit * lastSd);   // short: buys back once down here
+                levels.state = "short, " + z;
+            }
+            return levels;
+        }
 
         // Price levels that would trigger the next trade:
         //   flat:  "MEANREV(20/120)   L: 205.10 | C: 206.52 | U: 209.80   (z -0.42, BUY below L, SELL above U)"
