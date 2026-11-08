@@ -14,12 +14,6 @@ import pandas as pd
 from . import comparison, metrics, records
 from .project import Project
 
-try:
-    from zoneinfo import ZoneInfo
-    NEW_YORK = ZoneInfo("America/New_York")
-except Exception:
-    NEW_YORK = None
-
 # Tones the stylesheet colours (assets/style.css)
 POSITIVE, NEGATIVE, WARNING, MUTED, PLAIN = "positive", "negative", "warning", "muted", ""
 NOTHING = "-"
@@ -126,8 +120,6 @@ class Header:
     state_tone: str
     mode: str
     mode_tone: str
-    new_york_time: str
-    local_time: str
     market: str
     market_open: bool
     running: bool
@@ -140,11 +132,9 @@ def header(project: Project, status: dict, now: datetime) -> Header:
     state_tone = {"running": POSITIVE, "starting": WARNING, "stopping": WARNING}.get(health.state, MUTED)
     if health.state == "not responding":
         state_tone = NEGATIVE
-    new_york = now.astimezone(NEW_YORK).strftime("%H:%M:%S") if NEW_YORK else NOTHING
     return Header(state=health.state.capitalize(), state_tone=state_tone,
                   mode=project.describe_mode(), mode_tone=NEGATIVE if project.is_real_money else
                   (WARNING if project.is_dry_run else POSITIVE),
-                  new_york_time=f"New York {new_york}", local_time=f"Local {now.astimezone().strftime('%H:%M:%S')}",
                   market=hours.label + ("" if hours.exact or not hours.label else " (regular hours)"),
                   market_open=hours.is_open, running=health.running, warnings=health.warnings)
 

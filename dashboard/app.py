@@ -10,10 +10,11 @@ The look (black, monospace, cyan-framed panels) is in assets/style.css.
 from __future__ import annotations
 
 import argparse
+import logging
 from datetime import datetime, timezone
 
 import dash_bootstrap_components as dbc
-from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
+from dash import ClientsideFunction, Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from . import comparison, metrics, records, views
 from .project import Project
@@ -23,9 +24,12 @@ HOST = "127.0.0.1"   # this computer only
 PORT = 8050
 LIVE_REFRESH_MS = 2000
 SLOW_REFRESH_MS = 15000
+CLOCK_TICK_MS = 250        # in the browser only: the seconds turn over on time
+BACKTEST_POLL_MS = 2000    # only while a backtest is running
 MESSAGE_MS = 4000
 LOG_LINES = 200
 TITLE = "AlgoTrader"
+REQUEST_LOGGER = "werkzeug"   # Flask's server prints a line for every request; errors only
 FONTS = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=VT323&display=swap"
 SEPARATOR = "◆"
 
@@ -100,7 +104,6 @@ def layout() -> html.Div:
         html.Span("DAY", className="label"),
         dbc.Select(id="compare-day", className="day-picker"),
         key("RUN BACKTEST", "run-backtest", views.WARNING),
-        html.Span(id="backtest-state", className="muted"),
     ], className="controls")
 
     history_day = panel(3, "One day", html.Div(id="history-day-chart"),
@@ -120,6 +123,8 @@ def layout() -> html.Div:
                 "Send an order closing every position at market, then stop the trader?", "Flatten", views.NEGATIVE),
         dcc.Interval(id="fast", interval=LIVE_REFRESH_MS),
         dcc.Interval(id="slow", interval=SLOW_REFRESH_MS),
+        dcc.Interval(id="clock-tick", interval=CLOCK_TICK_MS),
+        dcc.Interval(id="backtest-poll", interval=BACKTEST_POLL_MS, disabled=True),
     ], className="page")
 
 
@@ -127,9 +132,13 @@ def layout() -> html.Div:
 
 def create_app(project: Project) -> Dash:
     control = TraderControl(project)
-    app = Dash(__name__, title=TITLE, external_stylesheets=[dbc.themes.BOOTSTRAP, FONTS],
+    app = Dash(__name__, title=TITLE, update_title=None, external_stylesheets=[dbc.themes.BOOTSTRAP, FONTS],
                suppress_callback_exceptions=True)
     app.layout = layout
+
+    # The clocks tick in the browser (assets/clock.js)
+    app.clientside_callback(ClientsideFunction("clock", "tick"), Output("clock-ny", "children"),
+                            Output("clock-local", "children"), Input("clock-tick", "n_intervals"))
 
     def now() -> datetime:
         return datetime.now(timezone.utc)
@@ -145,8 +154,7 @@ def create_app(project: Project) -> Dash:
 
     @app.callback(Output("mode", "children"), Output("mode", "className"),
                   Output("state", "children"), Output("state", "className"),
-                  Output("market", "children"), Output("clock-ny", "children"), Output("clock-local", "children"),
-                  Output("kpis", "children"), Output("warnings", "children"),
+                  Output("market", "children"), Output("kpis", "children"), Output("warnings", "children"),
                   Output("start", "disabled"), Output("stop", "disabled"), Output("flatten", "disabled"),
                   Input("fast", "n_intervals"))
     def refresh_header(_):
@@ -155,7 +163,7 @@ def create_app(project: Project) -> Dash:
         kpis = segments([kpi_segment(k) for k in views.live_kpis(status, trades, day) if k.title != views.TODAY_KPI])
         warnings = [html.Div(f"! {text}", className="warning-line") for text in head.warnings]
         return (head.mode.upper(), head.mode_tone, head.state.upper(), head.state_tone,
-                head.market.upper(), head.new_york_time.upper(), head.local_time.upper(), kpis, warnings,
+                head.market.upper(), kpis, warnings,
                 head.running, not head.running, not head.running)
 
     @app.callback(Output("live-tab", "children"), Input("fast", "n_intervals"), State("tabs", "active_tab"))
@@ -224,22 +232,19 @@ def create_app(project: Project) -> Dash:
         days = comparison.traded_days(project.live_records)
         return [{"label": day, "value": day} for day in days], chosen if chosen in days else (days[0] if days else None)
 
-    @app.callback(Output("backtest-state", "children"), Input("run-backtest", "n_clicks"),
-                  State("compare-day", "value"), prevent_initial_call=True)
-    def run_backtest(_, day):
-        if not day:
-            return "Pick a day first"
-        control.run_backtest(day)
-        return f"Backtesting {day}..."
-
-    @app.callback(Output("compare-body", "children"), Input("compare-day", "value"), Input("fast", "n_intervals"),
-                  State("tabs", "active_tab"))
-    def refresh_compare(day, _, active):
+    @app.callback(Output("compare-body", "children"), Output("backtest-poll", "disabled"),
+                  Input("compare-day", "value"), Input("backtest-poll", "n_intervals"),
+                  Input("run-backtest", "n_clicks"), State("tabs", "active_tab"))
+    def refresh_compare(day, _, __, active):
+        """Redrawn when the day changes or its backtest starts, then every couple of seconds while it runs."""
+        if ctx.triggered_id == "run-backtest" and day:
+            control.run_backtest(day)
+        job = control.jobs.get(day) if day else None
+        backtesting = bool(job and job.state == "running")
         if active != COMPARE:
-            return no_update
+            return no_update, not backtesting
         if not day:
-            return html.Div("NO TRADED DAYS RECORDED YET", className="empty")
-        job = control.jobs.get(day)
+            return html.Div("NO TRADED DAYS RECORDED YET", className="empty"), True
         result = comparison.compare(project.live_records, project.backtest_records(day), day)
         notes = []
         if job and job.state == "running":
@@ -248,13 +253,13 @@ def create_app(project: Project) -> Dash:
             notes.append(panel(0, "Backtest failed", html.Pre(job.output[-2000:], className="log")))
         if not result["has_backtest"]:
             notes.append(html.Div("NO BACKTEST OF THIS DAY YET: PRESS RUN BACKTEST", className="empty"))
-            return html.Div(notes)
+            return html.Div(notes), not backtesting
         return html.Div(notes + [
             dbc.Row([dbc.Col(panel(1, "Summary", table(views.comparison_table(result))), lg=5),
                      dbc.Col(panel(2, "Equity: live vs backtest", chart(views.comparison_figure(result))), lg=7)],
                     className="g-2"),
             panel(3, "Fills, side by side", table(views.fills_table(result))),
-        ])
+        ]), not backtesting
 
     # ----- History -----
 
@@ -299,5 +304,6 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=PORT)
     args = parser.parse_args()
     project = Project.find()
+    logging.getLogger(REQUEST_LOGGER).setLevel(logging.ERROR)
     print(f"Dashboard for {project.root} on http://{HOST}:{args.port}")
     create_app(project).run(host=HOST, port=args.port, debug=False)

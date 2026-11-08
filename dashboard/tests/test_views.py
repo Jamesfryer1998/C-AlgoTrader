@@ -37,7 +37,6 @@ def test_header_for_a_running_paper_trader(project):
     header = views.header(project, status, NOW)
     assert header.state == "Running" and header.state_tone == views.POSITIVE
     assert header.mode == "Paper account" and header.mode_tone == views.POSITIVE
-    assert header.new_york_time == "New York 14:00:00"
     assert header.market == "Open, closes in 2h 0m (regular hours)"
     assert header.running and header.warnings == []
 
