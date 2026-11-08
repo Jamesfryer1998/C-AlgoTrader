@@ -106,6 +106,8 @@ class LiveTrader
         // Where the end-of-session recap goes: the terminal unless silent
         std::ostream& recap() const;
 
+        static json withOptions(json config, const LiveOptions& options);
+
         json config;
         LiveOptions options;
         std::string dataRoot;

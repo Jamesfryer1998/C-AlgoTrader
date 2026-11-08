@@ -1,6 +1,7 @@
 #include "LiveOptions.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 #include "../util/CommandLine.hpp"
 
 LiveOptions
@@ -26,9 +27,18 @@ LiveOptions::parse(int argc, char* argv[])
             options.verbose = true;
         else if (args.is("--speed"))
             options.backtestSpeed = std::max(0.0, args.number());
+        else if (args.is("--capital"))
+        {
+            options.backtestCapital = args.number();
+            if (options.backtestCapital <= 0)
+                throw std::invalid_argument("--capital needs an amount above 0, e.g. --capital 25000");
+        }
         else
             args.rejectOption();
     }
+    if (options.backtestCapital > 0 && !options.backtest)
+        throw std::invalid_argument("--capital only works with --backtest: live trading uses the Alpaca account's "
+                                    "own money");
     return options;
 }
 
@@ -44,6 +54,8 @@ Usage: algo_trader_app [options]
                             first, which needs the keys in .env. No day: the latest saved for every stock
   --days 3                  backtest this many trading days from that day (default 1)
   --speed 10                simulated minutes per second, to watch it run (default 0: as fast as possible)
+  --capital 25000           the backtest's starting capital in $ (default: "starting_capital" in
+                            config/general.json)
   --quiet                   no minute tables, just the recap at the end
   --verbose                 also show each start-up step (config files, connections, back-fill)
 )";

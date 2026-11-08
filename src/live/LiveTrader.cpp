@@ -36,6 +36,7 @@ namespace
     const std::string RISK_LABEL = "Risk";
     const std::string RECORDS_LABEL = "Records";
     const std::string RISK_KEY = "risk";
+    const std::string STARTING_CAPITAL_KEY = "starting_capital";
 
     double millisecondsSince(std::chrono::steady_clock::time_point start)
     {
@@ -46,11 +47,20 @@ namespace
 std::atomic<bool> LiveTrader::stopRequested{false};
 
 LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std::string& dataRoot)
-    : config(config),
+    : config(withOptions(config, options)),
       options(options),
       dataRoot(dataRoot),
-      tracker(config.value("starting_capital", Defaults::STARTING_CAPITAL))
+      tracker(this->config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL))
 {
+}
+
+// The config with anything the command line overrides, e.g. --capital
+json
+LiveTrader::withOptions(json config, const LiveOptions& options)
+{
+    if (options.backtest && options.backtestCapital > 0)
+        config[STARTING_CAPITAL_KEY] = options.backtestCapital;
+    return config;
 }
 
 std::ostream&
@@ -85,7 +95,7 @@ LiveTrader::run()
     store->flush();   // finish writing the records before the recap
     printResultsHeading();
     session->printSummary(recap(), tickers);
-    recap() << capital.describe(config.value("starting_capital", Defaults::STARTING_CAPITAL)) << std::endl;
+    recap() << capital.describe(config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL)) << std::endl;
     recap() << "Records saved in " << recordsDir << std::endl;
     collectResult();
     return 0;

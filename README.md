@@ -78,6 +78,7 @@ bars instead of Alpaca's stream, with a simulated broker filling the orders and 
 ```sh
 ./build/app/algo_trader_app --backtest                     # the latest day saved for every portfolio stock
 ./build/app/algo_trader_app --backtest 2026-10-15 --days 3 # three trading days from 15 Oct
+./build/app/algo_trader_app --backtest 2026-10-01 --days 31 --capital 25000   # starting with $25,000
 ./build/app/algo_trader_app --backtest --speed 60          # 60 minutes a second, to watch it (default 0: as fast as possible)
 ./build/app/algo_trader_app --backtest 2025-11-03 --days 250 --quiet   # just the recap
 ```
