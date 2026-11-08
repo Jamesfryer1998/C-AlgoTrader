@@ -1,0 +1,4 @@
+dash>=2.17
+dash-bootstrap-components>=1.6
+pandas>=2.0
+pytest>=8.0

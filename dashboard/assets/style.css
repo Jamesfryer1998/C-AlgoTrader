@@ -1,0 +1,65 @@
+/* A dark trading-terminal look over Bootstrap's CYBORG theme. Tones match views.py. */
+:root {
+    --background: #0b0f14;
+    --panel: #11161d;
+    --border: #1e2630;
+    --text: #c9d1d9;
+    --muted: #7d8590;
+    --positive: #26c281;
+    --negative: #ef5350;
+    --warning: #f0b429;
+    --accent: #3fb6ff;
+}
+
+body { background: var(--background); color: var(--text); font-family: Inter, -apple-system, "Segoe UI", sans-serif; }
+.page { padding: 0 14px 24px; }
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+          padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+.header-left, .header-middle, .header-right { display: flex; align-items: center; gap: 10px; }
+.brand { font-weight: 700; font-size: 18px; letter-spacing: 0.5px; color: #fff; margin-right: 6px; }
+.clock { font-family: "JetBrains Mono", Menlo, monospace; color: var(--muted); font-size: 13px; }
+.badge-pill { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: var(--border); }
+.badge-pill.positive { background: rgba(38, 194, 129, 0.15); color: var(--positive); }
+.badge-pill.negative { background: rgba(239, 83, 80, 0.18); color: var(--negative); }
+.badge-pill.warning { background: rgba(240, 180, 41, 0.15); color: var(--warning); }
+.badge-pill.muted { color: var(--muted); }
+.warning-bar { padding: 6px 12px; margin-bottom: 8px; font-size: 13px; }
+
+.tabs { margin-bottom: 10px; border-bottom-color: var(--border); }
+.tabs .nav-link { color: var(--muted); font-size: 14px; }
+.tabs .nav-link.active { color: #fff; background: var(--panel); border-color: var(--border) var(--border) var(--panel); }
+
+.kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; height: 100%; }
+.kpi-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
+.kpi-value { font-size: 22px; font-weight: 600; font-family: "JetBrains Mono", Menlo, monospace; color: #fff; }
+.kpi-detail { color: var(--muted); font-size: 12px; }
+
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; }
+.panel-heading { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.panel-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 600; }
+.panel-body { padding: 6px 10px; }
+
+.table-wrap { max-height: 340px; overflow-y: auto; }
+.data-table { margin: 0; font-size: 12.5px; --bs-table-bg: transparent; }
+.data-table th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--panel);
+                 border-bottom: 1px solid var(--border); white-space: nowrap; }
+.data-table td { font-family: "JetBrains Mono", Menlo, monospace; border-color: var(--border); white-space: nowrap; }
+
+.positive { color: var(--positive) !important; }
+.negative { color: var(--negative) !important; }
+.warning { color: var(--warning) !important; }
+.muted, .empty, .footnote { color: var(--muted) !important; }
+.empty { padding: 14px 4px; font-size: 13px; }
+.footnote { font-size: 12px; padding: 6px 2px 2px; }
+
+.events { max-height: 340px; overflow-y: auto; font-size: 12.5px; }
+.event { padding: 3px 0; border-bottom: 1px solid var(--border); }
+.event-time { color: var(--muted); font-family: Menlo, monospace; margin-right: 8px; }
+.event-stock { color: var(--accent); font-weight: 600; margin-right: 8px; }
+
+.log { max-height: 300px; overflow-y: auto; font-size: 11.5px; color: var(--text); background: var(--background);
+       padding: 8px; border-radius: 4px; margin: 0; white-space: pre-wrap; }
+.controls { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.day-picker { width: 200px; color: #000; font-size: 13px; }
+.chart { width: 100%; }
