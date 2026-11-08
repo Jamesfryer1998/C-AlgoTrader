@@ -27,6 +27,7 @@ def test_formatting():
     assert views.percent(None) == "-"
     assert views.number(10.0, 0) == "10" and views.number(3.14159) == "3.14"
     assert views.milliseconds(12.34) == "12.3 ms" and views.milliseconds(0.0042) == "4 µs"
+    assert views.text_or(float("nan"), "-") == "-" and views.text_or("note") == "note"
     assert views.tone_of(-1) == views.NEGATIVE and views.tone_of(0) == views.PLAIN
 
 
@@ -58,12 +59,17 @@ def test_live_tab_from_a_real_backtest(project, backtest_folder):
 
     kpis = {k.title: k for k in views.live_kpis(status, trades, day)}
     assert kpis["Equity"].value == "$100,008.95"
-    assert kpis["Orders today"].value == str(int((trades["status"] == "sent").sum()))
-    assert kpis["Open positions"].value == "0"
+    assert kpis["Orders"].value == str(int((trades["status"] == "sent").sum()))
+    assert kpis["Positions"].value == "0"
 
     strategies = views.strategy_table(status)
     assert [row[0] for row in texts(strategies) if row[0]] == ["AAPL", "KO", "PEP"]
-    assert views.trades_table(trades, day).rows[0][0][0] == trades["time"].iloc[-1][11:19]   # newest first
+    tape = views.trades_table(trades, day)
+    newest = trades.iloc[-1]
+    assert tape.rows[0][0][0] == newest["time"][11:19]   # newest first
+    assert tape.rows[0][1] == ((views.BUY_ARROW, views.POSITIVE) if newest["side"] == "buy"
+                               else (views.SELL_ARROW, views.NEGATIVE))
+    assert "nan" not in [text for row in texts(tape) for text in row]   # empty notes stay empty
     assert views.positions_table(status, project.risk).rows == []
 
 
@@ -72,30 +78,29 @@ def test_positions_flag_a_stock_over_its_cap(project):
               "stocks": [{"ticker": "KO", "price": 60, "position": {"quantity": 50, "avg_price": 58,
                                                                      "market_value": 3000, "unrealised_pnl": 100}}]}
     table = views.positions_table(status, project.risk)
-    assert texts(table)[0] == ["KO", "50", "58", "60", "$3,000.00", "+$100.00", "30.0%", "20%"]
-    assert tones(table)[0][5] == views.POSITIVE and tones(table)[0][6] == views.WARNING   # 30% > the 20% cap
+    assert texts(table)[0] == ["KO", "50", "58", "60", "+$100.00", "30.0%"]
+    assert tones(table)[0][4] == views.POSITIVE and tones(table)[0][5] == views.WARNING   # 30% > the 20% cap
 
 
-def test_problems_and_events(tmp_path):
-    write_trades(tmp_path, [(f"{BACKTEST_DAY} 10:01:00", "KO", "buy", 5, 60, "blocked", 0, "beyond max_position_size")])
-    table = views.problems_table(records.trades(tmp_path), BACKTEST_DAY)
-    assert texts(table) == [["10:01:00", "KO", "buy", "5", "blocked", "beyond max_position_size"]]
+def test_events_newest_first():
     status = {"events": [{"time": f"{BACKTEST_DAY} 10:00:00", "ticker": "KO", "text": "first"},
                          {"time": f"{BACKTEST_DAY} 10:05:00", "ticker": "PEP", "text": "second"}]}
     assert views.events(status) == [("10:05", "PEP", "second"), ("10:00", "KO", "first")]
 
 
+def test_strategy_levels_on_one_line():
+    status = {"stocks": [{"ticker": "KO", "strategies": [{"label": "RSI", "lower": 30, "current": 45.2, "upper": 70,
+                                                          "state": "hold", "ready": True}]}]}
+    assert texts(views.strategy_table(status)) == [["KO", "RSI", "30 < 45.2 < 70", "hold"]]
+
+
 def test_charts_are_plotly_figures(backtest_folder):
     equity = records.equity(backtest_folder)
-    figure = views.equity_figure([("Live", equity, views.LIVE_COLOUR), ("Nothing", equity.iloc[0:0], "#fff")], "Today")
+    figure = views.equity_figure([("Live", equity, views.LIVE_COLOUR), ("Nothing", equity.iloc[0:0], "#fff")])
     assert len(figure["data"]) == 1   # empty curves are left out
     assert figure["data"][0]["x"][0] == f"{BACKTEST_DAY} 09:30:00"
-    assert figure["layout"]["paper_bgcolor"] == views.PANEL
+    assert figure["layout"]["paper_bgcolor"] == views.PANEL and not figure["layout"]["showlegend"]
     json.dumps(figure)   # plain data: Dash can send it as it is
-
-    trades = records.trades(backtest_folder)
-    json.dumps(views.latency_figure(trades, BACKTEST_DAY))
-    json.dumps(views.decision_figure(records.status(backtest_folder)))
 
 
 def test_comparison_views(project, backtest_folder):
@@ -107,7 +112,7 @@ def test_comparison_views(project, backtest_folder):
     assert summary[0][0] == "P&L" and summary[0][1] == summary[0][2] and summary[0][3] == "+$0.00"
     assert all(row[-1][0] == comparison.MATCH for row in views.fills_table(result).rows)
     figure = views.comparison_figure(result)
-    assert [trace["name"] for trace in figure["data"]] == ["Live", "Backtest"]
+    assert [trace["name"] for trace in figure["data"]] == ["Live", "Backtest"] and figure["layout"]["showlegend"]
 
 
 def test_history_views(tmp_path):

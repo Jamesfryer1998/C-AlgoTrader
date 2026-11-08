@@ -24,17 +24,21 @@ except Exception:
 POSITIVE, NEGATIVE, WARNING, MUTED, PLAIN = "positive", "negative", "warning", "muted", ""
 NOTHING = "-"
 
-# Chart colours: a dark trading-terminal look
-BACKGROUND = "#0b0f14"
-PANEL = "#11161d"
-GRID = "#1e2630"
-TEXT = "#c9d1d9"
-LIVE_COLOUR = "#3fb6ff"
-BACKTEST_COLOUR = "#f0b429"
-UP_COLOUR = "#26c281"
-DOWN_COLOUR = "#ef5350"
-CHART_FONT = "Inter, -apple-system, Segoe UI, sans-serif"
-CHART_MARGIN = {"l": 50, "r": 16, "t": 36, "b": 36}
+# Chart colours: the terminal look of assets/style.css
+PANEL = "#000000"
+GRID = "#141a1f"
+TEXT = "#9aa5ad"
+LIVE_COLOUR = "#3ad7f0"
+BACKTEST_COLOUR = "#f5d547"
+UP_COLOUR = "#4ade80"
+DOWN_COLOUR = "#f87171"
+CHART_FONT = "JetBrains Mono, Menlo, monospace"
+CHART_MARGIN = {"l": 8, "r": 64, "t": 10, "b": 28}
+CHART_HEIGHT = 300
+
+# The tape: an arrow for each side, as on a trading terminal
+BUY_ARROW, SELL_ARROW = "▲", "▼"
+TODAY_KPI = "Today"   # shown large in the P&L panel, the rest along the status bar
 
 RECENT_EVENTS = 40
 RECENT_TRADES = 60
@@ -81,6 +85,11 @@ def milliseconds(value) -> str:
     if missing(value):
         return NOTHING
     return f"{value:.1f} ms" if value >= 1 else f"{value * 1000:.0f} µs"
+
+
+def text_or(value, otherwise: str = "") -> str:
+    """A text column's value, or `otherwise` when it is empty (pandas reads empty cells as NaN)."""
+    return otherwise if missing(value) or value == "" else str(value)
 
 
 def tone_of(value) -> str:
@@ -166,15 +175,15 @@ def live_kpis(status: dict, trades: pd.DataFrame, day: str) -> list[Kpi]:
     rejected = int((orders["status"] == records.REJECTED).sum())
     return [
         Kpi("Equity", money(equity), "Alpaca" if has_account else "our estimate"),
-        Kpi("Today", signed_money(today_pnl), percent(today_pnl / (equity - today_pnl) * 100, signed=True)
+        Kpi(TODAY_KPI, signed_money(today_pnl), percent(today_pnl / (equity - today_pnl) * 100, signed=True)
             if not missing(today_pnl) and not missing(equity) and equity - today_pnl else "", tone_of(today_pnl)),
         Kpi("Realised P&L", signed_money(estimate.get("realised_pnl")),
             f"{estimate.get('closed_trades', 0)} closed, {percent(estimate.get('win_rate_percent'), 0)} won",
             tone_of(estimate.get("realised_pnl"))),
-        Kpi("Open positions", str(len(held)), f"{money(gross, 0)} gross"),
-        Kpi("Orders today", str(sent), f"{blocked} blocked, {rejected} rejected",
+        Kpi("Positions", str(len(held)), f"{money(gross, 0)} gross"),
+        Kpi("Orders", str(sent), f"{blocked} blocked, {rejected} rejected",
             WARNING if rejected else PLAIN),
-        Kpi("Order latency", milliseconds(latency["median"]),
+        Kpi("Latency", milliseconds(latency["median"]),
             f"p95 {milliseconds(latency['p95'])}, max {milliseconds(latency['max'])}" if latency["orders"] else
             "no orders yet"),
     ]
@@ -183,15 +192,14 @@ def live_kpis(status: dict, trades: pd.DataFrame, day: str) -> list[Kpi]:
 def positions_table(status: dict, risk_config: dict) -> Table:
     frame, _ = metrics.exposure(status, risk_config)
     prices = {s["ticker"]: s for s in (status or {}).get("stocks", [])}
-    table = Table(["Stock", "Quantity", "Avg price", "Price", "Market value", "Unrealised", "% of equity", "Cap"],
-                  empty="No open positions")
+    table = Table(["Stock", "Qty", "Avg", "Last", "Unrealised", "% eq"], empty="FLAT")
     for row in frame.itertuples():
         stock = prices.get(row.ticker, {})
         position = stock.get("position", {})
         over = row.percent_of_equity > row.cap_percent
         table.add(row.ticker, number(row.quantity, 0), number(position.get("avg_price")), number(stock.get("price")),
-                  money(row.market_value), (signed_money(row.unrealised_pnl), tone_of(row.unrealised_pnl)),
-                  (percent(row.percent_of_equity, 1), WARNING if over else PLAIN), percent(row.cap_percent, 0))
+                  (signed_money(row.unrealised_pnl), tone_of(row.unrealised_pnl)),
+                  (percent(row.percent_of_equity, 1), WARNING if over else PLAIN))
     return table
 
 
@@ -199,40 +207,31 @@ def exposure_line(status: dict, risk_config: dict) -> str:
     _, summary = metrics.exposure(status, risk_config)
     run = (status or {}).get("run", {})
     limit = f", at most {summary['share_limit']} shares a stock" if summary["share_limit"] else ""
-    return (f"Risk: {run.get('risk', summary['engine'])}{limit}. Gross exposure {percent(summary['gross_percent'], 1)} "
-            f"of equity (cap {percent(summary['cap_percent'], 0)}).")
+    return (f"{run.get('risk', summary['engine'])}{limit} · gross {percent(summary['gross_percent'], 1)} "
+            f"of {percent(summary['cap_percent'], 0)} cap")
 
 
 def strategy_table(status: dict) -> Table:
-    table = Table(["Stock", "Strategy", "Lower", "Current", "Upper", "State", "Decision", "Last bar"],
-                  empty="No bars yet")
+    """One line a strategy: where its indicator sits between the levels that would trade."""
+    table = Table(["Stock", "Strategy", "Low < now < high", "State"], empty="NO BARS YET")
     for stock in (status or {}).get("stocks", []):
         for i, levels in enumerate(stock.get("strategies", []) or [{}]):
-            table.add(stock["ticker"] if i == 0 else "", levels.get("label", NOTHING), levels.get("lower") or NOTHING,
-                      levels.get("current") or NOTHING, levels.get("upper") or NOTHING,
-                      (levels.get("state") or "warming up", PLAIN if levels.get("ready") else MUTED),
-                      milliseconds(stock.get("decision_ms")) if i == 0 else "",
-                      str(stock.get("time", ""))[11:16] if i == 0 else "")
+            between = " < ".join(str(levels.get(key) or NOTHING) for key in ("lower", "current", "upper"))
+            table.add(stock["ticker"] if i == 0 else "", levels.get("label", NOTHING), between,
+                      (levels.get("state") or "warming up", PLAIN if levels.get("ready") else MUTED))
     return table
 
 
 def trades_table(trades: pd.DataFrame, day: str, limit: int = RECENT_TRADES) -> Table:
-    table = Table(["Time", "Stock", "Side", "Qty", "Price", "Strategy", "Status", "Round trip", "Note"],
-                  empty="No orders today")
+    """The tape: today's orders, newest first."""
+    table = Table(["Time", "", "Stock", "Qty", "Price", "Strategy", "Status", "Note"], empty="NO ORDERS TODAY")
     tones = {records.SENT: POSITIVE, records.BLOCKED: WARNING, records.REJECTED: NEGATIVE, records.ADJUSTMENT: MUTED}
     for trade in trades[trades["day"] == day].iloc[::-1].head(limit).itertuples():
-        table.add(trade.time[11:19], trade.ticker, (trade.side, POSITIVE if trade.side == "buy" else NEGATIVE),
-                  number(trade.quantity, 0), number(trade.price), trade.strategy or NOTHING,
-                  (trade.status, tones.get(trade.status, PLAIN)),
-                  milliseconds(trade.round_trip_ms) if trade.round_trip_ms else NOTHING, trade.note or "")
-    return table
-
-
-def problems_table(trades: pd.DataFrame, day: str) -> Table:
-    table = Table(["Time", "Stock", "Side", "Qty", "Status", "Reason"], empty="Nothing blocked or rejected today")
-    for row in metrics.problems(trades[trades["day"] == day]).itertuples():
-        table.add(row.time[11:19], row.ticker, row.side, number(row.quantity, 0),
-                  (row.status, WARNING if row.status == records.BLOCKED else NEGATIVE), row.note or "")
+        buying = trade.side == "buy"
+        side_tone = POSITIVE if buying else NEGATIVE
+        table.add(trade.time[11:19], (BUY_ARROW if buying else SELL_ARROW, side_tone), (trade.ticker, side_tone),
+                  number(trade.quantity, 0), (number(trade.price), side_tone), text_or(trade.strategy, NOTHING),
+                  (trade.status, tones.get(trade.status, PLAIN)), text_or(trade.note))
     return table
 
 
@@ -244,20 +243,22 @@ def events(status: dict, limit: int = RECENT_EVENTS) -> list[tuple[str, str, str
 
 # ---------- Charts ----------
 
-def _layout(title: str, y_title: str = "", height: int = 300) -> dict:
-    return {"title": {"text": title, "font": {"size": 13}, "x": 0.01}, "height": height, "margin": CHART_MARGIN,
-            "paper_bgcolor": PANEL, "plot_bgcolor": PANEL, "font": {"color": TEXT, "family": CHART_FONT, "size": 11},
-            "xaxis": {"gridcolor": GRID, "zeroline": False}, "yaxis": {"gridcolor": GRID, "zeroline": False,
-                                                                          "title": {"text": y_title}},
-            "legend": {"orientation": "h", "y": 1.12, "x": 1, "xanchor": "right"}, "hovermode": "x unified"}
+def _layout(height: int = CHART_HEIGHT) -> dict:
+    """Black, faint grid, prices on the right: the panel around the chart carries its title."""
+    axis = {"gridcolor": GRID, "zeroline": False, "linecolor": GRID, "tickfont": {"size": 10}}
+    return {"height": height, "margin": CHART_MARGIN, "paper_bgcolor": PANEL, "plot_bgcolor": PANEL,
+            "font": {"color": TEXT, "family": CHART_FONT, "size": 10},
+            "xaxis": axis, "yaxis": {**axis, "side": "right", "tickprefix": "$"},
+            "legend": {"orientation": "h", "y": 1.0, "x": 0, "bgcolor": "rgba(0,0,0,0)"},
+            "hovermode": "x unified", "hoverlabel": {"bgcolor": PANEL, "font": {"family": CHART_FONT}}}
 
 
-def equity_figure(curves: list[tuple[str, pd.DataFrame, str]], title: str) -> dict:
+def equity_figure(curves: list[tuple[str, pd.DataFrame, str]]) -> dict:
     """curves: (name, equity frame, colour)"""
     data = [{"type": "scatter", "mode": "lines", "name": name, "x": list(frame["time"]),
-             "y": [round(v, 2) for v in frame["equity"]], "line": {"color": colour, "width": 1.6}}
+             "y": [round(v, 2) for v in frame["equity"]], "line": {"color": colour, "width": 1.5, "shape": "hv"}}
             for name, frame, colour in curves if not frame.empty]
-    return {"data": data, "layout": _layout(title, "$")}
+    return {"data": data, "layout": {**_layout(), "showlegend": len(data) > 1}}
 
 
 def daily_pnl_figure(history: pd.DataFrame) -> dict:
@@ -265,22 +266,7 @@ def daily_pnl_figure(history: pd.DataFrame) -> dict:
     return {"data": [{"type": "bar", "x": list(days["day"]), "y": [round(v, 2) for v in days["pnl"]],
                       "marker": {"color": [UP_COLOUR if v >= 0 else DOWN_COLOUR for v in days["pnl"]]},
                       "name": "P&L"}],
-            "layout": _layout("Daily P&L", "$")}
-
-
-def latency_figure(trades: pd.DataFrame, day: str) -> dict:
-    sent = trades[(trades["day"] == day) & (trades["status"] == records.SENT) & (trades["round_trip_ms"] > 0)]
-    return {"data": [{"type": "scatter", "mode": "markers", "x": list(sent["time"]), "y": list(sent["round_trip_ms"]),
-                      "text": list(sent["ticker"]), "marker": {"color": LIVE_COLOUR, "size": 7}, "name": "round trip"}],
-            "layout": _layout("Order round trip (ms)", "ms", height=240)}
-
-
-def decision_figure(status: dict) -> dict:
-    stocks = (status or {}).get("stocks", [])
-    return {"data": [{"type": "bar", "x": [s["ticker"] for s in stocks],
-                      "y": [round(s.get("decision_ms", 0) * 1000, 1) for s in stocks],
-                      "marker": {"color": LIVE_COLOUR}, "name": "decision"}],
-            "layout": _layout("Decision time per stock (µs)", "µs", height=240)}
+            "layout": {**_layout(), "showlegend": False}}
 
 
 # ---------- Backtest vs live ----------
@@ -321,8 +307,7 @@ def fills_table(result: dict) -> Table:
 
 def comparison_figure(result: dict) -> dict:
     return equity_figure([("Live", result["live_equity"], LIVE_COLOUR),
-                          ("Backtest", result["backtest_equity"], BACKTEST_COLOUR)],
-                         f"Equity on {result['day']}: live vs backtest")
+                          ("Backtest", result["backtest_equity"], BACKTEST_COLOUR)])
 
 
 # ---------- History ----------
@@ -342,14 +327,11 @@ def history_kpis(history: pd.DataFrame) -> list[Kpi]:
 
 
 def history_table(history: pd.DataFrame) -> Table:
-    table = Table(["Day", "Start", "End", "P&L", "P&L %", "Max drawdown", "Orders", "Blocked", "Rejected",
-                   "Closed", "Win rate"], empty="No trading days recorded yet")
+    table = Table(["Day", "P&L", "%", "Drawdown", "Orders", "Won"], empty="NO TRADING DAYS YET")
     for row in history.itertuples():
-        table.add(row.day, money(row.start_equity), money(row.end_equity), (signed_money(row.pnl), tone_of(row.pnl)),
+        table.add(row.day, (signed_money(row.pnl), tone_of(row.pnl)),
                   (percent(row.pnl_percent, signed=True), tone_of(row.pnl_percent)), percent(row.max_drawdown_percent),
-                  number(row.orders_sent, 0), number(row.blocked, 0),
-                  (number(row.rejected, 0), WARNING if row.rejected else PLAIN), number(row.closed_trades, 0),
-                  percent(row.win_rate_percent, 0))
+                  (number(row.orders_sent, 0), WARNING if row.rejected else PLAIN), percent(row.win_rate_percent, 0))
     return table
 
 

@@ -148,12 +148,6 @@ def latency(trades: pd.DataFrame) -> dict:
             "p95": float(sent.quantile(LATENCY_PERCENTILE)), "max": float(sent.max())}
 
 
-def problems(trades: pd.DataFrame) -> pd.DataFrame:
-    """Orders the risk checks blocked or the broker rejected, newest first, with the reason."""
-    frame = trades[trades["status"].isin([records.BLOCKED, records.REJECTED])]
-    return frame[["time", "ticker", "side", "quantity", "price", "strategy", "status", "note"]].iloc[::-1]
-
-
 # ---------- Exposure ----------
 
 def exposure(status: dict, risk_config: dict) -> tuple[pd.DataFrame, dict]:

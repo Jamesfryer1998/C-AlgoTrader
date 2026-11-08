@@ -107,15 +107,6 @@ def test_latency_of_orders_sent(tmp_path):
     assert figures["max"] == 1000
 
 
-def test_problems_are_the_blocked_and_rejected_orders(tmp_path):
-    write_trades(tmp_path, [(f"{BACKTEST_DAY} 10:00:00", "KO", "buy", 1, 60, "sent"),
-                            (f"{BACKTEST_DAY} 10:01:00", "KO", "buy", 5, 60, "blocked", 0, "holding 8 beyond 10"),
-                            (f"{BACKTEST_DAY} 10:02:00", "PEP", "sell", 1, 150, "rejected", 0, "HTTP 403")])
-    found = metrics.problems(records.trades(tmp_path))
-    assert list(found["ticker"]) == ["PEP", "KO"]   # newest first
-    assert list(found["note"]) == ["HTTP 403", "holding 8 beyond 10"]
-
-
 def test_exposure_against_the_caps(project):
     status = {"account": {"equity": 100000},
               "stocks": [{"ticker": "KO", "price": 60, "position": {"quantity": 100, "market_value": 6000}},
