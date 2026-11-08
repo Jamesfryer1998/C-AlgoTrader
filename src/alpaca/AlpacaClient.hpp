@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 #include <ctime>
 #include <string>
 #include <ixwebsocket/IXHttpClient.h>
@@ -16,6 +17,9 @@ using json = nlohmann::json;
  *
  * Keys are read from the environment variables APCA_API_KEY_ID and APCA_API_SECRET_KEY.
  * main() loads these from the git-ignored .env file (see .env.example).
+ *
+ * Every Alpaca class takes one in its constructor (a real one if none is given). Tests pass a fake that
+ * overrides get / post / del / wait with canned replies, so they never touch the network or sleep.
  */
 struct HttpResult
 {
@@ -33,18 +37,26 @@ class AlpacaClient
 {
     public:
         AlpacaClient();
+        virtual ~AlpacaClient() = default;
 
         bool hasKeys() const { return !keyId.empty() && !secretKey.empty(); }
         const std::string& getKeyId() const { return keyId; }
         const std::string& getSecretKey() const { return secretKey; }
 
-        HttpResult get(const std::string& url);
+        virtual HttpResult get(const std::string& url);
 
         // GET, asking again while Alpaca is busy and waiting a little longer each time
         // (firstWait, then 2 x firstWait, ...). Gives up after maxAttempts requests.
         HttpResult getWhenFree(const std::string& url, int maxAttempts, std::chrono::seconds firstWait);
-        HttpResult post(const std::string& url, const json& body);
-        HttpResult del(const std::string& url);   // HTTP DELETE, e.g. cancel an order
+        virtual HttpResult post(const std::string& url, const json& body);
+        virtual HttpResult del(const std::string& url);   // HTTP DELETE, e.g. cancel an order
+
+        // Pause between retries
+        virtual void wait(std::chrono::milliseconds duration);
+
+    protected:
+        // Keys given directly (for tests), not read from the environment
+        AlpacaClient(const std::string& keyId, const std::string& secretKey);
 
     private:
         HttpResult toResult(const ix::HttpResponsePtr& response);

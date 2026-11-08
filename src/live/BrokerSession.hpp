@@ -58,8 +58,10 @@ class BrokerSession
 class AlpacaSession : public BrokerSession
 {
     public:
-        // oms and tracker: our own records, for a dry run's figures
-        AlpacaSession(const json& config, OrderManagement& oms, PerformanceTracker& tracker);
+        // oms and tracker: our own records, for a dry run's figures. client: how it talks to Alpaca (none: a
+        // real AlpacaClient; tests pass a fake)
+        AlpacaSession(const json& config, OrderManagement& oms, PerformanceTracker& tracker,
+                      std::shared_ptr<AlpacaClient> client = nullptr);
 
         bool connect() override;
         BrokerBase& broker() override { return alpaca; }

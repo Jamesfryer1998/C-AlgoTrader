@@ -165,6 +165,14 @@ void OrderManagement::applyToPositions(const Order& order)
 // Called after each order, and at start-up so positions from a previous run are not forgotten.
 void OrderManagement::syncPosition(const string& ticker)
 {
+    // A dry run sends nothing, so the broker always says we hold nothing: our own book is the only record
+    if (!broker->reportsRealPositions())
+    {
+        if (store)
+            store->savePositions(positions);
+        return;
+    }
+
     // An order we sent hasn't filled yet: the broker's position doesn't include it, so don't "correct"
     // ours to match. Check again next bar.
     if (broker->hasPendingOrder(ticker))

@@ -1,9 +1,12 @@
 #pragma once
 
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+
+#include "../alpaca/AlpacaClient.hpp"
 
 using json = nlohmann::json;
 
@@ -21,7 +24,9 @@ using json = nlohmann::json;
 class BacktestDownloader
 {
     public:
-        BacktestDownloader(const json& config, const std::string& dataRoot);
+        // client: how it talks to Alpaca (none: a real AlpacaClient; tests pass a fake)
+        BacktestDownloader(const json& config, const std::string& dataRoot,
+                           std::shared_ptr<AlpacaClient> client = nullptr);
 
         // False if a needed download failed (e.g. Alpaca unreachable or no keys)
         bool downloadMissing(const std::vector<std::string>& tickers, const std::string& firstDay, int days);
@@ -39,4 +44,5 @@ class BacktestDownloader
 
         json config;
         std::string dataRoot;
+        std::shared_ptr<AlpacaClient> client;
 };

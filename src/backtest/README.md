@@ -59,10 +59,10 @@ StrategyTester tester(algoConfig);
 tester.setStartingCapital(100000.0);
 tester.setCommissionPerTrade(1.0);
 tester.setSlippagePercentage(0.001);
-tester.setDateRange("2023-01-01", "2023-12-31");
 
-// Run the backtest
-tester.run();
+// Run the backtest on bars you've loaded (oldest first), e.g. with MinuteBars
+tester.setMarketData(bars);
+tester.run();      // or tester.runOn(bars), which only reads them
 
 // Get the results
 const PerformanceMetrics& metrics = tester.getPerformanceMetrics();
@@ -70,7 +70,7 @@ const PerformanceMetrics& metrics = tester.getPerformanceMetrics();
 
 ## How it Works
 
-1. The StrategyTester loads historical market data and initializes the adapter.
+1. The StrategyTester is given the bars to test on (setMarketData or runOn).
 2. The adapter feeds one data point at a time to MarketData as the simulation runs.
 3. For each time step:
    - Adapter advances to the next data point and updates MarketData

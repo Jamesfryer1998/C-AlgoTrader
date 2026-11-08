@@ -3,6 +3,7 @@
 #include <ctime>
 
 #include <map>
+#include <memory>
 #include <string>
 #include <nlohmann/json.hpp>
 #include "AlpacaClient.hpp"
@@ -27,7 +28,8 @@ using json = nlohmann::json;
 class AlpacaBroker : public BrokerBase
 {
     public:
-        AlpacaBroker(const json& config);
+        // client: how it talks to Alpaca (none: a real AlpacaClient; tests pass a fake)
+        explicit AlpacaBroker(const json& config, std::shared_ptr<AlpacaClient> client = nullptr);
 
         int connect() override;
         int disconnect() override;
@@ -87,7 +89,7 @@ class AlpacaBroker : public BrokerBase
         static bool isWorkingStatus(const std::string& status);
 
     private:
-        AlpacaClient client;
+        std::shared_ptr<AlpacaClient> client;
         std::string tradingUrl;
         std::string dataUrl;
         std::string feed;

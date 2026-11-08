@@ -106,3 +106,11 @@ TEST(MarketTimeTests, WeekdaysSkipWeekends)
     EXPECT_EQ(MarketTime::weekdaysBetween("2026-11-06", "2026-11-10"),
               (std::vector<std::string>{"2026-11-06", "2026-11-09", "2026-11-10"}));
 }
+
+TEST(MarketTimeTests, BadTimesAreMinusOne)
+{
+    EXPECT_EQ(MarketTime::parseUtc("2026-10-26"), -1);         // no time
+    EXPECT_EQ(MarketTime::minuteOfDay("2026-10-26"), -1);
+    EXPECT_EQ(MarketTime::minuteOfDay("2026-10-26 xx:30:00"), -1);
+    EXPECT_EQ(MarketTime::minuteOfDay("2026-10-26 09:30:00"), 9 * 60 + 30);
+}

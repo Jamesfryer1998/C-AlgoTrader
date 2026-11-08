@@ -5,6 +5,7 @@
 #include <vector>
 #include <ixwebsocket/IXWebSocket.h>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include "AlpacaClient.hpp"
 #include "../data_access/BarFeed.hpp"
 #include "../data_access/MarketCondition.hpp"
@@ -32,7 +33,9 @@ class AlpacaStream : public BarFeed
     public:
         // Streams every one of `tickers` (the portfolio's stocks). The "test" feed only has FAKEPACA, so it
         // streams that instead.
-        AlpacaStream(const json& config, const std::vector<std::string>& tickers);
+        // client: for the REST back-fill and the stream's keys (none: a real AlpacaClient; tests pass a fake)
+        AlpacaStream(const json& config, const std::vector<std::string>& tickers,
+                     std::shared_ptr<AlpacaClient> client = nullptr);
 
         const std::vector<std::string>& getSymbols() const { return symbols; }
 
@@ -48,10 +51,12 @@ class AlpacaStream : public BarFeed
         std::string getFeed() const { return feed; }
         std::string describe() const override;
 
+        // One message from Alpaca's stream: a bar goes to onBar; the connected / authenticated steps return
+        // what to send back (log in, then subscribe). Public so it can be tested without a connection.
+        std::optional<json> handleAlpacaMessage(const json& message, const BarHandler& onBar);
 
     private:
         void onMessage(const ix::WebSocketMessagePtr& msg);
-        void handleAlpacaMessage(const json& message);
 
         std::string feed;
         std::string symbol;                 // the first (or only) ticker
@@ -59,7 +64,7 @@ class AlpacaStream : public BarFeed
         std::string streamUrl;
         std::string dataUrl;
 
-        AlpacaClient client;
+        std::shared_ptr<AlpacaClient> client;
         ix::WebSocket socket;
         BarHandler barCallback;
 };

@@ -19,7 +19,8 @@ namespace
     const std::chrono::seconds FIRST_RETRY_WAIT{3};
 }
 
-AlpacaDailyBars::AlpacaDailyBars(const json& config, const std::string& dataDir) : dataDir(dataDir)
+AlpacaDailyBars::AlpacaDailyBars(const json& config, const std::string& dataDir, std::shared_ptr<AlpacaClient> client)
+    : client(client ? client : std::make_shared<AlpacaClient>()), dataDir(dataDir)
 {
     json alpaca = config.value("alpaca", json::object());
     dataUrl = alpaca.value("data_url", AlpacaApi::DATA_URL);
@@ -64,7 +65,7 @@ bool
 AlpacaDailyBars::download(const std::string& symbol, const std::string& startDate, const std::string& endDate,
                           std::vector<quant::DailyBar>& bars)
 {
-    if (!client.hasKeys())
+    if (!client->hasKeys())
     {
         std::cerr << "WARNING - Alpaca keys missing (.env), can't download " << symbol << std::endl;
         return false;
@@ -90,7 +91,7 @@ AlpacaDailyBars::download(const std::string& symbol, const std::string& startDat
         if (!pageToken.empty())
             url += "&page_token=" + pageToken;
 
-        HttpResult result = client.getWhenFree(url, MAX_ATTEMPTS, FIRST_RETRY_WAIT);
+        HttpResult result = client->getWhenFree(url, MAX_ATTEMPTS, FIRST_RETRY_WAIT);
         if (!result.ok())
         {
             std::cerr << "WARNING - Could not download " << symbol << " daily bars (" << result.status << "): "

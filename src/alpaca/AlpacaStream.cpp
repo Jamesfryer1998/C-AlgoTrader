@@ -28,7 +28,9 @@ namespace
     const char* const UTC_TIME_FORMAT = UTC_TIME_FORMAT;
 }
 
-AlpacaStream::AlpacaStream(const json& config, const std::vector<std::string>& tickers)
+AlpacaStream::AlpacaStream(const json& config, const std::vector<std::string>& tickers,
+                           std::shared_ptr<AlpacaClient> client)
+    : client(client ? client : std::make_shared<AlpacaClient>())
 {
     json alpaca = config.value("alpaca", json::object());
 
@@ -66,7 +68,7 @@ AlpacaStream::history(const std::string& ticker, int count)
                     + "&limit=" + std::to_string(count)
                     + "&sort=desc&start=" + MarketTime::formatUtc(start);
 
-    HttpResult result = client.get(url);
+    HttpResult result = client->get(url);
     if (!result.ok() || !result.body.contains("bars") || !result.body["bars"].is_array())
     {
         std::cerr << "WARNING - Could not download recent " << ticker << " bars (" << result.status << "): "
@@ -142,7 +144,8 @@ AlpacaStream::onMessage(const ix::WebSocketMessagePtr& msg)
                 break;
             }
             for (const auto& message : messages)
-                handleAlpacaMessage(message);
+                if (std::optional<json> reply = handleAlpacaMessage(message, barCallback))
+                    socket.send(reply->dump());
             break;
         }
 
@@ -151,8 +154,8 @@ AlpacaStream::onMessage(const ix::WebSocketMessagePtr& msg)
     }
 }
 
-void
-AlpacaStream::handleAlpacaMessage(const json& message)
+std::optional<json>
+AlpacaStream::handleAlpacaMessage(const json& message, const BarHandler& onBar)
 {
     std::string type = message.value("T", "");
 
@@ -160,21 +163,19 @@ AlpacaStream::handleAlpacaMessage(const json& message)
     {
         MarketCondition bar = AlpacaApi::parseMinuteBar(message, symbol);   // printed by the app with the P&L
 
-        if (barCallback)
-            barCallback(bar);
+        if (onBar)
+            onBar(bar);
     }
     else if (type == SUCCESS_MESSAGE && message.value("msg", "") == CONNECTED)
     {
         // Step 1: log in
-        json auth = {{"action", "auth"}, {"key", client.getKeyId()}, {"secret", client.getSecretKey()}};
-        socket.send(auth.dump());
+        return json{{"action", "auth"}, {"key", client->getKeyId()}, {"secret", client->getSecretKey()}};
     }
     else if (type == SUCCESS_MESSAGE && message.value("msg", "") == AUTHENTICATED)
     {
         // Step 2: ask for 1-minute bars for every ticker
-        json subscribe = {{"action", "subscribe"}, {"bars", symbols}};
-        socket.send(subscribe.dump());
         Log::detail() << "Stream authenticated, subscribing to " << symbols.size() << " ticker(s)" << std::endl;
+        return json{{"action", "subscribe"}, {"bars", symbols}};
     }
     else if (type == SUBSCRIPTION_MESSAGE)
     {
@@ -188,4 +189,5 @@ AlpacaStream::handleAlpacaMessage(const json& message)
         std::cerr << "Alpaca stream error " << message.value("code", 0) << ": "
                   << message.value("msg", "") << std::endl;
     }
+    return std::nullopt;
 }

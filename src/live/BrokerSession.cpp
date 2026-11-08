@@ -61,8 +61,9 @@ namespace
 
 // ---------- Alpaca ----------
 
-AlpacaSession::AlpacaSession(const json& config, OrderManagement& oms, PerformanceTracker& tracker)
-    : alpaca(config), oms(oms), tracker(tracker)
+AlpacaSession::AlpacaSession(const json& config, OrderManagement& oms, PerformanceTracker& tracker,
+                             std::shared_ptr<AlpacaClient> client)
+    : alpaca(config, client), oms(oms), tracker(tracker)
 {
 }
 

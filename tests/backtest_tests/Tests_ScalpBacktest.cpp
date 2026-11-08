@@ -1,11 +1,16 @@
 #include <gtest/gtest.h>
 #include <cmath>
-#include <cstdio>
+#include <string>
 #include "../../src/backtest/StrategyTester.hpp"
 #include "../../src/util/Log.hpp"
 
 namespace
 {
+    std::string twoDigits(int number)
+    {
+        return (number < 10 ? "0" : "") + std::to_string(number);
+    }
+
     // `days` sessions of regular-hours minute bars that wobble around a slowly drifting level, with the
     // occasional sharp stretch that snaps back: what a VWAP fade looks for
     std::vector<MarketCondition> scalpDays(int days)
@@ -15,8 +20,7 @@ namespace
         double level = 100;
         for (int d = 0; d < days; d++)
         {
-            char day[16];
-            std::snprintf(day, sizeof(day), "2026-03-%02d", 2 + d);
+            std::string day = "2026-03-" + twoDigits(2 + d);
             double stretch = 0;
             for (int m = 0; m < 390; m++)
             {
@@ -26,8 +30,7 @@ namespace
                 stretch *= 0.8;                                          // ...that fades quickly
                 level += 0.001;
                 double price = level + noise + stretch;
-                char time[32];
-                std::snprintf(time, sizeof(time), "%s %02d:%02d:00", day, 9 + (30 + m) / 60, (30 + m) % 60);
+                std::string time = day + " " + twoDigits(9 + (30 + m) / 60) + ":" + twoDigits((30 + m) % 60) + ":00";
                 bars.emplace_back(time, "TEST", static_cast<float>(price), static_cast<float>(price), 1000, "1m");
             }
         }

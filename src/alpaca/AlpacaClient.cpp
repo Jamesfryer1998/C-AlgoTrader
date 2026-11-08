@@ -31,6 +31,18 @@ AlpacaClient::AlpacaClient()
 {
 }
 
+AlpacaClient::AlpacaClient(const std::string& keyId, const std::string& secretKey)
+: keyId(keyId),
+  secretKey(secretKey)
+{
+}
+
+void
+AlpacaClient::wait(std::chrono::milliseconds duration)
+{
+    std::this_thread::sleep_for(duration);
+}
+
 ix::HttpRequestArgsPtr
 AlpacaClient::makeArgs()
 {
@@ -78,9 +90,9 @@ AlpacaClient::getWhenFree(const std::string& url, int maxAttempts, std::chrono::
         result = get(url);
         if (!result.isBusy() || attempt == maxAttempts)
             break;
-        std::chrono::seconds wait = firstWait * attempt;
-        std::cerr << "  Alpaca busy (" << result.status << "), retrying in " << wait.count() << "s..." << std::endl;
-        std::this_thread::sleep_for(wait);
+        std::chrono::seconds pause = firstWait * attempt;
+        std::cerr << "  Alpaca busy (" << result.status << "), retrying in " << pause.count() << "s..." << std::endl;
+        wait(pause);
     }
     return result;
 }

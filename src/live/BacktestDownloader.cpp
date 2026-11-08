@@ -33,8 +33,9 @@ namespace
     }
 }
 
-BacktestDownloader::BacktestDownloader(const json& config, const std::string& dataRoot)
-    : config(config), dataRoot(dataRoot)
+BacktestDownloader::BacktestDownloader(const json& config, const std::string& dataRoot,
+                                       std::shared_ptr<AlpacaClient> client)
+    : config(config), dataRoot(dataRoot), client(client ? client : std::make_shared<AlpacaClient>())
 {
 }
 
@@ -59,7 +60,7 @@ BacktestDownloader::downloadMissing(const std::vector<std::string>& tickers, con
                   << " from Alpaca for the backtest..." << std::endl;
         json stockConfig = config;
         stockConfig["ticker"] = ticker;
-        AlpacaHistory history(stockConfig);
+        AlpacaHistory history(stockConfig, client);
         history.setQuiet(true);
         if (history.downloadToCsv(historyStart, lastDay, folderFor(ticker)) < 0)
         {

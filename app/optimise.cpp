@@ -11,7 +11,6 @@
 #include "../src/backtest/MinuteBars.hpp"
 #include "../src/backtest/Optimiser.hpp"
 #include "../src/data_access/CSVParser.hpp"
-#include "../src/data_access/DataStitcher.hpp"
 #include "../src/strategy_engine/Portfolio.hpp"
 #include "../src/util/Config.hpp"
 #include "../src/util/Format.hpp"

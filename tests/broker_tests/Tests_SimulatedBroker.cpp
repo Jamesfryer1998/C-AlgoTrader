@@ -816,3 +816,35 @@ TEST_F(SimulatedBrokerTests, RegulatoryFeesAreChargedOnSellsOnly)
     EXPECT_NEAR(broker->getRegulatoryFeesPaid(), expectedFee, 1e-6);
     EXPECT_NEAR(broker->getCurrentCash(), startingCash - bought + price * 100 - expectedFee, 1e-3);
 }
+
+TEST_F(SimulatedBrokerTests, AddingToALongAveragesItsCost)
+{
+    broker->setSlippage(0);
+    broker->placeOrder(createBuyOrder("AAPL", 100.0f));
+    executeStep();
+    broker->placeOrder(createBuyOrder("AAPL", 300.0f));
+    executeStep();
+
+    const std::vector<Order>& fills = broker->getFilledOrders();
+    ASSERT_EQ(fills.size(), 2u);
+    ASSERT_NE(fills[0].getPrice(), fills[1].getPrice());   // bought at two prices
+    Position held = broker->getLatestPosition("AAPL");
+    EXPECT_FLOAT_EQ(held.getQuantity(), 400);
+    EXPECT_NEAR(held.getAvgPrice(), (100 * fills[0].getPrice() + 300 * fills[1].getPrice()) / 400, 1e-3);
+}
+
+TEST_F(SimulatedBrokerTests, CoveringAShortIntoALongStartsAtTheNewPrice)
+{
+    broker->setSlippage(0);
+    broker->placeOrder(createSellOrder("AAPL", 100.0f));   // short 100
+    executeStep();
+    broker->placeOrder(createBuyOrder("AAPL", 150.0f));    // cover 100, then long 50
+    executeStep();
+
+    const std::vector<Order>& fills = broker->getFilledOrders();
+    ASSERT_EQ(fills.size(), 2u);
+    ASSERT_NE(fills[0].getPrice(), fills[1].getPrice());
+    Position held = broker->getLatestPosition("AAPL");
+    EXPECT_FLOAT_EQ(held.getQuantity(), 50);
+    EXPECT_NEAR(held.getAvgPrice(), fills[1].getPrice(), 1e-3);   // not the short's price
+}

@@ -73,3 +73,22 @@ TEST_F(SaveDataTests, LiveDryRunIsNotProtected)
     data.enforceLimit();
     EXPECT_FALSE(fs::exists(root / "live_dry_run/trades.csv"));
 }
+
+TEST_F(SaveDataTests, TheProgramsLimitIsCheckedAtStartAndOnEverySave)
+{
+    makeFile(root / "minute" / "old.csv", 600, 48);
+    makeFile(root / "minute" / "new.csv", 600, 1);
+
+    // 1 KB allowed: setting it up deletes the oldest straight away
+    SaveData::configure(root.string(), 1e-6);
+    EXPECT_FALSE(fs::exists(root / "minute" / "old.csv"));
+    EXPECT_TRUE(fs::exists(root / "minute" / "new.csv"));
+
+    // Writing another file makes room again, keeping the one just written
+    ASSERT_TRUE(SaveData::write((root / "minute" / "newest.csv").string(), std::string(600, 'y')));
+    EXPECT_FALSE(fs::exists(root / "minute" / "new.csv"));
+    EXPECT_TRUE(fs::exists(root / "minute" / "newest.csv"));
+
+    EXPECT_FALSE(SaveData::write((root / "no_such_folder" / "x.csv").string(), "x"));
+    SaveData::configure((root / "unused").string(), SaveData::DEFAULT_LIMIT_GB);   // leave nothing set up on root
+}

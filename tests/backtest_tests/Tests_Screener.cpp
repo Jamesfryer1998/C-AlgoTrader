@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <fstream>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -226,6 +227,19 @@ TEST(ScreenerTests, SummaryPicksAndCsv)
     EXPECT_EQ(read[1].parameters, rows[1].parameters);   // JSON with commas and quotes survives the CSV
     EXPECT_FALSE(read[4].found);
     std::remove(path.c_str());
+
+    // The top picks: ranked, one line each, parameters kept whole
+    std::string picksPath = (std::filesystem::temp_directory_path() / "screen_test_top_picks.csv").string();
+    ASSERT_TRUE(Screener::writeTopPicksCsv(picksPath, held));
+    std::ifstream picks(picksPath);
+    std::vector<std::string> lines;
+    for (std::string line; std::getline(picks, line);)
+        lines.push_back(line);
+    ASSERT_EQ(lines.size(), held.size() + 1);
+    EXPECT_EQ(lines[0].rfind("rank,symbol,strategy,parameters,", 0), 0u);
+    EXPECT_EQ(lines[1].rfind("1,B,", 0), 0u);
+    EXPECT_EQ(lines[2].rfind("2,", 0), 0u);
+    std::remove(picksPath.c_str());
 }
 
 TEST(ScreenerTests, TopPicksNeedBothPeriodsAndOnePerStock)
@@ -382,4 +396,28 @@ TEST(ScreenerTests, MinutePickValuesAreOnePerDay)
     EXPECT_EQ(ready["period"], 14);
     EXPECT_EQ(ready["stop_loss"], 10);   // not searched: kept from the base settings
     EXPECT_EQ(ready["active"], 1);
+}
+
+TEST(ScreenerTests, HeldUpMeansGoodInBothPeriodsAndBetterThanBuyAndHold)
+{
+    auto row = [](const std::string& symbol, double train, double test, double buyHold, int testTrades) {
+        Screener::Row r;
+        r.symbol = symbol;
+        r.strategy = "RSI";
+        r.found = true;
+        r.train.sharpeRatio = train;
+        r.test.sharpeRatio = test;
+        r.test.closedTrades = testTrades;
+        r.buyHoldSharpe = buyHold;
+        return r;
+    };
+    std::vector<Screener::Row> rows = {
+        row("GOOD", 2.0, 1.5, 0.5, 10),
+        row("HOLD_BETTER", 2.0, 1.5, 3.0, 10),    // strong both times, but just holding the stock did better
+        row("FEW_TRADES", 2.0, 1.5, 0.5, 1),       // too few test trades to trust
+        row("FADED", 2.0, -1.0, 0.5, 10)};          // didn't hold up in the test years
+
+    auto held = Screener::goodInBothPeriods(rows, 5);
+    ASSERT_EQ(held.size(), 1u);
+    EXPECT_EQ(held[0].symbol, "GOOD");
 }

@@ -68,7 +68,6 @@ public:
         // Create and configure the tester
         tester = std::make_unique<StrategyTester>(testConfig);
         tester->setMarketData(mockData);
-        tester->useDirectMarketData(true);
         
         // Verify the data was properly set in the tester
         std::cout << "After setting market data in tester" << std::endl;
@@ -116,27 +115,6 @@ TEST_F(StrategyTesterTests, ConfigurationSettersWork) {
     
     // Unfortunately, we can't directly test the values were set since they're private
     // However, we can verify the tester still works after setting these values
-    EXPECT_NO_THROW(tester->run());
-}
-
-TEST_F(StrategyTesterTests, DateRangeSettingWorks) {
-    createTester();
-    
-    std::string startDate = "2025-03-20";
-    std::string endDate = "2025-03-25";
-    
-    tester->setDateRange(startDate, endDate);
-    
-    // Again, we can't directly verify the internal state, but we can ensure it doesn't crash
-    EXPECT_NO_THROW(tester->run());
-}
-
-TEST_F(StrategyTesterTests, ThreadingSettingWorks) {
-    createTester();
-    
-    int numThreads = 4;
-    tester->setNumThreads(numThreads);
-    
     EXPECT_NO_THROW(tester->run());
 }
 

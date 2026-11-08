@@ -161,3 +161,26 @@ TEST(RiskEngineTests, UnknownEngineIsAnError)
 {
     EXPECT_THROW(engine({{"name", "YOLO"}}), std::runtime_error);
 }
+
+TEST(RiskEngineTests, EachEngineDescribesItsSettings)
+{
+    // As shown in the start-up summary and risk_app's tables
+    EXPECT_EQ(engine({{"name", "FIXED_SIZE"}, {"quantity", 3}})->describe(), "FIXED_SIZE 3");
+    EXPECT_EQ(engine({{"name", "FIXED_FRACTION"}, {"position_percent", 10}})->describe(), "FIXED_FRACTION 10.0%");
+    EXPECT_EQ(engine({{"name", "RISK_PER_TRADE"}, {"risk_percent", 0.5}})->describe(), "RISK_PER_TRADE 0.50%");
+    EXPECT_NE(engine({{"name", "VOLATILITY_TARGET"}, {"daily_volatility_percent", 1.0}})->describe().find("VOLATILITY_TARGET"),
+              std::string::npos);
+    EXPECT_EQ(engine({{"name", "KELLY"}, {"kelly_fraction", 0.5}, {"lookback_trades", 50}, {"min_trades", 20},
+                      {"starting_percent", 5}})->describe(),
+              "KELLY x0.50 (last 50 trades, 5.0% until 20)");
+}
+
+TEST(RiskEngineTests, TheFactoryKnowsEveryEngine)
+{
+    std::vector<std::string> names = RiskEngineFactory::names();
+    for (const char* name : {"FIXED_SIZE", "FIXED_FRACTION", "RISK_PER_TRADE", "VOLATILITY_TARGET", "KELLY"})
+    {
+        EXPECT_NE(std::find(names.begin(), names.end(), name), names.end()) << name;
+        EXPECT_NO_THROW(engine({{"name", name}})) << name;
+    }
+}

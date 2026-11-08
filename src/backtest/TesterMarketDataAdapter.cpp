@@ -21,43 +21,6 @@ TesterMarketDataAdapter::initialize(MarketData& marketDataInstance)
 }
 
 void 
-TesterMarketDataAdapter::loadHistoricalData(const json& configData, const std::string& startDate, const std::string& endDate)
-{
-    validateMarketData();
-    
-    // Use the MarketData instance to load historical data
-    marketData->processForDateRange(configData, startDate, endDate);
-    
-    // Store the full dataset for our own use
-    fullDataset = marketData->getData();
-    
-    // Reset the index
-    rewind();
-    
-    std::cout << "TesterMarketDataAdapter: Loaded " << fullDataset.size() 
-              << " historical data points from " << startDate << " to " << endDate << std::endl;
-}
-
-void 
-TesterMarketDataAdapter::loadHistoricalDataParallel(const json& configData, int numThreads,
-                                                      const std::string& startDate, const std::string& endDate)
-{
-    validateMarketData();
-    
-    // Use the MarketData instance to load historical data in parallel
-    marketData->processParallel(configData, numThreads, startDate, endDate);
-    
-    // Store the full dataset for our own use
-    fullDataset = marketData->getData();
-    
-    // Reset the index
-    rewind();
-    
-    std::cout << "TesterMarketDataAdapter: Loaded " << fullDataset.size() 
-              << " historical data points using " << numThreads << " threads" << std::endl;
-}
-
-void 
 TesterMarketDataAdapter::loadMockData(const std::vector<MarketCondition>& mockData)
 {
     validateMarketData();
@@ -153,26 +116,6 @@ TesterMarketDataAdapter::getCurrentData() const
     // Return the data point at the previous index (the one we just processed)
     int idx = std::min(currentIndex - 1, static_cast<int>(fullDataset.size() - 1));
     return fullDataset[idx];
-}
-
-bool 
-TesterMarketDataAdapter::reachedEnd() const
-{
-    return static_cast<size_t>(currentIndex + 1) >= fullDataset.size();
-}
-
-void 
-TesterMarketDataAdapter::updateMarketDataWithCurrentPoint()
-{
-    validateMarketData();
-    
-    if (fullDataset.empty() || currentIndex >= static_cast<int>(fullDataset.size())) {
-        return;
-    }
-    
-    // Update with the current data point
-    std::vector<MarketCondition> currentData = { fullDataset[currentIndex] };
-    marketData->update(currentData);
 }
 
 void 
