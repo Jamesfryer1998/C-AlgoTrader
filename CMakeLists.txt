@@ -46,6 +46,14 @@ FetchContent_MakeAvailable(ixwebsocket)
 # Our warning flags are set AFTER fetching third-party code so -Werror only applies to our code.
 set(CMAKE_CXX_FLAGS "-g -Wall -Werror -Wextra -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-lambda-capture")
 
+# Test coverage: cmake -B build-coverage -DENABLE_COVERAGE=ON, then ./run_coverage.sh (see it for the report)
+option(ENABLE_COVERAGE "Build with coverage counters for the unit tests" OFF)
+if(ENABLE_COVERAGE)
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)   # optimised code hides lines from the counts
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -O0")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+endif()
+
 # Setup CMAKE Module path for other conda packages
 SET(CMAKE_MODULE_PATH $ENV{$CONDA_PREFIX}/lib/cmake)
 if(DEFINED ENV{CONDA_PREFIX} AND NOT DEFINED ENV{CONDA_BUILD})
