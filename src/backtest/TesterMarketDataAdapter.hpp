@@ -23,22 +23,6 @@ public:
     void initialize(MarketData& marketDataInstance);
     
     /**
-     * Load historical data for backtesting
-     * @param configData Configuration for data loading
-     * @param startDate Start date for backtest data range
-     * @param endDate End date for backtest data range
-     */
-    void loadHistoricalData(const json& configData, const std::string& startDate, const std::string& endDate);
-    
-    /**
-     * Load parallel historical data for backtesting (multi-threaded)
-     * @param configData Configuration for data loading
-     * @param numThreads Number of threads to use for processing
-     */
-    void loadHistoricalDataParallel(const json& configData, int numThreads,
-                                    const std::string& startDate = "", const std::string& endDate = "");
-    
-    /**
      * Load mock data for backtesting (primarily for testing)
      * @param mockData Vector of market conditions to use for backtesting
      */
@@ -81,20 +65,11 @@ public:
      * @return Current market condition
      */
     MarketCondition getCurrentData() const;
-    
-    /**
-     * Check if we've reached the end of the dataset
-     * @return true if at the last data point, false otherwise
-     */
-    bool reachedEnd() const;
 
 private:
     MarketData* marketData;      // Reference to the wrapped MarketData instance
     std::vector<MarketCondition> fullDataset;  // Complete historical dataset
     int currentIndex;            // Current position in the dataset
-    
-    // Apply the current data point to the MarketData instance
-    void updateMarketDataWithCurrentPoint();
     
     // Helper methods
     void validateMarketData() const;

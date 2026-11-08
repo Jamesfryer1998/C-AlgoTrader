@@ -187,7 +187,6 @@ public:
         // Get the complete dataset from the adapter
         std::vector<MarketCondition> mockData = mockAdapter->getFullDataset();
         tester->setMarketData(mockData);
-        tester->useDirectMarketData(true);
     }
 };
 

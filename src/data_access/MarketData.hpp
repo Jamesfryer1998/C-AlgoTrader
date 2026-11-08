@@ -1,10 +1,6 @@
 #pragma once
 #include "CSVParser.hpp"
-#include "DataStitcher.hpp"
 #include "../util/Config.hpp"
-#include <chrono>
-#include <future>
-#include <thread>
 
 using namespace std;
 
@@ -19,22 +15,6 @@ class MarketData
     public:
         MarketData();
         ~MarketData();
-        
-        /**
-         * Process market data for a specific date range
-         * @param configData Configuration for data processing
-         * @param startDate Start date for the data range
-         * @param endDate End date for the data range
-         */
-        void processForDateRange(json configData, const std::string& startDate, const std::string& endDate);
-        
-        /**
-         * Process market data in parallel for improved performance
-         * @param configData Configuration for data processing
-         * @param numThreads Number of threads to use (0 = auto)
-         */
-        void processParallel(json configData, int numThreads = 0,
-                             const std::string& startDate = "", const std::string& endDate = "");
         
         /**
          * Load data from a specific file
@@ -62,19 +42,6 @@ class MarketData
         const std::vector<MarketCondition>& getData() const;
         
         /**
-         * Generate file path for data based on configuration
-         * @param configData Configuration data
-         * @return File path string
-         */
-        string generateFilePath(json configData);
-        
-        /**
-         * Get project root directory
-         * @return Path to project root
-         */
-        string getProjectRoot();
-        
-        /**
          * Get the last (most recent) close price
          * @return Close price as float
          */
@@ -88,7 +55,4 @@ class MarketData
 
     private:
         std::vector<MarketCondition> data;
-        
-        // Helper methods
-        std::string getDataDirectory();
 };

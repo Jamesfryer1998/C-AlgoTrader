@@ -1,18 +1,15 @@
 #include "StrategyTester.hpp"
 #include "../util/Log.hpp"
-#include "../util/MarketTime.hpp"
 #include <cmath>
 #include <numeric>
 #include <iomanip>
 #include "../risk/RiskEngineFactory.hpp"
 #include "../util/Defaults.hpp"
-#include "../util/SaveData.hpp"
 
 namespace
 {
     const double PERCENT = 100.0;
     const double CENT = 0.01;                  // P&L figures closer than this agree
-    const char* const TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S";
 }
 
 StrategyTester::StrategyTester(const json& algoConfig)
@@ -22,9 +19,6 @@ StrategyTester::StrategyTester(const json& algoConfig)
           stratEngine(),
           algoConfig(algoConfig),
           detailedLogging(false),
-          resultsFilename(""),
-          numThreads(0), // 0 means use all available cores
-          useDirectData(false),
           periodsPerYear(algoConfig.value("bars_per_year", PerformanceTracker::MINUTE_BARS_PER_YEAR))
 {
     // Initialize the performance metrics
@@ -38,13 +32,6 @@ StrategyTester::StrategyTester(const json& algoConfig)
     broker.setCommission(Defaults::COMMISSION_PER_TRADE);
     broker.setSlippage(Defaults::SLIPPAGE);
     broker.followLatestBar(true);   // the broker trades on the newest bar of the rolling window
-
-    // Default date range: the last few days (thread-safe; many Backtesters may be created at once)
-    std::time_t now = std::time(nullptr);
-    endDate = MarketTime::datePart(MarketTime::toNewYorkTime(now));
-    startDate = MarketTime::datePart(MarketTime::toNewYorkTime(now - Defaults::BACKTEST_DAYS * MarketTime::SECONDS_PER_DAY));
-    
-    Log::out() << "Default date range: " << startDate << " to " << endDate << std::endl;
 }
 
 void StrategyTester::setStartingCapital(double capital) {
@@ -73,20 +60,6 @@ void StrategyTester::enableDetailedLogging(bool enable) {
     detailedLogging = enable;
 }
 
-void StrategyTester::saveResultsToFile(const std::string& filename) {
-    resultsFilename = filename;
-}
-
-void StrategyTester::setDateRange(const std::string& start, const std::string& end) {
-    startDate = start;
-    endDate = end;
-    Log::out() << "Set backtest date range: " << startDate << " to " << endDate << std::endl;
-}
-
-void StrategyTester::setNumThreads(int threads) {
-    numThreads = threads;
-}
-
 void StrategyTester::setMarketData(std::vector<MarketCondition>& mockData) {
     Log::out() << "Setting mock market data with " << mockData.size() << " data points" << std::endl;
     
@@ -99,9 +72,6 @@ void StrategyTester::setMarketData(std::vector<MarketCondition>& mockData) {
     // Load the mock data into the adapter
     marketDataAdapter.loadMockData(mockData);
     
-    // Auto-enable direct data mode when mock data is provided
-    useDirectData = true;
-    
     Log::out() << "Verified market data size: " << marketDataAdapter.getDataSize() << " data points" << std::endl;
     if (marketDataAdapter.getDataSize() > 0) {
         MarketCondition firstPoint = marketDataAdapter.getCurrentData();
@@ -110,34 +80,15 @@ void StrategyTester::setMarketData(std::vector<MarketCondition>& mockData) {
     Log::out() << "Current index: " << marketDataAdapter.getCurrentIndex() << std::endl;
 }
 
-void StrategyTester::useDirectMarketData(bool useDirect) {
-    useDirectData = useDirect;
-}
-
 void 
 StrategyTester::run() 
 {
-    std::cout << "Starting backtest from " << startDate << " to " << endDate << "..." << std::endl;
-    
-    // Only process market data if not using direct data mode
-    if (!useDirectData) {
-        // Process market data with date range and parallel processing
-        if (numThreads > 0) {
-            std::cout << "Using " << numThreads << " threads for processing" << std::endl;
-            marketDataAdapter.loadHistoricalDataParallel(algoConfig, numThreads, startDate, endDate);
-        } else {
-            std::cout << "Using all available cores for processing" << std::endl;
-            marketDataAdapter.loadHistoricalData(algoConfig, startDate, endDate);
-        }
-    } else {
-        std::cout << "Using directly provided market data (" << marketDataAdapter.getDataSize() << " data points)" << std::endl;
-    }
-    
-    // Verify we have data before proceeding
+    // Runs on the bars given to setMarketData
     if (marketDataAdapter.getDataSize() == 0) {
-        std::cerr << "ERROR: No market data available for backtesting. Exiting run()." << std::endl;
+        std::cerr << "ERROR: No market data available for backtesting: call setMarketData first." << std::endl;
         return;
     }
+    std::cout << "Starting backtest on " << marketDataAdapter.getDataSize() << " bars..." << std::endl;
     
     runOn(marketDataAdapter.getFullDataset());
 }
@@ -164,7 +115,7 @@ StrategyTester::runOn(const std::vector<MarketCondition>& bars)
 
     // Warm-up bars only build the strategies' history
     for (size_t i = 0; i < warmupBars; i++)
-        marketData.addBar(bars[i], windowBars);
+        marketData.addBar(bars[i], WINDOW_BARS);
     equityCurve.push_back({bars[warmupBars].DateTime, broker.getCurrentEquity()});
 
     Log::out() << "Processing " << bars.size() - warmupBars << " market data points" << std::endl;
@@ -183,9 +134,6 @@ StrategyTester::runOn(const std::vector<MarketCondition>& bars)
 
     if (Log::verbose)
         printReport();
-
-    if (!resultsFilename.empty())
-        saveResults();
 
     Log::out() << "Backtest completed in " << metrics.executionTime.count() << " seconds" << std::endl;
 }
@@ -206,8 +154,8 @@ StrategyTester::initializeBacktest()
 void
 StrategyTester::executeTimeStep(const MarketCondition& bar)
 {
-    // 1. The new bar arrives (strategies see the newest windowBars bars, like live trading)
-    marketData.addBar(bar, windowBars);
+    // 1. The new bar arrives (strategies see the newest WINDOW_BARS bars, like live trading)
+    marketData.addBar(bar, WINDOW_BARS);
     Log::out() << "StrategyTester time step: " << bar.DateTime << std::endl;
 
     // 2. Strategies vote; the risk engine sizes an agreed order, which goes through the risk checks to the
@@ -326,74 +274,10 @@ StrategyTester::printReport()
     std::cout << "\n============================\n" << std::endl;
 }
 
-void 
-StrategyTester::saveResults() 
-{
-    std::ofstream outFile(resultsFilename);
-    
-    if (!outFile) {
-        std::cerr << "Error: Unable to open file " << resultsFilename << " for writing." << std::endl;
-        return;
-    }
-    
-    // Write header
-    outFile << "Backtest Results - " << getCurrentTimestamp() << "\n\n";
-    
-    // General information
-    outFile << "Starting capital: " << formatCurrency(metrics.startingCapital) << "\n";
-    outFile << "Final equity: " << formatCurrency(metrics.finalEquity) << "\n";
-    outFile << "Total P&L: " << formatCurrency(metrics.totalPnL) 
-            << " (" << formatPercent(metrics.totalPnLPercent) << "%)\n";
-    outFile << "Realised P&L: " << formatCurrency(metrics.realisedPnL) << "\n";
-    outFile << "Unrealised P&L: " << formatCurrency(metrics.unrealisedPnL) << "\n";
-    outFile << "Commission: " << formatCurrency(metrics.commissionPaid) << "\n";
-    outFile << "Execution time: " << metrics.executionTime.count() << " seconds\n\n";
-    
-    // Performance metrics
-    outFile << "Performance metrics:\n";
-    outFile << "- Sharpe ratio: " << std::fixed << std::setprecision(2) << metrics.sharpeRatio << "\n";
-    outFile << "- Max drawdown: " << formatPercent(metrics.maxDrawdownPercent) << "%\n";
-    outFile << "- Annualized return: " << formatPercent(metrics.annualizedReturn) << "%\n\n";
-    
-    // Trade statistics
-    outFile << "Trade statistics:\n";
-    outFile << "- Total trades: " << metrics.numTrades << "\n";
-    outFile << "- Winning trades: " << metrics.winningTrades 
-            << " (" << formatPercent(metrics.winRate) << "%)\n";
-    outFile << "- Losing trades: " << metrics.losingTrades << "\n";
-    outFile << "- Average win: " << formatCurrency(metrics.avgWin) << "\n";
-    outFile << "- Average loss: " << formatCurrency(metrics.avgLoss) << "\n";
-    outFile << "- Profit factor: " << std::fixed << std::setprecision(2) << metrics.profitFactor << "\n\n";
-    
-    // Write equity curve
-    outFile << "Equity Curve:\n";
-    outFile << "Timestamp,Equity\n";
-    
-    for (const auto& point : equityCurve) {
-        outFile << point.first << "," << point.second << "\n";
-    }
-    
-    outFile.close();
-    SaveData::saved(resultsFilename);
-    
-    std::cout << "Results saved to " << resultsFilename << std::endl;
-}
-
 const PerformanceMetrics& 
 StrategyTester::getPerformanceMetrics() const 
 {
     return metrics;
-}
-
-std::string 
-StrategyTester::getCurrentTimestamp() const 
-{
-    auto now = std::chrono::system_clock::now();
-    auto in_time_t = std::chrono::system_clock::to_time_t(now);
-    
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&in_time_t), TIMESTAMP_FORMAT);
-    return ss.str();
 }
 
 std::string 

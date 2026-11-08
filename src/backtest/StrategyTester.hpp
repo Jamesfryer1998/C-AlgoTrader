@@ -60,9 +60,7 @@ public:
      */
     StrategyTester(const json& algoConfig);
 
-    /**
-     * Run the backtest simulation
-     */
+    // Run the backtest on the bars given to setMarketData
     void run();
 
     /**
@@ -71,9 +69,6 @@ public:
      * Strategies see a rolling window of the newest bars, exactly like live trading.
      */
     void runOn(const std::vector<MarketCondition>& bars);
-
-    // Bars kept in memory for strategies (default 1000; strategies only look back a fixed amount)
-    void setWindowBars(size_t bars) { windowBars = bars; }
 
     // The first `bars` bars passed to runOn only fill the strategies' history: no decisions, no trades,
     // not counted in the results. Lets a test period start with strategies already warmed up.
@@ -96,15 +91,10 @@ public:
     void setSlippagePercentage(double slippage);
     // Capital, commission and slippage together (slippage always against us, as in live trading)
     void useCosts(const TradingCosts& costs);
-    void setDataTimeframe(const std::string& timeframe);
     void enableDetailedLogging(bool enable);
-    void saveResultsToFile(const std::string& filename);
-    void setDateRange(const std::string& startDate, const std::string& endDate);
-    void setNumThreads(int threads);
-    
-    // Testing support
+
+    // The bars run() backtests on, oldest first
     void setMarketData(std::vector<MarketCondition>& mockData);
-    void useDirectMarketData(bool useDirect);
     
     // Result access methods
     const PerformanceMetrics& getPerformanceMetrics() const;
@@ -119,15 +109,12 @@ private:
     OrderManagement oms;                      // Risk checks, then the simulated broker
     std::unique_ptr<RiskEngine> risk;         // How many shares each order is for (config "risk")
     
+    // Bars kept in memory for strategies (they only look back a fixed amount)
+    static constexpr size_t WINDOW_BARS = 1000;
+
     // Configuration
     json algoConfig;
     bool detailedLogging;
-    std::string resultsFilename;
-    std::string startDate;
-    std::string endDate;
-    int numThreads;
-    bool useDirectData;
-    size_t windowBars = 1000;
     size_t warmupBars = 0;
     double periodsPerYear;                    // bars in a year, for Sharpe: config "bars_per_year" (default 1-minute bars)
     bool keepCurve = true;
@@ -145,12 +132,10 @@ private:
     void logPerformance();
     void calculateMetrics();
     void printReport();
-    void saveResults();
     
     void recordNewFills();
     
     // Utility methods
-    std::string getCurrentTimestamp() const;
     std::string formatCurrency(double amount) const;
     std::string formatPercent(double percentage) const;
 };
