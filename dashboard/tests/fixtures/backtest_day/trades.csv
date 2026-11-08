@@ -1,0 +1,34 @@
+our_id,time,sent_at_utc,strategy,ticker,side,type,order_class,quantity,price,stop_loss,take_profit,status,broker_status,client_order_id,broker_order_id,round_trip_ms,note
+1,2026-10-29 09:30:00,2026-11-08T21:27:40.501Z,MEANREV,KO,buy,BUY,simple,1.0000,160.0551,158.4545,163.2562,sent,accepted,algo-1-1794173260,sim-1,0.0,
+2,2026-10-29 09:33:00,2026-11-08T21:27:40.501Z,broker,KO,sell,SELL,,1.0000,158.2763,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had 1 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+3,2026-10-29 09:49:00,2026-11-08T21:27:40.502Z,MEANREV,KO,sell,SELL,simple,1.0000,159.0414,160.6318,155.8606,sent,accepted,algo-3-1794173260,sim-3,0.0,
+4,2026-10-29 09:50:00,2026-11-08T21:27:40.502Z,SCALP,AAPL,buy,BUY,simple,1.0000,63.2421,62.9259,63.8745,sent,accepted,algo-4-1794173260,sim-4,0.0,
+5,2026-10-29 09:57:00,2026-11-08T21:27:40.502Z,broker,AAPL,sell,SELL,,1.0000,62.7801,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had 1 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+6,2026-10-29 10:00:00,2026-11-08T21:27:40.502Z,SCALP,AAPL,buy,BUY,simple,1.0000,62.8087,62.4947,63.4368,sent,accepted,algo-6-1794173260,sim-6,0.0,
+7,2026-10-29 10:10:00,2026-11-08T21:27:40.504Z,SCALP,AAPL,sell,SELL,simple,1.0000,63.0716,63.3870,62.4409,sent,accepted,algo-7-1794173260,sim-7,0.0,
+8,2026-10-29 10:14:00,2026-11-08T21:27:40.505Z,SCALP,AAPL,buy,BUY,simple,1.0000,62.3536,62.0418,62.9771,sent,accepted,algo-8-1794173260,sim-8,0.0,
+9,2026-10-29 10:15:00,2026-11-08T21:27:40.505Z,broker,KO,buy,BUY,,1.0000,155.0686,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had -1 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+10,2026-10-29 10:20:00,2026-11-08T21:27:40.506Z,broker,AAPL,sell,SELL,,1.0000,63.0446,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had 1 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+11,2026-10-29 10:24:00,2026-11-08T21:27:40.507Z,SCALP,AAPL,buy,BUY,simple,1.0000,62.3122,62.0006,62.9353,sent,accepted,algo-11-1794173260,sim-11,0.0,
+12,2026-10-29 10:31:00,2026-11-08T21:27:40.507Z,broker,AAPL,sell,SELL,,1.0000,61.9811,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had 1 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+13,2026-10-29 10:42:00,2026-11-08T21:27:40.508Z,SCALP,AAPL,buy,BUY,simple,1.0000,61.7544,61.4456,62.3719,sent,accepted,algo-13-1794173260,sim-13,0.0,
+14,2026-10-29 10:45:00,2026-11-08T21:27:40.508Z,RSI,PEP,buy,BUY,simple,1.0000,239.5534,237.1579,244.3445,sent,accepted,algo-14-1794173260,sim-14,0.0,
+15,2026-10-29 10:48:00,2026-11-08T21:27:40.508Z,RSI,PEP,buy,BUY,simple,1.0000,239.4792,237.0844,244.2688,sent,accepted,algo-15-1794173260,sim-15,0.0,
+16,2026-10-29 10:52:00,2026-11-08T21:27:40.509Z,SCALP,AAPL,sell,SELL,simple,1.0000,62.4401,62.7523,61.8157,sent,accepted,algo-16-1794173260,sim-16,0.0,
+17,2026-10-29 10:54:00,2026-11-08T21:27:40.509Z,SCALP,AAPL,buy,BUY,simple,1.0000,61.4581,61.1508,62.0727,sent,accepted,algo-17-1794173260,sim-17,0.0,
+18,2026-10-29 10:55:00,2026-11-08T21:27:40.509Z,broker,AAPL,sell,SELL,,1.0000,62.0760,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had 1 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+19,2026-10-29 11:00:00,2026-11-08T21:27:40.509Z,SCALP,AAPL,buy,BUY,simple,1.0000,61.3400,61.0333,61.9534,sent,accepted,algo-19-1794173260,sim-19,0.0,
+20,2026-10-29 11:06:00,2026-11-08T21:27:40.510Z,broker,PEP,sell,SELL,,2.0000,236.8240,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had 2 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+21,2026-10-29 11:08:00,2026-11-08T21:27:40.510Z,broker,AAPL,sell,SELL,,1.0000,61.0128,0.0000,0.0000,adjustment,,,,0.0,broker holds 0 but our records had 1 (e.g. a stop loss / take profit filled at the broker; or trades from before records were kept)
+22,2026-10-29 11:30:00,2026-11-08T21:27:40.511Z,SCALP,AAPL,buy,BUY,simple,1.0000,60.1814,59.8805,60.7832,sent,accepted,algo-22-1794173260,sim-22,0.0,
+23,2026-10-29 11:40:00,2026-11-08T21:27:40.512Z,SCALP,AAPL,sell,SELL,simple,1.0000,60.8659,61.1702,60.2572,sent,accepted,algo-23-1794173260,sim-23,0.0,
+24,2026-10-29 13:34:00,2026-11-08T21:27:40.518Z,MEANREV,KO,buy,BUY,simple,1.0000,147.3444,145.8710,150.2913,sent,accepted,algo-24-1794173260,sim-24,0.0,
+25,2026-10-29 13:35:00,2026-11-08T21:27:40.518Z,MEANREV,KO,sell,SELL,simple,1.0000,149.8225,151.3207,146.8260,sent,accepted,algo-25-1794173260,sim-25,0.0,
+26,2026-10-29 13:57:00,2026-11-08T21:27:40.520Z,MEANREV,KO,sell,SELL,simple,1.0000,149.9761,151.4759,146.9766,sent,accepted,algo-26-1794173260,sim-26,0.0,
+27,2026-10-29 13:58:00,2026-11-08T21:27:40.520Z,MEANREV,KO,buy,BUY,simple,1.0000,148.5917,147.1058,151.5635,sent,accepted,algo-27-1794173260,sim-27,0.0,
+28,2026-10-29 14:05:00,2026-11-08T21:27:40.520Z,MEANREV,KO,sell,SELL,simple,1.0000,150.3658,151.8695,147.3585,sent,accepted,algo-28-1794173260,sim-28,0.0,
+29,2026-10-29 14:06:00,2026-11-08T21:27:40.520Z,MEANREV,KO,buy,BUY,simple,1.0000,148.2315,146.7492,151.1961,sent,accepted,algo-29-1794173260,sim-29,0.0,
+30,2026-10-29 14:08:00,2026-11-08T21:27:40.520Z,MEANREV,KO,sell,SELL,simple,1.0000,150.6244,152.1306,147.6119,sent,accepted,algo-30-1794173260,sim-30,0.0,
+31,2026-10-29 14:10:00,2026-11-08T21:27:40.520Z,MEANREV,KO,buy,BUY,simple,1.0000,148.2461,146.7636,151.2110,sent,accepted,algo-31-1794173260,sim-31,0.0,
+32,2026-10-29 15:46:00,2026-11-08T21:27:40.526Z,MEANREV,KO,sell,SELL,simple,1.0000,153.0183,154.5485,149.9579,sent,accepted,algo-32-1794173260,sim-32,0.0,
+33,2026-10-29 15:47:00,2026-11-08T21:27:40.526Z,MEANREV,KO,buy,BUY,simple,1.0000,150.6173,149.1111,153.6296,sent,accepted,algo-33-1794173260,sim-33,0.0,

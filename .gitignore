@@ -7,3 +7,5 @@ TODO.txt
 # Secrets (API keys). Copy .env.example to .env
 .env
 /build-coverage
+__pycache__/
+.pytest_cache/

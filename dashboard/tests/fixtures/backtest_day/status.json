@@ -1,0 +1,213 @@
+{
+  "account": {
+    "available": true,
+    "cash": 100008.95484765626,
+    "equity": 100008.95484765626,
+    "today_pnl": 8.954847656263155
+  },
+  "connected": true,
+  "estimate": {
+    "annualised_return_percent": 2.398822617375207,
+    "avg_loss": -1.65673828125,
+    "avg_win": 1.60826284235174,
+    "cash": 100009.40719985962,
+    "closed_trades": 16,
+    "commission_paid": 0.0,
+    "equity": 100009.40719985962,
+    "fills": 33,
+    "losing_trades": 5,
+    "max_drawdown_percent": 0.00922514609702416,
+    "profit_factor": 2.135628960359564,
+    "realised_pnl": 9.40719985961914,
+    "roi_percent": 0.00940719985961914,
+    "sharpe_ratio": 10.815736199111203,
+    "starting_capital": 100000.0,
+    "total_pnl": 9.40719985961914,
+    "unrealised_pnl": 0.0,
+    "win_rate_percent": 68.75,
+    "winning_trades": 11
+  },
+  "events": [
+    {
+      "text": "Position adjusted to match the broker (KO 1 -> 0) at ~$158.276",
+      "ticker": "KO",
+      "time": "2026-10-29 09:33:00"
+    },
+    {
+      "text": "Position adjusted to match the broker (AAPL 1 -> 0) at ~$62.7801",
+      "ticker": "AAPL",
+      "time": "2026-10-29 09:57:00"
+    },
+    {
+      "text": "Position adjusted to match the broker (KO -1 -> 0) at ~$155.069",
+      "ticker": "KO",
+      "time": "2026-10-29 10:15:00"
+    },
+    {
+      "text": "Position adjusted to match the broker (AAPL 1 -> 0) at ~$63.0446",
+      "ticker": "AAPL",
+      "time": "2026-10-29 10:20:00"
+    },
+    {
+      "text": "Position adjusted to match the broker (AAPL 1 -> 0) at ~$61.9811",
+      "ticker": "AAPL",
+      "time": "2026-10-29 10:31:00"
+    },
+    {
+      "text": "Position adjusted to match the broker (AAPL 1 -> 0) at ~$62.076",
+      "ticker": "AAPL",
+      "time": "2026-10-29 10:55:00"
+    },
+    {
+      "text": "Position adjusted to match the broker (PEP 2 -> 0) at ~$236.824",
+      "ticker": "PEP",
+      "time": "2026-10-29 11:06:00"
+    },
+    {
+      "text": "Position adjusted to match the broker (AAPL 1 -> 0) at ~$61.0128",
+      "ticker": "AAPL",
+      "time": "2026-10-29 11:08:00"
+    }
+  ],
+  "last_bar_received_utc": "2026-11-08T21:27:40Z",
+  "last_bar_time": "2026-10-29 15:59:00",
+  "market_clock": {
+    "known": false
+  },
+  "pid": 1636,
+  "run": {
+    "account": "simulated, $100,000.00 to start, 0.01% slippage a fill, SEC and FINRA fees on sells",
+    "backtest": true,
+    "bars": "saved 1-minute bars, 2026-10-29 (390 minutes), as fast as possible",
+    "market": "",
+    "mode": "BACKTEST with a simulated broker: nothing is sent to Alpaca",
+    "records": "data/backtest/2026-10-29",
+    "risk": "FIXED_SIZE 1",
+    "started_utc": "2026-11-08T21:27:40Z",
+    "starting_capital": 100000.0,
+    "stocks": [
+      {
+        "backfilled": 60,
+        "bars_needed": 60,
+        "strategies": [
+          {
+            "active": 1,
+            "entry_threshold": 2.0,
+            "exit_threshold": 0.0,
+            "lookback_period": 60,
+            "moving_average_period": 20,
+            "name": "MEANREV",
+            "stop_loss": 1,
+            "take_profit": 2
+          }
+        ],
+        "ticker": "KO"
+      },
+      {
+        "backfilled": 14,
+        "bars_needed": 14,
+        "strategies": [
+          {
+            "active": 1,
+            "name": "RSI",
+            "overbought_threshold": 70,
+            "oversold_threshold": 30,
+            "period": 14,
+            "stop_loss": 1,
+            "take_profit": 2
+          }
+        ],
+        "ticker": "PEP"
+      },
+      {
+        "backfilled": 391,
+        "bars_needed": 391,
+        "strategies": [
+          {
+            "active": 1,
+            "entry_threshold": 2.0,
+            "exit_threshold": 0.0,
+            "max_hold_bars": 10,
+            "name": "SCALP",
+            "stop_loss": 0.5,
+            "take_profit": 1.0
+          }
+        ],
+        "ticker": "AAPL"
+      }
+    ]
+  },
+  "state": "stopped",
+  "stocks": [
+    {
+      "decision_ms": 0.000318,
+      "position": {
+        "avg_price": 0.0,
+        "market_value": 0.0,
+        "quantity": 0.0,
+        "unrealised_fraction": 0.0,
+        "unrealised_pnl": 0.0
+      },
+      "price": 61.1432991027832,
+      "strategies": [
+        {
+          "current": "61.14",
+          "label": "SCALP",
+          "lower": "58.52",
+          "ready": true,
+          "state": "flat, VWAP 60.92 (entries 09:45-15:45)",
+          "upper": "63.32"
+        }
+      ],
+      "ticker": "AAPL",
+      "time": "2026-10-29 15:59:00"
+    },
+    {
+      "decision_ms": 0.000222,
+      "position": {
+        "avg_price": 0.0,
+        "market_value": 0.0,
+        "quantity": 0.0,
+        "unrealised_fraction": 0.0,
+        "unrealised_pnl": 0.0
+      },
+      "price": 152.5283966064453,
+      "strategies": [
+        {
+          "current": "152.53",
+          "label": "MEANREV(20/60)",
+          "lower": "150.06",
+          "ready": true,
+          "state": "flat, z +1.36",
+          "upper": "153.00"
+        }
+      ],
+      "ticker": "KO",
+      "time": "2026-10-29 15:59:00"
+    },
+    {
+      "decision_ms": 0.000936,
+      "position": {
+        "avg_price": 0.0,
+        "market_value": 0.0,
+        "quantity": 0.0,
+        "unrealised_fraction": 0.0,
+        "unrealised_pnl": 0.0
+      },
+      "price": 236.3383026123047,
+      "strategies": [
+        {
+          "current": "54.36",
+          "label": "RSI(14)",
+          "lower": "30.00",
+          "ready": true,
+          "state": "",
+          "upper": "70.00"
+        }
+      ],
+      "ticker": "PEP",
+      "time": "2026-10-29 15:59:00"
+    }
+  ],
+  "updated_utc": "2026-11-08T21:27:40Z"
+}
