@@ -1,5 +1,6 @@
 #include "AlpacaBroker.hpp"
 #include "AlpacaApi.hpp"
+#include "../util/Log.hpp"
 #include "../util/MarketTime.hpp"
 
 #include <chrono>
@@ -12,6 +13,8 @@
 
 namespace
 {
+    const std::string UNKNOWN_STATUS = "?";
+
     // <data url>/v2/stocks/<SYMBOL>/trades/latest
     const std::string LATEST_TRADE_PATH = "/trades/latest";
     const int HTTP_FORBIDDEN = 403;
@@ -89,13 +92,23 @@ AlpacaBroker::connect()
         return 0;
     }
 
-    std::cout << "Connected to Alpaca (" << tradingUrl << ")"
+    connectedAccount.status = result.body.value("status", UNKNOWN_STATUS);
+    connectedAccount.cash = AlpacaApi::numberField(result.body, "cash");
+    connectedAccount.buyingPower = AlpacaApi::numberField(result.body, "buying_power");
+
+    Log::detail() << "Connected to Alpaca (" << tradingUrl << ")"
               << "\n  - Account status: " << result.body.value("status", "?")
               << "\n  - Cash:           $" << result.body.value("cash", "?")
               << "\n  - Buying power:   $" << result.body.value("buying_power", "?")
               << (dryRun ? "\n  - DRY RUN: orders will be printed, not sent" : "")
               << std::endl;
     return 1;
+}
+
+bool
+AlpacaBroker::isPaper() const
+{
+    return tradingUrl == AlpacaApi::PAPER_TRADING_URL;
 }
 
 int

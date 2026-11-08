@@ -32,7 +32,7 @@ OrderValidator::setParams(json configData)
         throw std::runtime_error("Error: Invalid config data - " + std::string(e.what()));
     }
 
-    Log::out() << "  --> Params set: " 
+    Log::detail() << "  --> Params set: " 
                 << "maxPositionSize=" << (maxPositionSize == NO_SHARE_LIMIT ? std::string("none (sized by the risk engine)")
                                                                           : std::to_string(static_cast<int>(maxPositionSize))) << ", "
                 << "maxExposure=" << maxExposure << ", "

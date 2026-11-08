@@ -1,4 +1,5 @@
 #include "AlpacaStream.hpp"
+#include "../util/Log.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -77,11 +78,17 @@ AlpacaStream::history(const std::string& ticker, int count)
         bars.push_back(AlpacaApi::parseMinuteBar(bar, ticker));
 
     std::reverse(bars.begin(), bars.end()); // We asked for newest first, strategies want oldest first
-    std::cout << "Back-filled " << bars.size() << " of " << count << " recent " << ticker << " bars from Alpaca" << std::endl;
-    if (static_cast<int>(bars.size()) < count)
-        std::cerr << "WARNING - Only " << bars.size() << " bars available; strategies needing more will "
-                  << "start deciding once enough live bars arrive" << std::endl;
+    Log::detail() << "Back-filled " << bars.size() << " of " << count << " recent " << ticker << " bars from Alpaca" << std::endl;
     return bars;
+}
+
+// e.g. "Alpaca's IEX stream, 1-minute bars"
+std::string
+AlpacaStream::describe() const
+{
+    std::string name = feed;
+    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+    return "Alpaca's " + name + " stream, 1-minute bars";
 }
 
 void
@@ -97,7 +104,7 @@ AlpacaStream::start(BarHandler onBar, std::function<void()>)
     std::string names;
     for (const auto& s : symbols)
         names += (names.empty() ? "" : ", ") + s;
-    std::cout << "Connecting to " << streamUrl << " for " << names << " 1-minute bars..." << std::endl;
+    Log::detail() << "Connecting to " << streamUrl << " for " << names << " 1-minute bars..." << std::endl;
     socket.start();
 }
 
@@ -113,7 +120,7 @@ AlpacaStream::onMessage(const ix::WebSocketMessagePtr& msg)
     switch (msg->type)
     {
         case ix::WebSocketMessageType::Open:
-            std::cout << "Stream connected" << std::endl;
+            Log::detail() << "Stream connected" << std::endl;
             break;
 
         case ix::WebSocketMessageType::Close:
@@ -167,11 +174,13 @@ AlpacaStream::handleAlpacaMessage(const json& message)
         // Step 2: ask for 1-minute bars for every ticker
         json subscribe = {{"action", "subscribe"}, {"bars", symbols}};
         socket.send(subscribe.dump());
-        std::cout << "Stream authenticated, subscribing to " << symbols.size() << " ticker(s)" << std::endl;
+        Log::detail() << "Stream authenticated, subscribing to " << symbols.size() << " ticker(s)" << std::endl;
     }
     else if (type == SUBSCRIPTION_MESSAGE)
     {
-        std::cout << "Subscribed: " << message.dump() << std::endl;
+        Log::detail() << "Subscribed: " << message.dump() << std::endl;
+        std::cout << "Streaming " << message.value("bars", json::array()).size()
+                  << " stock(s): waiting for the next minute's bars..." << std::endl;
     }
     else if (type == ERROR_MESSAGE)
     {

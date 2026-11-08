@@ -29,4 +29,7 @@ class BarFeed
         // reaching its last minute; a live stream never does).
         virtual void start(BarHandler onBar, std::function<void()> onFinished) = 0;
         virtual void stop() = 0;
+
+        // Where the bars come from, for the start-up summary, e.g. "Alpaca's IEX stream, 1-minute bars"
+        virtual std::string describe() const = 0;
 };

@@ -27,6 +27,12 @@ class StockLane
         // e.g. "MEANREV" or "RSI, MACD"
         std::string strategyNames() const;
 
+        // The settings of each strategy it runs, from config/strategy.json
+        json activeStrategies() const;
+
+        // How many bars backfill() was given (barsNeeded() asked for)
+        size_t backfilledBars() const { return backfilled; }
+
         // The most bars any of its strategies needs before it can decide
         int barsNeeded() const { return engine.barsNeeded(); }
 
@@ -60,4 +66,5 @@ class StockLane
         StrategyEngine engine;
         std::unique_ptr<RiskEngine> risk;
         size_t barsToKeep = 1;
+        size_t backfilled = 0;
 };

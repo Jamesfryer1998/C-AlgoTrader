@@ -115,7 +115,7 @@ SimulatedBroker::process()
 int
 SimulatedBroker::connect()
 {
-    Log::out() << "Connected to simulated broker with $" << startingCapital << " capital" << std::endl;
+    Log::detail() << "Connected to simulated broker with $" << startingCapital << " capital" << std::endl;
     return 1;
 }
 

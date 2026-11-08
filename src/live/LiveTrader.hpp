@@ -81,6 +81,8 @@ class LiveTrader
         bool connectBroker();
         void backfillLanes();
         void openRecords();
+        void printStartup();
+        std::string describeRecords() const;
 
         // Running
         void startFeed();

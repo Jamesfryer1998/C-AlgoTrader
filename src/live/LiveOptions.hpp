@@ -19,6 +19,7 @@ struct LiveOptions
 
     bool showHelp = false;
     bool quiet = false;    // --quiet: no start-up notes or minute tables, just the recap at the end
+    bool verbose = false;  // --verbose: also each start-up step (files loaded, connections, back-fill)
     bool silent = false;   // nothing at all (risk_app runs many backtests and prints its own table)
     bool backtest = false;
     std::string backtestDay;   // empty: the latest day saved for every stock

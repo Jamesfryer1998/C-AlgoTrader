@@ -84,9 +84,26 @@ AlpacaSession::recordsFolder() const
     return alpaca.isDryRun() ? DRY_RUN_FOLDER : LIVE_FOLDER;
 }
 
-// e.g. "New York market opens in 56m (09:30 New York, 14:30 here)"
-void
-AlpacaSession::printMarketHours(std::ostream& out)
+std::string
+AlpacaSession::describeMode() const
+{
+    if (alpaca.isDryRun())
+        return "DRY RUN on Alpaca: orders are printed, not sent";
+    return alpaca.isPaper() ? "LIVE on Alpaca's paper account" : "LIVE on Alpaca, REAL MONEY (" + alpaca.getTradingUrl() + ")";
+}
+
+// e.g. "ACTIVE, cash $98,150.70, buying power $396,385.69"
+std::string
+AlpacaSession::describeAccount() const
+{
+    const AlpacaBroker::AccountStatus& account = alpaca.getConnectedAccount();
+    return account.status + ", cash " + Format::dollars(account.cash) + ", buying power "
+         + Format::dollars(account.buyingPower);
+}
+
+// e.g. "closed, opens in 56m (09:30 New York, 14:30 here)"
+std::string
+AlpacaSession::describeMarketHours()
 {
     std::time_t now = std::time(nullptr);
     AlpacaBroker::MarketClock clock = alpaca.getMarketClock();
@@ -98,13 +115,10 @@ AlpacaSession::printMarketHours(std::ostream& out)
         clock.nextClose = MarketTime::regularCloseAfter(now);
     }
 
-    if (clock.isOpen)
-        out << "New York market is open, closes in " << Format::duration(clock.nextClose - now) << " ("
-            << describe(clock.nextClose, now) << ")";
-    else
-        out << "New York market opens in " << Format::duration(clock.nextOpen - now) << " ("
-            << describe(clock.nextOpen, now) << ")";
-    out << (clock.known ? "" : " - regular hours, holidays not checked") << std::endl;
+    std::string hours = clock.isOpen
+        ? "open, closes in " + Format::duration(clock.nextClose - now) + " (" + describe(clock.nextClose, now) + ")"
+        : "closed, opens in " + Format::duration(clock.nextOpen - now) + " (" + describe(clock.nextOpen, now) + ")";
+    return hours + (clock.known ? "" : " - regular hours, holidays not checked");
 }
 
 void
@@ -152,6 +166,20 @@ std::string
 BacktestSession::recordsFolder() const
 {
     return BACKTEST_FOLDER + firstDay;
+}
+
+std::string
+BacktestSession::describeMode() const
+{
+    return "BACKTEST with a simulated broker: nothing is sent to Alpaca";
+}
+
+// e.g. "simulated, $100,000.00 to start, 0.01% slippage a fill"
+std::string
+BacktestSession::describeAccount() const
+{
+    return "simulated, " + Format::dollars(simulated.getStartingCapital()) + " to start, "
+         + Format::number(simulated.getSlippagePercentage() * PERCENT, 2) + "% slippage a fill";
 }
 
 // The simulated broker prices this bar's orders off its close

@@ -40,8 +40,10 @@ class BrokerSession
         // Where this session's trades, positions and performance are saved, under data/
         virtual std::string recordsFolder() const = 0;
 
-        // Printed at start-up: is the market open, and how long until it opens / closes (live only)
-        virtual void printMarketHours(std::ostream& out) {}
+        // For the start-up summary
+        virtual std::string describeMode() const = 0;      // e.g. "LIVE on Alpaca's paper account"
+        virtual std::string describeAccount() const = 0;   // e.g. "ACTIVE, cash $98,150.70, buying power ..."
+        virtual std::string describeMarketHours() { return ""; }   // e.g. "closed, opens in 56m (...)"; live only
 
         virtual void beforeDecision(const MarketCondition& bar) {}
         virtual void afterDecision() {}
@@ -63,7 +65,9 @@ class AlpacaSession : public BrokerSession
         BrokerBase& broker() override { return alpaca; }
         AccountMonitor& account() override { return *monitor; }
         std::string recordsFolder() const override;
-        void printMarketHours(std::ostream& out) override;
+        std::string describeMode() const override;
+        std::string describeAccount() const override;
+        std::string describeMarketHours() override;
         void printSummary(std::ostream& out, const std::vector<std::string>& tickers) override;
 
     private:
@@ -83,6 +87,8 @@ class BacktestSession : public BrokerSession
         BrokerBase& broker() override { return simulated; }
         AccountMonitor& account() override { return monitor; }
         std::string recordsFolder() const override;
+        std::string describeMode() const override;
+        std::string describeAccount() const override;
         void beforeDecision(const MarketCondition& bar) override;
         void afterDecision() override;
         size_t fills() const override { return simulated.getFilledOrders().size(); }

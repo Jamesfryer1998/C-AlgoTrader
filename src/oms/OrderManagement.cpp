@@ -217,9 +217,11 @@ void OrderManagement::enablePersistence(TradeStore* tradeStore, PerformanceTrack
     for (Position position : store->loadPositions())
         addPosition(position);
 
+    restoredOrders = trades.size();
+    restoredPositions = positions.size();
     if (trades.empty() && positions.empty())
         return;   // a fresh start (e.g. every backtest): nothing to report
-    Log::out() << "Restored " << trades.size() << " order record(s) (" << replayed << " that changed a position) and "
+    Log::detail() << "Restored " << trades.size() << " order record(s) (" << replayed << " that changed a position) and "
               << positions.size() << " position(s) from " << store->getDirectory()
               << ". Next order id: " << latestOrderId << std::endl;
 }

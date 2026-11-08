@@ -63,6 +63,12 @@ Settings live in the `"alpaca"` block of `config/general.json`:
 
 At start-up the app back-fills exactly the bars the active strategies need (the largest of: RSI `period`, MEANREV `lookback_period`/`moving_average_period`, MACD `5 × (long_period + signal_period)`) and keeps that many in memory, so every strategy decides from the first live bar.
 
+It then prints one summary of what it's about to do: the mode (paper, real money, dry run or backtest), the
+account's cash and buying power, when the market opens or closes, where the bars come from, the risk engine and
+its settings, the records restored from the last run, and a table of each stock's strategy, stop, target,
+settings and back-filled bars. Add `--verbose` to also see each step (config files read, connections made,
+bars back-filled).
+
 Outside US market hours, set `"data_feed": "test"` to see bars flowing.
 
 #### Backtest: run the whole app on past days

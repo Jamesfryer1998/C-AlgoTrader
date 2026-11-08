@@ -1,4 +1,5 @@
 #include "BacktestStream.hpp"
+#include "../util/Format.hpp"
 #include "../util/MarketTime.hpp"
 
 #include <algorithm>
@@ -114,6 +115,16 @@ BacktestStream::load()
             return std::find(tickers.begin(), tickers.end(), a.Ticker) < std::find(tickers.begin(), tickers.end(), b.Ticker);
         });
     return !byMinute.empty();
+}
+
+std::string
+BacktestStream::describe() const
+{
+    if (days.empty())
+        return "saved 1-minute bars";
+    return "saved 1-minute bars, " + days.front() + (days.size() > 1 ? " to " + days.back() : std::string())
+         + " (" + std::to_string(minutes()) + " minutes), "
+         + (speed > 0 ? Format::number(speed, 0) + " minutes per second" : std::string("as fast as possible"));
 }
 
 std::vector<MarketCondition>

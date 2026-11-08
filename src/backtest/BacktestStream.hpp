@@ -44,6 +44,9 @@ class BacktestStream : public BarFeed
         const std::vector<std::string>& getDays() const { return days; }
         size_t minutes() const { return byMinute.size(); }
 
+        // e.g. "saved 1-minute bars, 2026-10-27 to 2026-10-29 (1170 minutes), as fast as possible"
+        std::string describe() const override;
+
         // Where a ticker's saved minute bars are: data/minute/<TICKER>/ if it exists, else data/
         static std::string folderFor(const std::string& dataRoot, const std::string& ticker);
 

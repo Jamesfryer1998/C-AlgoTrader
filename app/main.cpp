@@ -39,6 +39,7 @@ int main(int argc, char* argv[])
 
     if (options.quiet)
         Log::verbose = false;   // also hides the broker's and the risk checks' start-up notes
+    Log::details = options.verbose;
 
     std::signal(SIGINT, onStopSignal);   // Ctrl+C
     std::signal(SIGTERM, onStopSignal);  // systemctl stop / kill

@@ -41,7 +41,7 @@ Config::loadConfig()
         }
     }
     configData = merged;
-    Log::out() << "JSON Data: " << configData.dump(4) << std::endl;
+    Log::detail() << "JSON Data: " << configData.dump(4) << std::endl;
     return configData;
 }
 
@@ -54,7 +54,7 @@ Config::loadJson(const std::string& path)
         throw std::runtime_error("Failed to open JSON file: " + path);
     }
 
-    Log::out() << "Loading JSON from: " << path << std::endl;
+    Log::detail() << "Loading JSON from: " << path << std::endl;
 
     json j;
     file >> j;  

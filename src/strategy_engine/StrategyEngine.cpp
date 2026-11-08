@@ -17,7 +17,7 @@ StrategyEngine::~StrategyEngine()
 void 
 StrategyEngine::setUp(json configdata, StrategyFactory &stratFactory, const MarketData &marketdata)
 {    
-    Log::out() << "Setting up Strategy Engine..." << std::endl;
+    Log::detail() << "Setting up Strategy Engine..." << std::endl;
     configData = configdata;
     strategyList = stratFactory.generateStrategies();
     marketData = &marketdata;
@@ -93,11 +93,11 @@ StrategyEngine::agreedOrder(const std::vector<Order>& proposals)
 void
 StrategyEngine::printStategies()
 {
-    Log::out() << "Loaded strategies:" << std::endl;
+    Log::detail() << "Loaded strategies:" << std::endl;
 
     for (auto& strat : strategyList) 
     {
-        Log::out() << "  -> "  << strat->_strategyAttribute.name << std::endl;
+        Log::detail() << "  -> "  << strat->_strategyAttribute.name << std::endl;
     }
 }
 

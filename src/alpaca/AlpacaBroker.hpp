@@ -36,6 +36,17 @@ class AlpacaBroker : public BrokerBase
         Position getLatestPosition(std::string ticker) override;
 
         bool isDryRun() const { return dryRun; }
+        bool isPaper() const;
+        const std::string& getTradingUrl() const { return tradingUrl; }
+
+        // The account as connect() found it, for the start-up summary
+        struct AccountStatus
+        {
+            std::string status;   // e.g. ACTIVE
+            double cash = 0;
+            double buyingPower = 0;
+        };
+        const AccountStatus& getConnectedAccount() const { return connectedAccount; }
 
         // Asks Alpaca whether our last order for this ticker is still waiting to fill
         bool hasPendingOrder(const std::string& ticker) override;
@@ -81,6 +92,7 @@ class AlpacaBroker : public BrokerBase
         std::string dataUrl;
         std::string feed;
         bool dryRun;
+        AccountStatus connectedAccount;
         json lastPosition = json::object();
         std::map<std::string, std::string> pendingOrderIds;   // ticker -> our latest order's Alpaca id
 

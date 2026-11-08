@@ -44,9 +44,15 @@ class OrderManagement
         // Loads anything saved by a previous run straight away. Backtests don't call this.
         void enablePersistence(TradeStore* tradeStore, PerformanceTracker* performanceTracker);
 
+        // What enablePersistence reloaded from the last run
+        size_t getRestoredOrders() const { return restoredOrders; }
+        size_t getRestoredPositions() const { return restoredPositions; }
+
         BrokerBase* broker;
         vector<Order> orders;
         int latestOrderId = 1;
+        size_t restoredOrders = 0;
+        size_t restoredPositions = 0;
         const MarketData* marketData = nullptr; // owned by the caller, not copied
         int latestPositionId = 1;
         OrderValidator validator;

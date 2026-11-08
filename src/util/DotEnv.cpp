@@ -1,4 +1,5 @@
 #include "DotEnv.hpp"
+#include "Log.hpp"
 
 #include <cstdlib>
 #include <fstream>
@@ -63,6 +64,6 @@ DotEnv::load(const std::string& filePath)
             loaded++;
     }
 
-    std::cout << "Loaded " << loaded << " setting(s) from " << filePath << std::endl;
+    Log::detail() << "Loaded " << loaded << " setting(s) from " << filePath << std::endl;
     return loaded;
 }

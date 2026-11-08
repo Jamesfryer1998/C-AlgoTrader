@@ -46,6 +46,7 @@ class AlpacaStream : public BarFeed
 
         std::string getSymbol() const { return symbol; }
         std::string getFeed() const { return feed; }
+        std::string describe() const override;
 
 
     private:

@@ -7,6 +7,7 @@
 #include "../alpaca/AlpacaApi.hpp"
 #include "../alpaca/AlpacaStream.hpp"
 #include "BacktestDownloader.hpp"
+#include "StartupSummary.hpp"
 #include "../backtest/BacktestStream.hpp"
 #include "../util/Config.hpp"
 #include "../util/Defaults.hpp"
@@ -26,6 +27,15 @@ namespace
     // performance.json is rewritten at most this often (a backtest runs many minutes a second); the last
     // figures are always saved at the end
     const std::chrono::seconds PERFORMANCE_SAVE_INTERVAL{1};
+
+    // The start-up summary's labels
+    const std::string MODE_LABEL = "Mode";
+    const std::string ACCOUNT_LABEL = "Account";
+    const std::string MARKET_LABEL = "Market";
+    const std::string BARS_LABEL = "Bars";
+    const std::string RISK_LABEL = "Risk";
+    const std::string RECORDS_LABEL = "Records";
+    const std::string RISK_KEY = "risk";
 
     double millisecondsSince(std::chrono::steady_clock::time_point start)
     {
@@ -66,7 +76,7 @@ LiveTrader::run()
         return 1;
     backfillLanes();
     openRecords();
-    session->printMarketHours(screen());
+    printStartup();
 
     startFeed();
     waitUntilFinished();
@@ -145,11 +155,6 @@ LiveTrader::openFeed()
     if (!stream->load())
         return false;
     const auto& days = stream->getDays();
-    screen() << "\nBACKTEST of " << days.front() << (days.size() > 1 ? " to " + days.back() : std::string())
-              << " (" << stream->minutes() << " minutes) with a simulated broker, "
-              << (options.backtestSpeed > 0 ? Format::number(options.backtestSpeed, 0) + " minutes per second"
-                                          : std::string("as fast as possible"))
-              << ". Nothing is sent to Alpaca." << std::endl;
     session = std::make_unique<BacktestSession>(config, days.front());
     result.firstDay = days.front();
     result.lastDay = days.back();
@@ -174,12 +179,8 @@ LiveTrader::connectBroker()
 void
 LiveTrader::backfillLanes()
 {
-    screen() << "Trading " << lanes.size() << " stock(s), sized by " << lanes.front()->describeRisk() << ":" << std::endl;
     for (auto& lane : lanes)
-    {
-        screen() << "  " << lane->getTicker() << ": " << lane->strategyNames() << std::endl;
         lane->backfill(feed->history(lane->getTicker(), lane->barsNeeded()));
-    }
 }
 
 // Trades and positions from the last run are reloaded (live), then each stock is checked against the broker.
@@ -199,6 +200,36 @@ LiveTrader::openRecords()
         oms.setMarketData(lane->getMarketData());
         oms.syncPosition(lane->getTicker());
     }
+}
+
+// Everything set up above, in one block (StartupSummary)
+void
+LiveTrader::printStartup()
+{
+    StartupSummary summary;
+    summary.add(MODE_LABEL, session->describeMode());
+    summary.add(ACCOUNT_LABEL, session->describeAccount());
+    summary.add(MARKET_LABEL, session->describeMarketHours());
+    summary.add(BARS_LABEL, feed->describe());
+    summary.add(RISK_LABEL, config.contains(RISK_KEY) ? StartupSummary::describeRisk(config[RISK_KEY])
+                                                      : lanes.front()->describeRisk());
+    summary.add(RECORDS_LABEL, describeRecords());
+    for (const auto& lane : lanes)
+        summary.addStock(lane->getTicker(), lane->activeStrategies(), lane->backfilledBars(), lane->barsNeeded());
+    summary.print(screen());
+}
+
+// e.g. "data/live: 43 orders and 5 positions restored"
+std::string
+LiveTrader::describeRecords() const
+{
+    std::string folder = config.value("marketDataBasePath", std::string(Defaults::DATA_FOLDER)) + session->recordsFolder();
+    if (options.backtest)
+        return folder;
+    size_t orders = oms.getRestoredOrders(), positions = oms.getRestoredPositions();
+    if (orders == 0 && positions == 0)
+        return folder + ": starting fresh";
+    return folder + ": " + std::to_string(orders) + " orders and " + std::to_string(positions) + " positions restored";
 }
 
 // ---------- Running ----------
