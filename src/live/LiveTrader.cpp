@@ -1,6 +1,8 @@
 #include "LiveTrader.hpp"
 
 #include <chrono>
+#include <cmath>
+#include <ctime>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -13,6 +15,7 @@
 #include "../util/Defaults.hpp"
 #include "../util/Format.hpp"
 #include "../util/Log.hpp"
+#include "../util/MarketTime.hpp"
 #include "../util/OutputCapture.hpp"
 
 namespace
@@ -38,6 +41,15 @@ namespace
     const std::string RISK_KEY = "risk";
     const std::string STARTING_CAPITAL_KEY = "starting_capital";
 
+    // The dashboard's status: the market clock is asked for again this often (it's an Alpaca request)
+    const std::chrono::minutes MARKET_CLOCK_REFRESH{5};
+    const std::string RUNNING = "running", STOPPING = "stopping", STOPPED = "stopped";
+
+    // Flattening: the closing orders' stop loss and take profit (the risk checks want both; they close
+    // the whole position, so nothing is left for them to protect)
+    const float FLATTEN_PROTECTION_PERCENT = 5;
+    const std::string FLATTEN_STRATEGY = "flatten";
+
     double millisecondsSince(std::chrono::steady_clock::time_point start)
     {
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -45,6 +57,7 @@ namespace
 }
 
 std::atomic<bool> LiveTrader::stopRequested{false};
+std::atomic<bool> LiveTrader::flattenRequested{false};
 
 LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std::string& dataRoot)
     : config(withOptions(config, options)),
@@ -79,6 +92,7 @@ int
 LiveTrader::run()
 {
     stopRequested = false;
+    flattenRequested = false;
     if (!loadPortfolio())
         return 1;
     createLanes();
@@ -89,9 +103,13 @@ LiveTrader::run()
     printStartup();
 
     startFeed();
+    status.setState(RUNNING);
+    saveStatus(true);
     waitUntilFinished();
     stopFeed();
     savePerformance(true);
+    status.setState(STOPPED);
+    saveStatus(true);
     store->flush();   // finish writing the records before the recap
     printResultsHeading();
     session->printSummary(recap(), tickers);
@@ -227,6 +245,80 @@ LiveTrader::printStartup()
     for (const auto& lane : lanes)
         summary.addStock(lane->getTicker(), lane->activeStrategies(), lane->backfilledBars(), lane->barsNeeded());
     summary.print(screen());
+    describeRunForStatus();
+}
+
+// The startup summary's facts, for the dashboard
+void
+LiveTrader::describeRunForStatus()
+{
+    if (!writesStatus())
+        return;
+    json stocks = json::array();
+    for (const auto& lane : lanes)
+        stocks.push_back({{"ticker", lane->getTicker()}, {"strategies", lane->activeStrategies()},
+                          {"bars_needed", lane->barsNeeded()}, {"backfilled", lane->backfilledBars()}});
+    status.setRun({{"mode", session->describeMode()}, {"account", session->describeAccount()},
+                   {"market", session->describeMarketHours()}, {"bars", feed->describe()},
+                   {"risk", config.contains(RISK_KEY) ? StartupSummary::describeRisk(config[RISK_KEY])
+                                                      : lanes.front()->describeRisk()},
+                   {"records", describeRecords()}, {"backtest", options.backtest},
+                   {"starting_capital", config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL)},
+                   {"started_utc", MarketTime::formatUtc(std::time(nullptr))}, {"stocks", stocks}});
+    status.setMarketClock(session->marketClock());
+    lastClockCheck = std::chrono::steady_clock::now();
+}
+
+void
+LiveTrader::saveStatus(bool now)
+{
+    if (writesStatus())
+        status.save(*store, now, [this] { return PerformanceTracker::toJson(tracker.summary()); });
+}
+
+// From the main thread, about every CHECK_INTERVAL: a heartbeat for the dashboard (even with no bars, e.g.
+// with the market closed), the stream's health, and the market clock now and then
+void
+LiveTrader::keepStatusFresh()
+{
+    if (!writesStatus())
+        return;
+    status.setConnected(feed->isConnected());
+    auto now = std::chrono::steady_clock::now();
+    if (now - lastClockCheck >= MARKET_CLOCK_REFRESH)
+    {
+        lastClockCheck = now;
+        status.setMarketClock(session->marketClock());
+    }
+    saveStatus(false);
+}
+
+// The kill switch: close every position at its last price, then the caller stops trading
+void
+LiveTrader::flattenAll()
+{
+    std::lock_guard<std::mutex> guard(tradingLock);
+    screen() << "\nFlatten requested: closing every position, then stopping" << std::endl;
+    for (auto& lane : lanes)
+    {
+        const std::string& ticker = lane->getTicker();
+        float held = oms.heldQuantity(ticker);
+        if (held == 0 || lane->getMarketData().getData().empty())
+            continue;
+        float price = lane->getMarketData().getLastClosePrice();
+        Order exit(held > 0 ? OrderType::SELL : OrderType::BUY, ticker, std::fabs(held), price);
+        exit.setStopLoss(FLATTEN_PROTECTION_PERCENT);
+        exit.setTakeProfit(FLATTEN_PROTECTION_PERCENT);
+        exit.setStrategy(FLATTEN_STRATEGY);
+        OutputCapture notes;
+        sendOrder(*lane, exit);
+        std::string sent = notes.release();
+        screen() << sent;
+        status.addEvent(lane->getMarketData().getCurrentData().DateTime, ticker,
+                        "Flatten: " + (held > 0 ? std::string("sell ") : std::string("buy ")) + Format::number(std::fabs(held), 0)
+                        + " at ~" + Format::number(price));
+    }
+    saveStatus(true);
 }
 
 // e.g. "data/live: 43 orders and 5 positions restored"
@@ -259,9 +351,18 @@ LiveTrader::waitUntilFinished()
     while (!stopRequested)
     {
         std::this_thread::sleep_for(CHECK_INTERVAL);
-        std::lock_guard<std::mutex> guard(reportLock);
-        if (report->isOverdue(WAIT_FOR_MISSING_BARS))
-            report->print(screen());
+        if (flattenRequested.exchange(false))
+        {
+            flattenAll();
+            stopRequested = true;
+            break;
+        }
+        {
+            std::lock_guard<std::mutex> guard(reportLock);
+            if (report->isOverdue(WAIT_FOR_MISSING_BARS))
+                report->print(screen());
+        }
+        keepStatusFresh();
     }
 }
 
@@ -285,6 +386,8 @@ LiveTrader::stopFeed()
 {
     if (!feedFinished)
         screen() << "\nStopping..." << std::endl;
+    status.setState(STOPPING);
+    saveStatus(true);
     feed->stop();
 
     std::lock_guard<std::mutex> guard(reportLock);
@@ -300,6 +403,7 @@ LiveTrader::onBar(const MarketCondition& bar)
     if (found == laneByTicker.end())
         return;   // not one of ours
     StockLane& lane = *found->second;
+    std::lock_guard<std::mutex> trading(tradingLock);
 
     OutputCapture notes;   // orders sent, rejections, strategy notes: listed under the table
     session->beforeDecision(bar);
@@ -360,6 +464,19 @@ LiveTrader::addToReport(const StockLane& lane, const MarketCondition& bar, doubl
     savedPositions[bar.Ticker] = row.position.toJson();
     lastAccount = account;
     savePerformance(false);
+
+    if (writesStatus())
+    {
+        status.updateStock(bar.Ticker, bar.DateTime, bar.Close, row.strategies, row.position, decisionMs);
+        std::istringstream noteLines(notes);
+        for (std::string line; std::getline(noteLines, line);)
+            if (!line.empty())
+                status.addEvent(bar.DateTime, bar.Ticker, line);
+        status.setAccount(account);
+        if (account.available)
+            status.recordEquity(*store, bar.DateTime, account.equity);
+        saveStatus(false);
+    }
 
     std::lock_guard<std::mutex> guard(reportLock);
     report->addRow(bar, row, screen());

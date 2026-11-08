@@ -18,6 +18,12 @@ static void onStopSignal(int)
     LiveTrader::requestStop();
 }
 
+// The dashboard's kill switch: close every position, then stop
+static void onFlattenSignal(int)
+{
+    LiveTrader::requestFlatten();
+}
+
 int main(int argc, char* argv[])
 {
     LiveOptions options;
@@ -43,6 +49,7 @@ int main(int argc, char* argv[])
 
     std::signal(SIGINT, onStopSignal);   // Ctrl+C
     std::signal(SIGTERM, onStopSignal);  // systemctl stop / kill
+    std::signal(SIGUSR1, onFlattenSignal);   // kill -USR1: flatten, then stop
 
     Config config;
     DotEnv::load(config.getProjectRoot() + "/.env");

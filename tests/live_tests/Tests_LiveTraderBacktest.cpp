@@ -4,6 +4,7 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
+#include <thread>
 #include "../../src/live/LiveTrader.hpp"
 #include "../../src/oms/TradeStore.hpp"
 
@@ -215,4 +216,103 @@ TEST_F(LiveTraderBacktestTests, NoPortfolioIsAnError)
     config.erase("portfolio");
     LiveTrader trader(config, backtest(FIRST_DAY), dataRoot);
     EXPECT_EQ(trader.run(), 1);
+}
+
+// ---------- What the dashboard reads ----------
+
+TEST_F(LiveTraderBacktestTests, WritesTheDashboardsStatusAndEquityCurve)
+{
+    LiveOptions options = backtest(FIRST_DAY);
+    options.silent = false;   // quiet: only the recap printed, and status.json written
+    options.quiet = true;
+    LiveTrader trader(config(), options, dataRoot);
+    ASSERT_EQ(trader.run(), 0);
+
+    std::string records = dataRoot + "backtest/" + FIRST_DAY + "/";
+    std::ifstream statusFile(records + "status.json");
+    json status = json::parse(statusFile);
+    EXPECT_EQ(status["state"], "stopped");
+    EXPECT_GT(status["pid"].get<long>(), 0);
+    EXPECT_TRUE(status["run"]["backtest"].get<bool>());
+    EXPECT_EQ(status["run"]["stocks"].size(), 2u);
+    EXPECT_EQ(status["last_bar_time"], FIRST_DAY + " 15:59:00");
+    ASSERT_EQ(status["stocks"].size(), 2u);
+    EXPECT_EQ(status["stocks"][0]["ticker"], "KO");
+    EXPECT_FALSE(status["stocks"][0]["strategies"].empty());
+    EXPECT_TRUE(status["account"]["available"].get<bool>());
+    EXPECT_EQ(status["estimate"]["fills"], 2);
+    bool sawTheOrder = false;
+    for (const auto& event : status["events"])
+        sawTheOrder |= event["ticker"] == "KO";
+    EXPECT_TRUE(sawTheOrder);
+
+    // One line a minute
+    std::ifstream equityFile(records + "equity.csv");
+    std::string header, line;
+    std::getline(equityFile, header);
+    EXPECT_EQ(header, "time,equity");
+    int lines = 0;
+    while (std::getline(equityFile, line))
+        lines++;
+    EXPECT_EQ(lines, MINUTES_PER_DAY);
+}
+
+TEST_F(LiveTraderBacktestTests, NothingForTheDashboardWhenSilent)
+{
+    LiveOptions options = backtest(FIRST_DAY);
+    options.silent = true;   // as risk_app runs many backtests
+    LiveTrader trader(config(), options, dataRoot);
+    ASSERT_EQ(trader.run(), 0);
+    EXPECT_FALSE(fs::exists(dataRoot + "backtest/" + FIRST_DAY + "/status.json"));
+}
+
+TEST_F(LiveTraderBacktestTests, FlattenClosesEveryPositionThenStops)
+{
+    // A stop too wide to trigger, so KO is still held when the kill switch is pulled. 60 minutes a second,
+    // so the day takes long enough to pull it.
+    json wideStop = config();
+    for (auto& stock : wideStop["portfolio"])
+        stock["strategy"]["stop_loss"] = 30;
+    LiveOptions options = backtest(FIRST_DAY);
+    options.backtestSpeed = 60;
+    options.silent = false;
+    options.quiet = true;
+    std::string statusPath = dataRoot + "backtest/" + FIRST_DAY + "/status.json";
+
+    std::thread killSwitch([&] {
+        // Wait until status.json shows KO held, then flatten
+        for (int i = 0; i < 400; i++)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(25));
+            std::ifstream file(statusPath);
+            json status = json::parse(file, nullptr, false);
+            if (status.is_discarded() || !status.contains("stocks"))
+                continue;
+            for (const auto& stock : status["stocks"])
+                if (stock["ticker"] == "KO" && stock["position"]["quantity"].get<double>() > 0)
+                {
+                    LiveTrader::requestFlatten();
+                    return;
+                }
+        }
+    });
+    LiveTrader trader(wideStop, options, dataRoot);
+    int exitCode = trader.run();
+    killSwitch.join();
+    ASSERT_EQ(exitCode, 0);
+
+    std::vector<TradeRecord> records = trades(FIRST_DAY);
+    ASSERT_FALSE(records.empty());
+    const TradeRecord& last = records.back();
+    EXPECT_EQ(last.strategy, "flatten");
+    EXPECT_EQ(last.side, "sell");
+    EXPECT_DOUBLE_EQ(last.quantity, SHARES);
+    for (const auto& position : TradeStore(dataRoot + "backtest/" + FIRST_DAY).loadPositions())
+        EXPECT_FLOAT_EQ(position.getQuantity(), 0);
+
+    // Stopped early, not at the end of the day
+    std::ifstream file(statusPath);
+    json status = json::parse(file);
+    EXPECT_EQ(status["state"], "stopped");
+    EXPECT_LT(status["last_bar_time"].get<std::string>(), FIRST_DAY + " 15:59:00");
 }

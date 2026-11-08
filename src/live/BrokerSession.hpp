@@ -45,6 +45,9 @@ class BrokerSession
         virtual std::string describeAccount() const = 0;   // e.g. "ACTIVE, cash $98,150.70, buying power ..."
         virtual std::string describeMarketHours() { return ""; }   // e.g. "closed, opens in 56m (...)"; live only
 
+        // For the dashboard: {"known", "is_open", "next_open_utc", "next_close_utc"}; not known in a backtest
+        virtual json marketClock() { return {{"known", false}}; }
+
         virtual void beforeDecision(const MarketCondition& bar) {}
         virtual void afterDecision() {}
 
@@ -70,6 +73,7 @@ class AlpacaSession : public BrokerSession
         std::string describeMode() const override;
         std::string describeAccount() const override;
         std::string describeMarketHours() override;
+        json marketClock() override;
         void printSummary(std::ostream& out, const std::vector<std::string>& tickers) override;
 
     private:

@@ -122,14 +122,17 @@ AlpacaStream::onMessage(const ix::WebSocketMessagePtr& msg)
     switch (msg->type)
     {
         case ix::WebSocketMessageType::Open:
+            connected = true;
             Log::detail() << "Stream connected" << std::endl;
             break;
 
         case ix::WebSocketMessageType::Close:
+            connected = false;
             std::cout << "Stream closed: " << msg->closeInfo.reason << std::endl;
             break;
 
         case ix::WebSocketMessageType::Error:
+            connected = false;
             std::cerr << "Stream error: " << msg->errorInfo.reason
                       << " (retrying in " << msg->errorInfo.wait_time << " ms)" << std::endl;
             break;

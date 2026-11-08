@@ -11,6 +11,10 @@
 static const char* TRADES_FILE = "trades.csv";
 static const char* POSITIONS_FILE = "positions.csv";
 static const char* PERFORMANCE_FILE = "performance.json";
+static const char* STATUS_FILE = "status.json";
+static const char* EQUITY_FILE = "equity.csv";
+static const char* EQUITY_HEADER = "time,equity";
+static const int EQUITY_DECIMALS = 2;
 
 // Upgrading a trades.csv from before the extra columns: the original is kept as trades.csv.old
 static const char* OLD_FILE_SUFFIX = ".old";
@@ -261,6 +265,35 @@ TradeStore::savePerformance(const json& performance)
     enqueue([this, contents] { writeAtomically(PERFORMANCE_FILE, contents); });
 }
 
+void
+TradeStore::saveStatus(const json& status)
+{
+    std::string contents = status.dump(2) + "\n";
+    enqueue([this, contents] { writeAtomically(STATUS_FILE, contents); });
+}
+
+void
+TradeStore::appendEquity(const std::string& time, double equity)
+{
+    std::ostringstream line;
+    line << time << "," << std::fixed << std::setprecision(EQUITY_DECIMALS) << equity << "\n";
+    std::string filePath = path(EQUITY_FILE), text = line.str();
+    enqueue([filePath, text] {
+        bool isNew = !std::filesystem::exists(filePath);
+        std::ofstream file(filePath, std::ios::app);
+        if (!file)
+        {
+            std::cerr << "WARNING - Could not write " << filePath << std::endl;
+            return;
+        }
+        if (isNew)
+            file << EQUITY_HEADER << "\n";
+        file << text;
+        file.close();
+        SaveData::saved(filePath);
+    });
+}
+
 // ---------- reads (start-up only) ----------
 
 // Files written before the extra columns existed are rewritten in the new layout, keeping every trade
@@ -296,7 +329,7 @@ TradeStore::upgradeOldTradesFile()
 void
 TradeStore::removeFiles(const std::string& directory)
 {
-    for (const char* file : {TRADES_FILE, POSITIONS_FILE, PERFORMANCE_FILE})
+    for (const char* file : {TRADES_FILE, POSITIONS_FILE, PERFORMANCE_FILE, STATUS_FILE, EQUITY_FILE})
         std::filesystem::remove(std::filesystem::path(directory) / file);
 }
 

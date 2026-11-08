@@ -5,6 +5,7 @@
 #include <vector>
 #include <ixwebsocket/IXWebSocket.h>
 #include <nlohmann/json.hpp>
+#include <atomic>
 #include <optional>
 #include "AlpacaClient.hpp"
 #include "../data_access/BarFeed.hpp"
@@ -50,6 +51,7 @@ class AlpacaStream : public BarFeed
         std::string getSymbol() const { return symbol; }
         std::string getFeed() const { return feed; }
         std::string describe() const override;
+        bool isConnected() const override { return connected; }
 
         // One message from Alpaca's stream: a bar goes to onBar; the connected / authenticated steps return
         // what to send back (log in, then subscribe). Public so it can be tested without a connection.
@@ -66,5 +68,6 @@ class AlpacaStream : public BarFeed
 
         std::shared_ptr<AlpacaClient> client;
         ix::WebSocket socket;
+        std::atomic<bool> connected{false};
         BarHandler barCallback;
 };

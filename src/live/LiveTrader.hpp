@@ -13,6 +13,7 @@
 #include "EquityStats.hpp"
 #include "LiveOptions.hpp"
 #include "MinuteReport.hpp"
+#include "StatusWriter.hpp"
 #include "StockLane.hpp"
 #include "../data_access/BarFeed.hpp"
 #include "../oms/OrderManagement.hpp"
@@ -59,6 +60,9 @@ class LiveTrader
         // For the SIGINT / SIGTERM handler
         static void requestStop() { stopRequested = true; }
 
+        // For the SIGUSR1 handler (the dashboard's kill switch): close every position, then stop
+        static void requestFlatten() { flattenRequested = true; }
+
         // How a session went, once run() has returned (e.g. to compare risk engines)
         struct Result
         {
@@ -97,6 +101,15 @@ class LiveTrader
         void addToReport(const StockLane& lane, const MarketCondition& bar, double decisionMs,
                          const std::string& notes);
         void savePerformance(bool now);
+
+        // The dashboard's status.json and equity.csv (StatusWriter); not written when silent
+        bool writesStatus() const { return !options.silent && store != nullptr; }
+        void describeRunForStatus();
+        void saveStatus(bool now);
+        void keepStatusFresh();
+
+        // Kill switch: send an order closing each position, on the main thread
+        void flattenAll();
         RiskEngine::SizingContext sizingContext(const std::string& ticker, float held);
         void collectResult();
 
@@ -141,5 +154,13 @@ class LiveTrader
         std::mutex reportLock;
         std::unique_ptr<MinuteReport> report;
 
+        // What the dashboard reads
+        StatusWriter status;
+        std::chrono::steady_clock::time_point lastClockCheck;
+
+        // One decision at a time: a bar on the feed's thread, or flattening on the main one
+        std::mutex tradingLock;
+
         static std::atomic<bool> stopRequested;
+        static std::atomic<bool> flattenRequested;
 };

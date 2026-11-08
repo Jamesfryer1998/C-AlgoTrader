@@ -92,6 +92,11 @@ class TradeStore
         void savePositions(const std::vector<Position>& positions);
         void savePerformance(const json& performance);
 
+        // For the dashboard: what the trader is doing now (status.json, rewritten each time), and the
+        // account's value once a minute (equity.csv, appended: time,equity)
+        void saveStatus(const json& status);
+        void appendEquity(const std::string& time, double equity);
+
         // Wait until every queued write is on disk (used by tests and at shutdown)
         void flush();
 

@@ -122,6 +122,16 @@ AlpacaSession::describeMarketHours()
     return hours + (clock.known ? "" : " - regular hours, holidays not checked");
 }
 
+json
+AlpacaSession::marketClock()
+{
+    AlpacaBroker::MarketClock clock = alpaca.getMarketClock();
+    if (!clock.known)
+        return {{"known", false}};
+    return {{"known", true}, {"is_open", clock.isOpen}, {"next_open_utc", MarketTime::formatUtc(clock.nextOpen)},
+            {"next_close_utc", MarketTime::formatUtc(clock.nextClose)}};
+}
+
 void
 AlpacaSession::printSummary(std::ostream& out, const std::vector<std::string>& tickers)
 {
