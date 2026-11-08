@@ -22,6 +22,22 @@ SERVICE="algo-trader-dashboard.service"
 TRADER_APPS=(algo_trader_app optimise_app quant_app screen_app risk_app)   # the tests are CI's job
 REQUIREMENTS="$APP_DIR/dashboard/requirements.txt"
 
+SETUP_GUIDE="deploy/README.md"
+SECRETS_FILE="/etc/algo-trader.env"
+SUDOERS_FILE="/etc/sudoers.d/algo-trader"
+DEPLOY_USER="$(id -un)"
+
+# ── the one-off server setup, checked first so a missing step fails in seconds with its name ──
+missing=()
+[[ -f "$CONDA_BASE/etc/profile.d/conda.sh" ]] || missing+=("step 1: miniforge for $DEPLOY_USER in $CONDA_BASE")
+sudo -n -l /usr/bin/systemctl daemon-reload > /dev/null 2>&1 || missing+=("step 2: $SUDOERS_FILE")
+[[ -r "$SECRETS_FILE" ]] || missing+=("step 3: $SECRETS_FILE with the Alpaca keys, readable by $DEPLOY_USER")
+if (( ${#missing[@]} )); then
+  echo "The server isn't set up yet (see $SETUP_GUIDE):"
+  printf '  - %s\n' "${missing[@]}"
+  exit 1
+fi
+
 echo "==> Deploying $(git -C "$SRC" rev-parse --short HEAD) to $APP_DIR"
 mkdir -p "$APP_DIR" "$DATA_DIR"
 rsync -a --delete \
