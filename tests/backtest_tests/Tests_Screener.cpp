@@ -397,3 +397,27 @@ TEST(ScreenerTests, MinutePickValuesAreOnePerDay)
     EXPECT_EQ(ready["stop_loss"], 10);   // not searched: kept from the base settings
     EXPECT_EQ(ready["active"], 1);
 }
+
+TEST(ScreenerTests, HeldUpMeansGoodInBothPeriodsAndBetterThanBuyAndHold)
+{
+    auto row = [](const std::string& symbol, double train, double test, double buyHold, int testTrades) {
+        Screener::Row r;
+        r.symbol = symbol;
+        r.strategy = "RSI";
+        r.found = true;
+        r.train.sharpeRatio = train;
+        r.test.sharpeRatio = test;
+        r.test.closedTrades = testTrades;
+        r.buyHoldSharpe = buyHold;
+        return r;
+    };
+    std::vector<Screener::Row> rows = {
+        row("GOOD", 2.0, 1.5, 0.5, 10),
+        row("HOLD_BETTER", 2.0, 1.5, 3.0, 10),    // strong both times, but just holding the stock did better
+        row("FEW_TRADES", 2.0, 1.5, 0.5, 1),       // too few test trades to trust
+        row("FADED", 2.0, -1.0, 0.5, 10)};          // didn't hold up in the test years
+
+    auto held = Screener::goodInBothPeriods(rows, 5);
+    ASSERT_EQ(held.size(), 1u);
+    EXPECT_EQ(held[0].symbol, "GOOD");
+}
