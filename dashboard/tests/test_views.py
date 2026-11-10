@@ -69,7 +69,8 @@ def test_live_tab_from_a_real_backtest(project, backtest_folder):
     assert tape.rows[0][1] == ((views.BUY_ARROW, views.POSITIVE) if newest["side"] == "buy"
                                else (views.SELL_ARROW, views.NEGATIVE))
     assert "nan" not in [text for row in texts(tape) for text in row]   # empty notes stay empty
-    assert views.positions_table(status, project.risk).rows == []
+    flat = views.positions_table(status, project.risk)
+    assert flat.rows == [] and flat.empty == "" and flat.columns[0] == "Stock"   # just the headers when flat
 
 
 def test_positions_flag_a_stock_over_its_cap(project):

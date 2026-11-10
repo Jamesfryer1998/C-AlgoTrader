@@ -98,7 +98,7 @@ def tone_of(value) -> str:
 class Table:
     columns: list[str]
     rows: list[list[tuple[str, str]]] = field(default_factory=list)   # each cell: (text, tone)
-    empty: str = "Nothing yet"
+    empty: str = "Nothing yet"   # shown instead of the table when there are no rows; "" keeps just the headers
 
     def add(self, *cells) -> None:
         self.rows.append([cell if isinstance(cell, tuple) else (str(cell), PLAIN) for cell in cells])
@@ -182,7 +182,7 @@ def live_kpis(status: dict, trades: pd.DataFrame, day: str) -> list[Kpi]:
 def positions_table(status: dict, risk_config: dict) -> Table:
     frame, _ = metrics.exposure(status, risk_config)
     prices = {s["ticker"]: s for s in (status or {}).get("stocks", [])}
-    table = Table(["Stock", "Qty", "Avg", "Last", "Unrealised", "% eq"], empty="FLAT")
+    table = Table(["Stock", "Qty", "Avg", "Last", "Unrealised", "% eq"], empty="")
     for row in frame.itertuples():
         stock = prices.get(row.ticker, {})
         position = stock.get("position", {})
@@ -191,14 +191,6 @@ def positions_table(status: dict, risk_config: dict) -> Table:
                   (signed_money(row.unrealised_pnl), tone_of(row.unrealised_pnl)),
                   (percent(row.percent_of_equity, 1), WARNING if over else PLAIN))
     return table
-
-
-def exposure_line(status: dict, risk_config: dict) -> str:
-    _, summary = metrics.exposure(status, risk_config)
-    run = (status or {}).get("run", {})
-    limit = f", at most {summary['share_limit']} shares a stock" if summary["share_limit"] else ""
-    return (f"{run.get('risk', summary['engine'])}{limit} · gross {percent(summary['gross_percent'], 1)} "
-            f"of {percent(summary['cap_percent'], 0)} cap")
 
 
 def strategy_table(status: dict) -> Table:

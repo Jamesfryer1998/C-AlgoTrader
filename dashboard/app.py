@@ -40,7 +40,7 @@ TABS = [(LIVE, "1 LIVE"), (COMPARE, "2 BACKTEST VS LIVE"), (HISTORY, "3 HISTORY"
 # ---------- Building blocks ----------
 
 def table(view: views.Table) -> html.Div:
-    if not view.rows:
+    if not view.rows and view.empty:
         return html.Div(view.empty, className="empty")
     head = html.Thead(html.Tr([html.Th(column) for column in view.columns]))
     body = html.Tbody([html.Tr([html.Td(text, className=tone) for text, tone in row]) for row in view.rows])
@@ -181,9 +181,7 @@ def create_app(project: Project) -> Dash:
                 dbc.Col(panel(1, f"Equity {day}", chart(views.equity_figure(
                     [("Equity", equity[equity["day"] == day], views.LIVE_COLOUR)])), tall=True), lg=8),
                 dbc.Col([panel(2, "P&L today", pnl),
-                         panel(3, "Positions", [table(views.positions_table(status, project.risk)),
-                                                html.Div(views.exposure_line(status, project.risk),
-                                                         className="footnote")])], lg=4),
+                         panel(3, "Positions", table(views.positions_table(status, project.risk)))], lg=4),
             ], className="g-2"),
             dbc.Row([
                 dbc.Col(panel(4, "Tape", table(views.trades_table(trades, day))), lg=8),

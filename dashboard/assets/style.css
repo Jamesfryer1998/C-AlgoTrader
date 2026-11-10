@@ -76,10 +76,9 @@ html, body { background: var(--black); color: var(--text); font-family: var(--mo
 .positive { color: var(--positive) !important; }
 .negative { color: var(--negative) !important; }
 .warning { color: var(--warning) !important; }
-.muted, .empty, .footnote { color: var(--muted) !important; }
+.muted, .empty { color: var(--muted) !important; }
 .accent { color: var(--accent); }
 .empty { padding: 10px 2px; letter-spacing: 1px; }
-.footnote { padding: 6px 0 0; font-size: 11px; }
 
 .big-number { font-family: var(--display); font-size: 64px; line-height: 0.9; }
 .big-detail { font-size: 12px; padding-top: 2px; }
