@@ -29,6 +29,7 @@ DOWN_COLOUR = "#f87171"
 CHART_FONT = "JetBrains Mono, Menlo, monospace"
 CHART_MARGIN = {"l": 8, "r": 64, "t": 10, "b": 28}
 CHART_HEIGHT = 300
+DAILY_PNL_ZOOM_KEY = "daily-pnl"   # one chart of every day: it keeps its zoom as new days arrive
 
 # The tape: an arrow for each side, as on a trading terminal
 BUY_ARROW, SELL_ARROW = "▲", "▼"
@@ -225,22 +226,27 @@ def events(status: dict, limit: int = RECENT_EVENTS) -> list[tuple[str, str, str
 
 # ---------- Charts ----------
 
-def _layout(height: int = CHART_HEIGHT) -> dict:
-    """Black, faint grid, prices on the right: the panel around the chart carries its title."""
+def _layout(zoom_key: str, height: int = CHART_HEIGHT) -> dict:
+    """Black, faint grid, prices on the right: the panel around the chart carries its title.
+
+    zoom_key: the chart keeps the viewer's zoom through new data while this stays the same (Plotly's uirevision),
+    e.g. the day it shows; another day starts zoomed out. A double-click or a page refresh also zooms out.
+    """
     axis = {"gridcolor": GRID, "zeroline": False, "linecolor": GRID, "tickfont": {"size": 10}}
     return {"height": height, "margin": CHART_MARGIN, "paper_bgcolor": PANEL, "plot_bgcolor": PANEL,
+            "uirevision": zoom_key,
             "font": {"color": TEXT, "family": CHART_FONT, "size": 10},
             "xaxis": axis, "yaxis": {**axis, "side": "right", "tickprefix": "$"},
             "legend": {"orientation": "h", "y": 1.0, "x": 0, "bgcolor": "rgba(0,0,0,0)"},
             "hovermode": "x unified", "hoverlabel": {"bgcolor": PANEL, "font": {"family": CHART_FONT}}}
 
 
-def equity_figure(curves: list[tuple[str, pd.DataFrame, str]]) -> dict:
-    """curves: (name, equity frame, colour)"""
+def equity_figure(curves: list[tuple[str, pd.DataFrame, str]], zoom_key: str) -> dict:
+    """curves: (name, equity frame, colour). zoom_key: see _layout, usually the day shown."""
     data = [{"type": "scatter", "mode": "lines", "name": name, "x": list(frame["time"]),
              "y": [round(v, 2) for v in frame["equity"]], "line": {"color": colour, "width": 1.5, "shape": "hv"}}
             for name, frame, colour in curves if not frame.empty]
-    return {"data": data, "layout": {**_layout(), "showlegend": len(data) > 1}}
+    return {"data": data, "layout": {**_layout(zoom_key), "showlegend": len(data) > 1}}
 
 
 def daily_pnl_figure(history: pd.DataFrame) -> dict:
@@ -248,7 +254,7 @@ def daily_pnl_figure(history: pd.DataFrame) -> dict:
     return {"data": [{"type": "bar", "x": list(days["day"]), "y": [round(v, 2) for v in days["pnl"]],
                       "marker": {"color": [UP_COLOUR if v >= 0 else DOWN_COLOUR for v in days["pnl"]]},
                       "name": "P&L"}],
-            "layout": {**_layout(), "showlegend": False}}
+            "layout": {**_layout(DAILY_PNL_ZOOM_KEY), "showlegend": False}}
 
 
 # ---------- Backtest vs live ----------
@@ -289,7 +295,7 @@ def fills_table(result: dict) -> Table:
 
 def comparison_figure(result: dict) -> dict:
     return equity_figure([("Live", result["live_equity"], LIVE_COLOUR),
-                          ("Backtest", result["backtest_equity"], BACKTEST_COLOUR)])
+                          ("Backtest", result["backtest_equity"], BACKTEST_COLOUR)], result["day"])
 
 
 # ---------- History ----------

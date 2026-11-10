@@ -96,10 +96,12 @@ def test_strategy_levels_on_one_line():
 
 def test_charts_are_plotly_figures(backtest_folder):
     equity = records.equity(backtest_folder)
-    figure = views.equity_figure([("Live", equity, views.LIVE_COLOUR), ("Nothing", equity.iloc[0:0], "#fff")])
+    figure = views.equity_figure([("Live", equity, views.LIVE_COLOUR), ("Nothing", equity.iloc[0:0], "#fff")],
+                                 BACKTEST_DAY)
     assert len(figure["data"]) == 1   # empty curves are left out
     assert figure["data"][0]["x"][0] == f"{BACKTEST_DAY} 09:30:00"
     assert figure["layout"]["paper_bgcolor"] == views.PANEL and not figure["layout"]["showlegend"]
+    assert figure["layout"]["uirevision"] == BACKTEST_DAY   # keeps the viewer's zoom while it's the same day
     json.dumps(figure)   # plain data: Dash can send it as it is
 
 

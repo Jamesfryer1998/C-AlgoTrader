@@ -10,6 +10,7 @@ The look (black, monospace, cyan-framed panels) is in assets/style.css.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 from datetime import datetime, timezone
 
@@ -33,6 +34,8 @@ REQUEST_LOGGER = "werkzeug"   # Flask's server prints a line for every request; 
 FONTS = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=VT323&display=swap"
 SEPARATOR = "◆"
 
+GRAPH_CONFIG = {"displayModeBar": False}   # drag to zoom, double-click to zoom back out
+
 LIVE, COMPARE, HISTORY, SYSTEM = "live", "compare", "history", "system"
 TABS = [(LIVE, "1 LIVE"), (COMPARE, "2 BACKTEST VS LIVE"), (HISTORY, "3 HISTORY"), (SYSTEM, "4 SYSTEM")]
 
@@ -55,7 +58,43 @@ def panel(number: int, title: str, body, extra=None, tall: bool = False) -> html
 
 
 def chart(figure: dict) -> dcc.Graph:
-    return dcc.Graph(figure=figure, config={"displayModeBar": False}, className="chart")
+    return dcc.Graph(figure=figure, config=GRAPH_CONFIG, className="chart")
+
+
+def graph(id_: str) -> dcc.Graph:
+    """A chart whose figure a callback fills in (and later updates, keeping the viewer's zoom)."""
+    return dcc.Graph(id=id_, config=GRAPH_CONFIG, className="chart")
+
+
+def big_number(kpi: views.Kpi) -> html.Div:
+    return html.Div([html.Div(kpi.value, className=f"big-number {kpi.tone}"),
+                     html.Div(kpi.detail, className=f"big-detail {kpi.tone}")])
+
+
+def event_list(events: list[tuple[str, str, str]]):
+    if not events:
+        return html.Div("NOTHING YET", className="empty")
+    return [html.Div([html.Span(time, className="muted"), html.Span(stock, className="accent"), html.Span(text)],
+                     className="event") for time, stock, text in events]
+
+
+class SentParts:
+    """What the browser shows already: a fingerprint of each part's data, kept in the page (a dcc.Store).
+
+    A refresh sends only the parts whose data changed and leaves the rest alone, so the browser redraws less
+    and a chart keeps the viewer's zoom. A reloaded page starts with none, so it gets everything.
+    """
+
+    def __init__(self, fingerprints: dict | None):
+        self.fingerprints = dict(fingerprints or {})
+
+    def update(self, part: str, data, render):
+        """render(data) if `part`'s data changed since the browser last got it, else Dash's no_update."""
+        fingerprint = hashlib.sha1(repr(data).encode()).hexdigest()
+        if self.fingerprints.get(part) == fingerprint:
+            return no_update
+        self.fingerprints[part] = fingerprint
+        return render(data)
 
 
 def segments(parts: list) -> list:
@@ -106,17 +145,30 @@ def layout() -> html.Div:
         key("RUN BACKTEST", "run-backtest", views.WARNING),
     ], className="controls")
 
-    history_day = panel(3, "One day", html.Div(id="history-day-chart"),
-                        extra=dbc.Select(id="history-day", className="day-picker"))
+    live_tab = html.Div([
+        dbc.Row([dbc.Col(panel(1, "Equity today", graph("live-equity"), tall=True), lg=8),
+                 dbc.Col([panel(2, "P&L today", html.Div(id="live-pnl")),
+                          panel(3, "Positions", html.Div(id="live-positions"))], lg=4)], className="g-2"),
+        dbc.Row([dbc.Col(panel(4, "Tape", html.Div(id="live-tape")), lg=8),
+                 dbc.Col([panel(5, "Strategies", html.Div(id="live-strategies")),
+                          panel(6, "Events", html.Div(id="live-events", className="events"))], lg=4)], className="g-2"),
+    ], id="live-tab")
+
+    history_tab = html.Div([
+        html.Div(id="history-stats", className="stat-line"),
+        dbc.Row([dbc.Col(panel(1, "Daily P&L", graph("history-daily")), lg=7),
+                 dbc.Col(panel(2, "Days", html.Div(id="history-days")), lg=5)], className="g-2"),
+        panel(3, "One day", graph("history-day-equity"), extra=dbc.Select(id="history-day", className="day-picker")),
+    ], id="history-tab", style={"display": "none"})
 
     return html.Div([
         status_bar,
         html.Div(id="warnings"),
         html.Div(id="message"),
         tabs,
-        html.Div(id="live-tab"),
+        live_tab,
         html.Div([compare_controls, html.Div(id="compare-body")], id="compare-tab", style={"display": "none"}),
-        html.Div([html.Div(id="history-body"), history_day], id="history-tab", style={"display": "none"}),
+        history_tab,
         html.Div(id="system-tab", style={"display": "none"}),
         confirm("start", "Start trading", "", "Start", views.POSITIVE),
         confirm("flatten", "Flatten and stop",
@@ -125,6 +177,8 @@ def layout() -> html.Div:
         dcc.Interval(id="slow", interval=SLOW_REFRESH_MS),
         dcc.Interval(id="clock-tick", interval=CLOCK_TICK_MS),
         dcc.Interval(id="backtest-poll", interval=BACKTEST_POLL_MS, disabled=True),
+        dcc.Store(id="live-sent"),
+        dcc.Store(id="history-sent"),
     ], className="page")
 
 
@@ -156,40 +210,34 @@ def create_app(project: Project) -> Dash:
                   Output("state", "children"), Output("state", "className"),
                   Output("market", "children"), Output("kpis", "children"), Output("warnings", "children"),
                   Output("start", "disabled"), Output("stop", "disabled"), Output("flatten", "disabled"),
-                  Input("fast", "n_intervals"))
-    def refresh_header(_):
-        status, trades, _, day = live_day()
-        head = views.header(project, status, now())
-        kpis = segments([kpi_segment(k) for k in views.live_kpis(status, trades, day) if k.title != views.TODAY_KPI])
-        warnings = [html.Div(f"! {text}", className="warning-line") for text in head.warnings]
-        return (head.mode.upper(), head.mode_tone, head.state.upper(), head.state_tone,
-                head.market.upper(), kpis, warnings,
-                head.running, not head.running, not head.running)
-
-    @app.callback(Output("live-tab", "children"), Input("fast", "n_intervals"), State("tabs", "active_tab"))
-    def refresh_live(_, active):
-        if active != LIVE:
-            return no_update
+                  Output("live-equity", "figure"), Output("live-pnl", "children"), Output("live-positions", "children"),
+                  Output("live-tape", "children"), Output("live-strategies", "children"),
+                  Output("live-events", "children"), Output("live-sent", "data"),
+                  Input("fast", "n_intervals"), Input("tabs", "active_tab"), State("live-sent", "data"))
+    def refresh_live(_, active, sent_before):
+        """The status bar, and the Live tab when it's showing: one read of the records for both."""
         status, trades, equity, day = live_day()
-        today = next(k for k in views.live_kpis(status, trades, day) if k.title == views.TODAY_KPI)
-        pnl = html.Div([html.Div(today.value, className=f"big-number {today.tone}"),
-                        html.Div(today.detail, className=f"big-detail {today.tone}")])
-        event_lines = [html.Div([html.Span(time, className="muted"), html.Span(stock, className="accent"),
-                                 html.Span(text)], className="event") for time, stock, text in views.events(status)]
-        return html.Div([
-            dbc.Row([
-                dbc.Col(panel(1, f"Equity {day}", chart(views.equity_figure(
-                    [("Equity", equity[equity["day"] == day], views.LIVE_COLOUR)])), tall=True), lg=8),
-                dbc.Col([panel(2, "P&L today", pnl),
-                         panel(3, "Positions", table(views.positions_table(status, project.risk)))], lg=4),
-            ], className="g-2"),
-            dbc.Row([
-                dbc.Col(panel(4, "Tape", table(views.trades_table(trades, day))), lg=8),
-                dbc.Col([panel(5, "Strategies", table(views.strategy_table(status))),
-                         panel(6, "Events", html.Div(event_lines or html.Div("NOTHING YET", className="empty"),
-                                                     className="events"))], lg=4),
-            ], className="g-2"),
-        ])
+        sent = SentParts(sent_before)
+        head = views.header(project, status, now())
+        kpis = views.live_kpis(status, trades, day)
+        header = (head.mode.upper(), head.mode_tone, head.state.upper(), head.state_tone, head.market.upper(),
+                  sent.update("kpis", [k for k in kpis if k.title != views.TODAY_KPI],
+                              lambda bar: segments([kpi_segment(k) for k in bar])),
+                  sent.update("warnings", head.warnings,
+                              lambda texts: [html.Div(f"! {text}", className="warning-line") for text in texts]),
+                  head.running, not head.running, not head.running)
+        if active != LIVE:   # the hidden tab keeps what it shows, and catches up when it's opened again
+            return (*header, *[no_update] * 6, sent.fingerprints)
+
+        todays_equity = equity[equity["day"] == day]
+        live = (sent.update("equity", (day, todays_equity.values.tolist()),
+                            lambda _: views.equity_figure([("Equity", todays_equity, views.LIVE_COLOUR)], day)),
+                sent.update("pnl", next(k for k in kpis if k.title == views.TODAY_KPI), big_number),
+                sent.update("positions", views.positions_table(status, project.risk), table),
+                sent.update("tape", views.trades_table(trades, day), table),
+                sent.update("strategies", views.strategy_table(status), table),
+                sent.update("events", views.events(status), event_list))
+        return (*header, *live, sent.fingerprints)
 
     # ----- Start / stop / flatten -----
 
@@ -261,24 +309,29 @@ def create_app(project: Project) -> Dash:
 
     # ----- History -----
 
-    @app.callback(Output("history-body", "children"), Output("history-day-chart", "children"),
-                  Output("history-day", "options"), Output("history-day", "value"),
-                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("history-day", "value"))
-    def refresh_history(active, _, chosen_day):
+    @app.callback(Output("history-stats", "children"), Output("history-daily", "figure"),
+                  Output("history-days", "children"), Output("history-day-equity", "figure"),
+                  Output("history-day", "options"), Output("history-day", "value"), Output("history-sent", "data"),
+                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("history-day", "value"),
+                  State("history-sent", "data"))
+    def refresh_history(active, _, chosen_day, sent_before):
         if active != HISTORY:
-            return no_update, no_update, no_update, no_update
+            return (*[no_update] * 6, sent_before)
+        sent = SentParts(sent_before)
         trades, equity = records.trades(project.live_records), records.equity(project.live_records)
         history = metrics.day_history(trades, equity)
         days = list(history["day"])
         day = chosen_day if chosen_day in days else (days[0] if days else None)
         intraday = equity[equity["day"] == day] if day else equity.iloc[0:0]
-        body = html.Div([
-            html.Div(segments([kpi_segment(k) for k in views.history_kpis(history)]), className="stat-line"),
-            dbc.Row([dbc.Col(panel(1, "Daily P&L", chart(views.daily_pnl_figure(history))), lg=7),
-                     dbc.Col(panel(2, "Days", table(views.history_table(history))), lg=5)], className="g-2"),
-        ])
-        day_chart = chart(views.equity_figure([("Equity", intraday, views.LIVE_COLOUR)]))
-        return body, day_chart, [{"label": d, "value": d} for d in days], day
+        return (sent.update("stats", views.history_kpis(history),
+                            lambda kpis: segments([kpi_segment(k) for k in kpis])),
+                sent.update("daily", history.values.tolist(), lambda _: views.daily_pnl_figure(history)),
+                sent.update("days", views.history_table(history), table),
+                sent.update("day", (day, intraday.values.tolist()),
+                            lambda _: views.equity_figure([("Equity", intraday, views.LIVE_COLOUR)], day or "")),
+                sent.update("options", days, lambda names: [{"label": d, "value": d} for d in names]),
+                day if day != chosen_day else no_update,
+                sent.fingerprints)
 
     # ----- System: config and the trader's output -----
 
