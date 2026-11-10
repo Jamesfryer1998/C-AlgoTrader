@@ -129,6 +129,21 @@ def test_history_views(tmp_path):
     assert figure["data"][0]["x"] == ["2026-10-28", "2026-10-29", "2026-10-30"]   # oldest first on the chart
 
 
+def test_strategy_views(tmp_path):
+    write_trades(tmp_path, [(f"{BACKTEST_DAY} 10:00:00", "KO", "buy", 2, 100, "sent", 0, "", "RSI"),
+                            (f"{BACKTEST_DAY} 10:05:00", "KO", "sell", 2, 110, "sent", 0, "", "RSI"),
+                            (f"{BACKTEST_DAY} 10:10:00", "PEP", "buy", 1, 50, "blocked", 0, "", "MACD")])
+    trades = records.trades(tmp_path)
+    rows = texts(views.strategies_table(metrics.strategy_performance(trades)))
+    assert rows[0] == ["RSI", "KO", "2", "0", "1", "100%", "+$20.00", "+$20.00", "+$20.00", "+$20.00"]
+    assert rows[1][:2] == ["MACD", "PEP"] and rows[1][6:] == ["+$0.00", "-", "-", "-"]   # blocked, never traded
+    assert texts(views.strategy_stock_table(metrics.strategy_by_stock(trades))) == [
+        ["RSI", "KO", "1", "100%", "+$20.00", "+$20.00"]]
+    figure = views.strategy_pnl_figure(metrics.closed_trades(trades))
+    assert [trace["name"] for trace in figure["data"]] == ["RSI"] and figure["data"][0]["y"] == [20.0]
+    json.dumps(figure)
+
+
 def test_config_views(project):
     (project.root / "config" / "strategy.json").write_text(json.dumps(
         {"portfolio": [{"ticker": "KO", "strategy": {"name": "RSI", "active": 1, "period": 14}}]}))

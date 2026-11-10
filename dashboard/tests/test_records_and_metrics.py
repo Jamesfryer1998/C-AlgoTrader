@@ -10,13 +10,15 @@ NOW = datetime(2026, 10, 29, 18, 0, tzinfo=timezone.utc)   # 14:00 New York, a T
 
 
 def write_trades(folder, rows):
-    """trades.csv from (time, ticker, side, quantity, price, status[, round_trip_ms, note]) tuples."""
+    """trades.csv from (time, ticker, side, quantity, price, status[, round_trip_ms, note, strategy]) tuples."""
     lines = [",".join(records.TRADE_COLUMNS)]
     for i, row in enumerate(rows, 1):
         time, ticker, side, quantity, price, status, *rest = row
         ms = rest[0] if rest else 0
         note = rest[1] if len(rest) > 1 else ""
-        lines.append(f"{i},{time},,RSI,{ticker},{side},{side.upper()},simple,{quantity},{price},0,0,{status},,,,{ms},{note}")
+        strategy = rest[2] if len(rest) > 2 else "RSI"
+        lines.append(f"{i},{time},,{strategy},{ticker},{side},{side.upper()},simple,{quantity},{price},0,0,{status},,,,"
+                     f"{ms},{note}")
     (folder / records.TRADES_FILE).write_text("\n".join(lines) + "\n")
 
 
@@ -130,6 +132,31 @@ def test_closed_trades_long_short_and_flip(tmp_path):
     closed = metrics.closed_trades(records.trades(tmp_path))
     assert list(closed["pnl"]) == [60.0, 40.0]
     assert list(closed["entry"]) == [105.0, 120.0]
+
+
+def test_each_strategy_owns_the_trades_it_opened(tmp_path):
+    day = BACKTEST_DAY
+    write_trades(tmp_path, [(f"{day} 10:00:00", "KO", "buy", 2, 100, "sent", 0, "", "RSI"),
+                            (f"{day} 10:05:00", "KO", "sell", 2, 110, "adjustment", 0, "", "broker"),  # take profit: +20
+                            (f"{day} 10:10:00", "PEP", "buy", 1, 50, "sent", 0, "", "MACD"),
+                            (f"{day} 10:15:00", "PEP", "sell", 1, 45, "sent", 0, "", "MACD"),           # -5
+                            (f"{day} 10:20:00", "KO", "buy", 1, 100, "sent", 0, "", "MACD"),
+                            (f"{day} 10:25:00", "KO", "sell", 1, 101, "sent", 0, "", "RSI"),            # MACD's: +1
+                            (f"{day} 10:30:00", "KO", "buy", 9, 100, "blocked", 0, "", "RSI")])
+    trades = records.trades(tmp_path)
+    assert list(metrics.closed_trades(trades)["strategy"]) == ["RSI", "MACD", "MACD"]
+
+    performance = metrics.strategy_performance(trades)
+    assert list(performance["strategy"]) == ["RSI", "MACD"]          # best first; "broker" isn't a strategy
+    rsi, macd = performance.iloc[0], performance.iloc[1]
+    assert rsi["pnl"] == 20 and rsi["closed_trades"] == 1 and rsi["win_rate_percent"] == 100
+    assert rsi["orders_sent"] == 2 and rsi["blocked"] == 1 and rsi["stocks"] == "KO"
+    assert macd["pnl"] == -4 and macd["closed_trades"] == 2 and macd["win_rate_percent"] == 50
+    assert macd["best"] == 1 and macd["worst"] == -5 and macd["stocks"] == "KO, PEP"
+
+    by_stock = metrics.strategy_by_stock(trades)
+    assert [tuple(row) for row in by_stock[["strategy", "ticker", "pnl"]].values] == [
+        ("RSI", "KO", 20.0), ("MACD", "KO", 1.0), ("MACD", "PEP", -5.0)]
 
 
 def test_day_history(tmp_path):

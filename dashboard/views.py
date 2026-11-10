@@ -30,6 +30,9 @@ CHART_FONT = "JetBrains Mono, Menlo, monospace"
 CHART_MARGIN = {"l": 8, "r": 64, "t": 10, "b": 28}
 CHART_HEIGHT = 300
 DAILY_PNL_ZOOM_KEY = "daily-pnl"   # one chart of every day: it keeps its zoom as new days arrive
+STRATEGY_PNL_ZOOM_KEY = "strategy-pnl"
+# A line per strategy: none of them green or red, which mean profit and loss here
+STRATEGY_COLOURS = ["#3ad7f0", "#f5d547", "#e879f9", "#fb923c", "#a78bfa", "#94a3b8"]
 
 # The tape: an arrow for each side, as on a trading terminal
 BUY_ARROW, SELL_ARROW = "▲", "▼"
@@ -321,6 +324,41 @@ def history_table(history: pd.DataFrame) -> Table:
                   (percent(row.pnl_percent, signed=True), tone_of(row.pnl_percent)), percent(row.max_drawdown_percent),
                   (number(row.orders_sent, 0), WARNING if row.rejected else PLAIN), percent(row.win_rate_percent, 0))
     return table
+
+
+# ---------- Strategies ----------
+
+def strategies_table(performance: pd.DataFrame) -> Table:
+    table = Table(["Strategy", "Stocks", "Orders", "Blocked", "Closed", "Won", "P&L", "Average", "Best", "Worst"],
+                  empty="NO TRADES RECORDED YET")
+    for row in performance.itertuples():
+        table.add(row.strategy, row.stocks, number(row.orders_sent, 0), number(row.blocked, 0),
+                  number(row.closed_trades, 0), percent(row.win_rate_percent, 0),
+                  (signed_money(row.pnl), tone_of(row.pnl)), _signed_or_nothing(row.average_pnl),
+                  _signed_or_nothing(row.best), _signed_or_nothing(row.worst))
+    return table
+
+
+def strategy_stock_table(by_stock: pd.DataFrame) -> Table:
+    table = Table(["Strategy", "Stock", "Closed", "Won", "P&L", "Average"], empty="NO CLOSED TRADES YET")
+    for row in by_stock.itertuples():
+        table.add(row.strategy, row.ticker, number(row.closed_trades, 0), percent(row.win_rate_percent, 0),
+                  (signed_money(row.pnl), tone_of(row.pnl)), _signed_or_nothing(row.average_pnl))
+    return table
+
+
+def strategy_pnl_figure(closed: pd.DataFrame) -> dict:
+    """Each strategy's realised P&L adding up, trade by trade."""
+    data = []
+    for i, (name, exits) in enumerate(closed.groupby("strategy", sort=True)):
+        data.append({"type": "scatter", "mode": "lines", "name": name, "x": list(exits["time"]),
+                     "y": [round(v, 2) for v in exits["pnl"].cumsum()],
+                     "line": {"color": STRATEGY_COLOURS[i % len(STRATEGY_COLOURS)], "width": 1.5, "shape": "hv"}})
+    return {"data": data, "layout": {**_layout(STRATEGY_PNL_ZOOM_KEY), "showlegend": True}}
+
+
+def _signed_or_nothing(value) -> tuple[str, str]:
+    return (NOTHING, MUTED) if missing(value) else (signed_money(value), tone_of(value))
 
 
 # ---------- Config ----------

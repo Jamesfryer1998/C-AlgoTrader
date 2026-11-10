@@ -183,8 +183,13 @@ def exposure(status: dict, risk_config: dict) -> tuple[pd.DataFrame, dict]:
 
 def closed_trades(trades: pd.DataFrame) -> pd.DataFrame:
     """Each position closed (or reduced), with its P&L, by replaying the orders that changed what we held
-    through an average-cost book (as the trader's own P&L tracker does)."""
+    through an average-cost book (as the trader's own P&L tracker does).
+
+    `strategy` is the one that opened the position: a stop loss or take profit filled at the broker shows up as
+    a "broker" adjustment, but the trade is still that strategy's.
+    """
     held: dict[str, tuple[float, float]] = {}   # ticker -> (quantity, average price)
+    opened_by: dict[str, str] = {}              # ticker -> the strategy that opened what we hold
     rows = []
     for trade in trades[trades["status"].isin(records.CHANGED_POSITION)].itertuples():
         quantity = float(trade.quantity or 0)
@@ -195,20 +200,75 @@ def closed_trades(trades: pd.DataFrame) -> pd.DataFrame:
         if current == 0 or (current > 0) == (signed > 0):
             total = abs(current) + quantity
             held[trade.ticker] = (current + signed, (abs(current) * average + quantity * trade.price) / total)
+            if current == 0:
+                opened_by[trade.ticker] = trade.strategy
             continue
         closing = min(quantity, abs(current))
         direction = 1.0 if current > 0 else -1.0
         pnl = closing * (trade.price - average) * direction
-        rows.append({"day": trade.day, "time": trade.time, "ticker": trade.ticker, "quantity": closing,
+        rows.append({"day": trade.day, "time": trade.time, "ticker": trade.ticker,
+                     "strategy": opened_by.get(trade.ticker, trade.strategy), "quantity": closing,
                      "entry": average, "exit": float(trade.price), "pnl": pnl,
                      "return_percent": (trade.price - average) / average * 100 * direction if average else 0.0})
         left = current + (closing if signed > 0 else -closing)
         remaining = quantity - closing
-        if remaining > 0:
+        if remaining > 0:   # flipped from long to short (or back): this order opened the new position
             held[trade.ticker] = (remaining if signed > 0 else -remaining, float(trade.price))
+            opened_by[trade.ticker] = trade.strategy
         else:
             held[trade.ticker] = (left, average if abs(left) > SAME_QUANTITY else 0.0)
-    return pd.DataFrame(rows, columns=["day", "time", "ticker", "quantity", "entry", "exit", "pnl", "return_percent"])
+    return pd.DataFrame(rows, columns=["day", "time", "ticker", "strategy", "quantity", "entry", "exit", "pnl",
+                                       "return_percent"])
+
+
+# ---------- Strategies ----------
+
+STRATEGY_COLUMNS = ["strategy", "stocks", "orders_sent", "blocked", "rejected", "closed_trades", "win_rate_percent",
+                    "pnl", "average_pnl", "best", "worst"]
+
+
+def strategy_performance(trades: pd.DataFrame) -> pd.DataFrame:
+    """One row per strategy over every recorded day: its orders and its closed trades' realised P&L. Best first.
+
+    Positions still open aren't counted until they close. The broker's own adjustments aren't a strategy's orders.
+    """
+    closed = closed_trades(trades)
+    orders = trades[trades["status"] != records.ADJUSTMENT]
+    names = sorted(set(orders["strategy"].dropna()) | set(closed["strategy"].dropna()))
+    rows = []
+    for name in names:
+        own = orders[orders["strategy"] == name]
+        exits = closed[closed["strategy"] == name]
+        rows.append({
+            "strategy": name,
+            "stocks": ", ".join(sorted(set(own["ticker"]) | set(exits["ticker"]))),
+            "orders_sent": int((own["status"] == records.SENT).sum()),
+            "blocked": int((own["status"] == records.BLOCKED).sum()),
+            "rejected": int((own["status"] == records.REJECTED).sum()),
+            **_closed_summary(exits),
+        })
+    frame = pd.DataFrame(rows, columns=STRATEGY_COLUMNS)
+    return frame.sort_values("pnl", ascending=False).reset_index(drop=True)
+
+
+def strategy_by_stock(trades: pd.DataFrame) -> pd.DataFrame:
+    """Each strategy's closed trades on each stock: where it makes and loses money. Best first."""
+    closed = closed_trades(trades)
+    rows = [{"strategy": strategy, "ticker": ticker, **_closed_summary(exits)}
+            for (strategy, ticker), exits in closed.groupby(["strategy", "ticker"])]
+    frame = pd.DataFrame(rows, columns=["strategy", "ticker", "closed_trades", "win_rate_percent", "pnl",
+                                        "average_pnl", "best", "worst"])
+    return frame.sort_values("pnl", ascending=False).reset_index(drop=True)
+
+
+def _closed_summary(exits: pd.DataFrame) -> dict:
+    count = len(exits)
+    return {"closed_trades": count,
+            "win_rate_percent": float((exits["pnl"] > 0).mean() * 100) if count else None,
+            "pnl": float(exits["pnl"].sum()),
+            "average_pnl": float(exits["pnl"].mean()) if count else None,
+            "best": float(exits["pnl"].max()) if count else None,
+            "worst": float(exits["pnl"].min()) if count else None}
 
 
 def day_history(trades: pd.DataFrame, equity: pd.DataFrame) -> pd.DataFrame:

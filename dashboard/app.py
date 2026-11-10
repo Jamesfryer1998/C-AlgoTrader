@@ -36,8 +36,9 @@ SEPARATOR = "◆"
 
 GRAPH_CONFIG = {"displayModeBar": False}   # drag to zoom, double-click to zoom back out
 
-LIVE, COMPARE, HISTORY, SYSTEM = "live", "compare", "history", "system"
-TABS = [(LIVE, "1 LIVE"), (COMPARE, "2 BACKTEST VS LIVE"), (HISTORY, "3 HISTORY"), (SYSTEM, "4 SYSTEM")]
+LIVE, COMPARE, HISTORY, STRATEGIES, SYSTEM = "live", "compare", "history", "strategies", "system"
+TABS = [(LIVE, "1 LIVE"), (COMPARE, "2 BACKTEST VS LIVE"), (HISTORY, "3 HISTORY"), (STRATEGIES, "4 STRATEGIES"),
+        (SYSTEM, "5 SYSTEM")]
 
 
 # ---------- Building blocks ----------
@@ -161,6 +162,14 @@ def layout() -> html.Div:
         panel(3, "One day", graph("history-day-equity"), extra=dbc.Select(id="history-day", className="day-picker")),
     ], id="history-tab", style={"display": "none"})
 
+    strategies_tab = html.Div([
+        dbc.Row([dbc.Col(panel(1, "Realised P&L by strategy", graph("strategies-pnl")), lg=7),
+                 dbc.Col(panel(2, "By stock", html.Div(id="strategies-by-stock")), lg=5)], className="g-2"),
+        panel(3, "Strategies, every recorded day", html.Div(id="strategies-table")),
+        html.Div("Realised P&L of closed trades only, each credited to the strategy that opened it "
+                 "(stop losses and take profits filled at the broker included).", className="empty"),
+    ], id="strategies-tab", style={"display": "none"})
+
     return html.Div([
         status_bar,
         html.Div(id="warnings"),
@@ -169,6 +178,7 @@ def layout() -> html.Div:
         live_tab,
         html.Div([compare_controls, html.Div(id="compare-body")], id="compare-tab", style={"display": "none"}),
         history_tab,
+        strategies_tab,
         html.Div(id="system-tab", style={"display": "none"}),
         confirm("start", "Start trading", "", "Start", views.POSITIVE),
         confirm("flatten", "Flatten and stop",
@@ -179,6 +189,7 @@ def layout() -> html.Div:
         dcc.Interval(id="backtest-poll", interval=BACKTEST_POLL_MS, disabled=True),
         dcc.Store(id="live-sent"),
         dcc.Store(id="history-sent"),
+        dcc.Store(id="strategies-sent"),
     ], className="page")
 
 
@@ -331,6 +342,22 @@ def create_app(project: Project) -> Dash:
                             lambda _: views.equity_figure([("Equity", intraday, views.LIVE_COLOUR)], day or "")),
                 sent.update("options", days, lambda names: [{"label": d, "value": d} for d in names]),
                 day if day != chosen_day else no_update,
+                sent.fingerprints)
+
+    # ----- Strategies -----
+
+    @app.callback(Output("strategies-pnl", "figure"), Output("strategies-by-stock", "children"),
+                  Output("strategies-table", "children"), Output("strategies-sent", "data"),
+                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), State("strategies-sent", "data"))
+    def refresh_strategies(active, _, sent_before):
+        if active != STRATEGIES:
+            return no_update, no_update, no_update, sent_before
+        sent = SentParts(sent_before)
+        trades = records.trades(project.live_records)
+        closed = metrics.closed_trades(trades)
+        return (sent.update("pnl", closed.values.tolist(), lambda _: views.strategy_pnl_figure(closed)),
+                sent.update("by-stock", views.strategy_stock_table(metrics.strategy_by_stock(trades)), table),
+                sent.update("table", views.strategies_table(metrics.strategy_performance(trades)), table),
                 sent.fingerprints)
 
     # ----- System: config and the trader's output -----
