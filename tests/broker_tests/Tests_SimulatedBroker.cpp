@@ -848,3 +848,14 @@ TEST_F(SimulatedBrokerTests, CoveringAShortIntoALongStartsAtTheNewPrice)
     EXPECT_FLOAT_EQ(held.getQuantity(), 50);
     EXPECT_NEAR(held.getAvgPrice(), fills[1].getPrice(), 1e-3);   // not the short's price
 }
+
+TEST_F(SimulatedBrokerTests, ACarriedPositionKeepsItsValueUntilItsFirstBar)
+{
+    // A position carried in at a $290 close, while the bars so far are another stock's (~$100 here; META's
+    // $640 on the day this went wrong): the account must still be worth its capital, not 25 x the difference
+    broker->startWithPosition("TXN", 25, 280.0, 290.0);
+    executeStep();   // an AAPL bar: TXN hasn't traded yet
+    EXPECT_DOUBLE_EQ(broker->getLatestPrice("TXN"), 290.0);
+    EXPECT_NEAR(broker->getCurrentEquity(), 100000.0, 0.01);
+    EXPECT_NEAR(broker->getCurrentCash(), 100000.0 - 25 * 290.0, 0.01);
+}

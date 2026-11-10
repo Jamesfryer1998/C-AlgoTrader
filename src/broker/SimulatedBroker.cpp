@@ -635,6 +635,8 @@ SimulatedBroker::startWithPosition(const std::string& ticker, double quantity, d
 {
     positionsByTicker[ticker] = Position(ticker, quantity, averagePrice);
     currentCash -= quantity * price;
+    // Valued at that close until its first bar arrives (as an account is overnight), not at another stock's price
+    latestPrices[ticker] = price;
 }
 
 void
