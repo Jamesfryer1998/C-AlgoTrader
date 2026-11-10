@@ -135,9 +135,18 @@ def test_history_views(tmp_path):
     kpis = {k.title: k for k in views.history_kpis(history)}
     assert kpis["Total P&L"].value == "+$400.00"   # -250 then +650 (the first day has no previous close)
     assert kpis["Best day"].detail == "2026-10-30" and kpis["Worst day"].detail == "2026-10-29"
+    assert kpis["Best day"].tone == views.POSITIVE
     assert texts(views.history_table(history))[0][0] == "2026-10-30"
     figure = views.daily_pnl_figure(history)
     assert figure["data"][0]["x"] == ["2026-10-28", "2026-10-29", "2026-10-30"]   # oldest first on the chart
+
+
+def test_the_best_day_of_only_losing_days_is_not_green(tmp_path):
+    (tmp_path / records.EQUITY_FILE).write_text("time,equity\n2026-11-09 09:30:00,100000\n2026-11-09 15:59:00,99917\n"
+                                                "2026-11-10 09:30:00,99917\n2026-11-10 15:59:00,99782.49\n")
+    kpis = {k.title: k for k in views.history_kpis(metrics.day_history(records.trades(tmp_path),
+                                                                       records.equity(tmp_path)))}
+    assert kpis["Best day"].value == "-$83.00" and kpis["Best day"].tone == views.NEGATIVE
 
 
 def test_strategy_views(tmp_path):

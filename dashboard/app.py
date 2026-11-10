@@ -53,7 +53,8 @@ def table(view: views.Table) -> html.Div:
 
 def panel(number: int, title: str, body, extra=None, tall: bool = False) -> html.Div:
     """A cyan-framed box with its numbered title tab on the top edge, like '2 CHART'."""
-    tab = html.Div([html.Span(f"{number} {title}".upper(), className="panel-tab"), extra or ""],
+    # `is None`, not `or`: a Dash component with no children is falsy, and `extra or ""` would drop it
+    tab = html.Div([html.Span(f"{number} {title}".upper(), className="panel-tab"), "" if extra is None else extra],
                    className="panel-heading")
     return html.Div([tab, html.Div(body, className="panel-body")], className="panel tall" if tall else "panel")
 

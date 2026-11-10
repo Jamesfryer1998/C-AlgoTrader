@@ -328,7 +328,7 @@ def history_kpis(history: pd.DataFrame) -> list[Kpi]:
     return [Kpi("Days traded", str(len(days))),
             Kpi("Total P&L", signed_money(total), "", tone_of(total)),
             Kpi("Winning days", percent((days["pnl"] > 0).mean() * 100, 0), f"{int((days['pnl'] > 0).sum())} of {len(days)}"),
-            Kpi("Best day", signed_money(best["pnl"]), best["day"], POSITIVE),
+            Kpi("Best day", signed_money(best["pnl"]), best["day"], tone_of(best["pnl"])),
             Kpi("Worst day", signed_money(worst["pnl"]), worst["day"], NEGATIVE if worst["pnl"] < 0 else PLAIN),
             Kpi("Worst drawdown", percent(days["max_drawdown_percent"].max()), "within a day")]
 
