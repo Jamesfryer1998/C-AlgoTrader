@@ -26,7 +26,7 @@ namespace
     // reaches this far past its last day; bars outside the month are dropped afterwards
     const std::time_t REQUEST_OVERLAP_SECONDS = 32 * MarketTime::SECONDS_PER_HOUR;
 
-    // Today's file counts as complete once it reaches the last bar of the session
+    // A day's file is complete once it reaches the last bar of the session...
     const std::string LAST_BAR_TIME = "15:59";
     const size_t TIME_START = MarketTime::DATE_LENGTH + 1;   // "YYYY-MM-DD HH:MM"
     const size_t HOURS_AND_MINUTES = 5;
@@ -59,10 +59,19 @@ AlpacaHistory::csvPath(const std::string& dataDir, const std::string& date) cons
     return (std::filesystem::path(dataDir) / (fileBaseName + "_" + symbol + "_" + date + CSV_EXTENSION)).string();
 }
 
-// Is <path> a finished download of <day>? Its first bar must be from that day (old Yahoo files shared these
-// names but held a different week). Past days are always written whole; today's may be partial, so it
-// counts as finished only once it reaches the 15:59 bar.
-static bool isCompleteDay(const std::string& path, const std::string& day, const std::string& today)
+// When the file was last written, as UTC seconds
+static std::time_t writtenAt(const std::string& path)
+{
+    std::error_code error;
+    auto written = std::filesystem::last_write_time(path, error);
+    if (error)
+        return -1;
+    auto age = std::chrono::duration_cast<std::chrono::seconds>(std::filesystem::file_time_type::clock::now() - written);
+    return std::time(nullptr) - age.count();
+}
+
+bool
+AlpacaHistory::isCompleteDay(const std::string& path, const std::string& day)
 {
     std::ifstream file(path);
     std::string line, first, last;
@@ -77,7 +86,11 @@ static bool isCompleteDay(const std::string& path, const std::string& day, const
     }
     if (first.size() < TIME_START + HOURS_AND_MINUTES || MarketTime::datePart(first) != day)
         return false;
-    return day < today || last.substr(TIME_START, HOURS_AND_MINUTES) >= LAST_BAR_TIME;
+    if (last.substr(TIME_START, HOURS_AND_MINUTES) >= LAST_BAR_TIME)
+        return true;
+    // ...or once it was written after that day's close, when Alpaca had all of it (an early close, a halted stock)
+    std::time_t dataComplete = MarketTime::regularCloseAfter(MarketTime::parseDate(day)) + AlpacaApi::SIP_DELAY_SECONDS;
+    return writtenAt(path) >= dataComplete;
 }
 
 std::vector<MarketCondition>
@@ -223,8 +236,6 @@ int
 AlpacaHistory::downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const std::string& startDate,
                              const std::string& endDate, const std::string& dataDir, bool overwrite)
 {
-    std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(std::time(nullptr)));
-
     std::time_t requestStart = chunkStart;
     std::time_t requestEnd = chunkEnd + REQUEST_OVERLAP_SECONDS;
 
@@ -259,7 +270,7 @@ AlpacaHistory::downloadChunk(std::time_t chunkStart, std::time_t chunkEnd, const
     for (const auto& [day, dayBars] : byDay)
     {
         std::string path = csvPath(dataDir, day);
-        if (!overwrite && std::filesystem::exists(path) && isCompleteDay(path, day, today))
+        if (!overwrite && std::filesystem::exists(path) && isCompleteDay(path, day))
         {
             skipped++;
             continue;

@@ -166,6 +166,20 @@ TEST_F(BacktestDownloaderTests, DownloadsAStockMissingADay)
         EXPECT_TRUE(fs::exists(folder("PEP") / ("marketData_PEP_" + day + ".csv"))) << day;
 }
 
+TEST_F(BacktestDownloaderTests, FetchesAgainADaySavedWhileItWasStillTrading)
+{
+    for (const auto& day : NEEDED)
+        save("KO", day);
+    // The 26th was downloaded at noon that day, so it stops there
+    fs::path partial = folder("KO") / "marketData_KO_2026-10-26.csv";
+    std::time_t noon = MarketTime::parseUtc("2026-10-26T16:00:00Z");
+    fs::last_write_time(partial, fs::file_time_type::clock::now() - std::chrono::seconds(std::time(nullptr) - noon));
+    replyBars("KO", NEEDED);
+
+    EXPECT_TRUE(downloader().downloadMissing({"KO"}, "2026-10-26", 1));
+    EXPECT_FALSE(alpaca->sent("GET", "/stocks/KO/").empty());
+}
+
 TEST_F(BacktestDownloaderTests, RemembersDaysWithNoBarsSoTheyArentFetchedAgain)
 {
     // Alpaca has nothing for the 21st (as on a holiday)

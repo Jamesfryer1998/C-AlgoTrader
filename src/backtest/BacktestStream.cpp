@@ -15,6 +15,9 @@ namespace
     const std::string MINUTE_FOLDER = "minute";
 
     const int LOADING_THREADS = 4;
+
+    // "marketData_KO_": a day file's name before its date
+    std::string dayFilePrefix(const std::string& ticker) { return DEFAULT_MARKET_DATA_FILE_NAME + "_" + ticker + "_"; }
 }
 
 namespace fs = std::filesystem;
@@ -32,11 +35,17 @@ BacktestStream::folderFor(const std::string& dataRoot, const std::string& ticker
     return fs::is_directory(own) ? own.string() : dataRoot;
 }
 
+std::string
+BacktestStream::dayFile(const std::string& dataRoot, const std::string& ticker, const std::string& day)
+{
+    return (fs::path(folderFor(dataRoot, ticker)) / (dayFilePrefix(ticker) + day + CSV_EXTENSION)).string();
+}
+
 std::vector<std::string>
 BacktestStream::savedDays(const std::string& dataRoot, const std::string& ticker)
 {
     std::vector<std::string> found;
-    std::string prefix = DEFAULT_MARKET_DATA_FILE_NAME + "_" + ticker + "_";
+    std::string prefix = dayFilePrefix(ticker);
     std::error_code error;
     for (const auto& entry : fs::directory_iterator(folderFor(dataRoot, ticker), error))
     {

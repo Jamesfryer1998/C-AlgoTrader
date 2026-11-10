@@ -4,6 +4,7 @@
 #include "FakeAlpacaClient.hpp"
 #include "../../src/alpaca/AlpacaHistory.hpp"
 #include "../../src/data_access/CSVParser.hpp"
+#include "../../src/util/MarketTime.hpp"
 
 namespace fs = std::filesystem;
 
@@ -18,6 +19,17 @@ namespace
     json minuteBar(const std::string& utc, double close)
     {
         return {{"t", utc}, {"o", close}, {"c", close}, {"v", 1000}};
+    }
+
+    // 26 Oct 2026: closes 16:00 New York, 20:00 UTC
+    const std::string DAY = "2026-10-26";
+    const std::time_t MIDDAY = MarketTime::parseUtc("2026-10-26T16:00:00Z");      // 12:00 in New York
+    const std::time_t EVENING = MarketTime::parseUtc("2026-10-26T23:00:00Z");     // 19:00, long after the close
+
+    // Pretend the file was written at `utc`
+    void setWrittenAt(const fs::path& path, std::time_t utc)
+    {
+        fs::last_write_time(path, fs::file_time_type::clock::now() - std::chrono::seconds(std::time(nullptr) - utc));
     }
 
     struct AlpacaHistoryTests : public ::testing::Test
@@ -117,6 +129,39 @@ TEST_F(AlpacaHistoryTests, SkipsDaysAlreadySavedUnlessOverwriting)
     EXPECT_EQ(history().downloadToCsv("2026-10-26", "2026-10-26", folder.string()), 1);
     EXPECT_EQ(history().downloadToCsv("2026-10-26", "2026-10-26", folder.string()), 0);   // already there
     EXPECT_EQ(history().downloadToCsv("2026-10-26", "2026-10-26", folder.string(), true), 1);
+}
+
+TEST_F(AlpacaHistoryTests, ADayIsCompleteAtItsLastBarOrWhenSavedAfterTheClose)
+{
+    fs::create_directories(folder);
+    fs::path whole = folder / "whole.csv", morning = folder / "morning.csv", other = folder / "other.csv";
+    std::ofstream(whole) << MARKET_DATA_CSV_HEADER << "\n" << DAY << " 09:30:00,KO,60,60,1000,1m\n"
+                         << DAY << " 15:59:00,KO,60,60,1000,1m\n";
+    std::ofstream(morning) << MARKET_DATA_CSV_HEADER << "\n" << DAY << " 09:30:00,KO,60,60,1000,1m\n";
+    std::ofstream(other) << MARKET_DATA_CSV_HEADER << "\n2026-10-19 09:30:00,KO,60,60,1000,1m\n";
+
+    setWrittenAt(whole, MIDDAY);
+    EXPECT_TRUE(AlpacaHistory::isCompleteDay(whole.string(), DAY));      // it reaches 15:59
+
+    setWrittenAt(morning, MIDDAY);
+    EXPECT_FALSE(AlpacaHistory::isCompleteDay(morning.string(), DAY));   // saved while the day was trading
+    setWrittenAt(morning, EVENING);
+    EXPECT_TRUE(AlpacaHistory::isCompleteDay(morning.string(), DAY));    // all Alpaca had (an early close, a halt)
+
+    EXPECT_FALSE(AlpacaHistory::isCompleteDay(other.string(), DAY));     // a different day's bars
+    EXPECT_FALSE(AlpacaHistory::isCompleteDay((folder / "missing.csv").string(), DAY));
+}
+
+TEST_F(AlpacaHistoryTests, ADaySavedWhileItWasTradingIsDownloadedAgain)
+{
+    alpaca->reply("GET", BARS, 200, {{"bars", {minuteBar("2026-10-26T13:30:00Z", 60.0)}}});
+    EXPECT_EQ(history().downloadToCsv(DAY, DAY, folder.string()), 1);
+    setWrittenAt(folder / ("marketData_KO_" + DAY + ".csv"), MIDDAY);   // as if downloaded at noon that day
+
+    alpaca->reply("GET", BARS, 200, {{"bars", {minuteBar("2026-10-26T13:30:00Z", 60.0),
+                                               minuteBar("2026-10-26T19:59:00Z", 61.0)}}});
+    EXPECT_EQ(history().downloadToCsv(DAY, DAY, folder.string()), 2);   // the rest of the day
+    EXPECT_EQ(readDay(DAY).size(), 2u);
 }
 
 TEST_F(AlpacaHistoryTests, RemembersFinishedMonths)

@@ -72,11 +72,14 @@ BacktestDownloader::downloadMissing(const std::vector<std::string>& tickers, con
     return true;
 }
 
+// Days with a complete file (not one saved while the day was still trading), or known to have no bars
 std::set<std::string>
 BacktestDownloader::coveredDays(const std::string& ticker) const
 {
-    std::vector<std::string> saved = BacktestStream::savedDays(dataRoot, ticker);
-    std::set<std::string> days(saved.begin(), saved.end());
+    std::set<std::string> days;
+    for (const auto& day : BacktestStream::savedDays(dataRoot, ticker))
+        if (AlpacaHistory::isCompleteDay(BacktestStream::dayFile(dataRoot, ticker, day), day))
+            days.insert(day);
     std::set<std::string> empty = readDays((std::filesystem::path(folderFor(ticker)) / DAYS_WITHOUT_BARS_FILE).string());
     days.insert(empty.begin(), empty.end());
     return days;

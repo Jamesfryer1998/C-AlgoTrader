@@ -50,6 +50,9 @@ class BacktestStream : public BarFeed
         // Where a ticker's saved minute bars are: data/minute/<TICKER>/ if it exists, else data/
         static std::string folderFor(const std::string& dataRoot, const std::string& ticker);
 
+        // The file holding one day of a ticker's saved bars, e.g. data/minute/KO/marketData_KO_2026-10-29.csv
+        static std::string dayFile(const std::string& dataRoot, const std::string& ticker, const std::string& day);
+
         // Every trading day saved for a ticker (from the file names), oldest first
         static std::vector<std::string> savedDays(const std::string& dataRoot, const std::string& ticker);
 

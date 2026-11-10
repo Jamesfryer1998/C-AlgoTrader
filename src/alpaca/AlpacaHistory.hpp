@@ -35,7 +35,7 @@ class AlpacaHistory
         explicit AlpacaHistory(const json& config, std::shared_ptr<AlpacaClient> client = nullptr);
 
         // Download every trading day from startDate to endDate (YYYY-MM-DD, inclusive) into dataDir.
-        // Days that already have a file are skipped unless overwrite is true.
+        // Days that already have a complete file are skipped unless overwrite is true.
         // Returns the number of bars written, or -1 if Alpaca could not be reached.
         int downloadToCsv(const std::string& startDate, const std::string& endDate,
                           const std::string& dataDir, bool overwrite = false);
@@ -49,6 +49,11 @@ class AlpacaHistory
 
         // Path of the CSV for one day, e.g. <dataDir>/marketData_NVDA_2026-10-28.csv
         std::string csvPath(const std::string& dataDir, const std::string& date) const;
+
+        // Is <path> a whole day of <day>'s bars? It must start on that day (old Yahoo files shared these names but
+        // held a different week) and either reach the 15:59 bar or have been written after the day's close.
+        // A day saved while it was still trading is not complete, so it's downloaded again.
+        static bool isCompleteDay(const std::string& path, const std::string& day);
 
         // Write bars to a CSV in the market data format
         static bool writeCsv(const std::string& path, const std::vector<MarketCondition>& bars);
