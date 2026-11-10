@@ -313,7 +313,7 @@ def create_app(project: Project) -> Dash:
             return html.Div(notes), not backtesting
         return html.Div(notes + [
             dbc.Row([dbc.Col(panel(1, "Summary", table(views.comparison_table(result))), lg=5),
-                     dbc.Col(panel(2, "Equity: live vs backtest", chart(views.comparison_figure(result))), lg=7)],
+                     dbc.Col(panel(2, "P&L since the open: live vs backtest", chart(views.comparison_figure(result))), lg=7)],
                     className="g-2"),
             panel(3, "Fills, side by side", table(views.fills_table(result))),
         ]), not backtesting

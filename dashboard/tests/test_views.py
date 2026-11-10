@@ -117,6 +117,17 @@ def test_comparison_views(project, backtest_folder):
     assert [trace["name"] for trace in figure["data"]] == ["Live", "Backtest"] and figure["layout"]["showlegend"]
 
 
+def test_live_and_backtest_lines_both_start_at_zero(project, backtest_folder):
+    live = project.live_records
+    (live / records.EQUITY_FILE).write_text("time,equity\n"            # live began the day nearer 99k
+                                            f"{BACKTEST_DAY} 09:30:00,99000\n{BACKTEST_DAY} 15:59:00,99012.5\n")
+    result = comparison.compare(live, backtest_folder, BACKTEST_DAY)
+    live_line, backtest_line = views.comparison_figure(result)["data"]
+    assert live_line["y"] == [0.0, 12.5]
+    assert backtest_line["y"][0] == 0.0 and backtest_line["y"][-1] == round(
+        result["backtest_equity"]["equity"].iloc[-1] - result["backtest_equity"]["equity"].iloc[0], 2)
+
+
 def test_history_views(tmp_path):
     (tmp_path / records.EQUITY_FILE).write_text("time,equity\n2026-10-28 15:59:00,100500\n2026-10-29 15:59:00,100250\n"
                                                 "2026-10-30 15:59:00,100900\n")

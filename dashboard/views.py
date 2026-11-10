@@ -31,6 +31,7 @@ CHART_MARGIN = {"l": 8, "r": 64, "t": 10, "b": 28}
 CHART_HEIGHT = 300
 DAILY_PNL_ZOOM_KEY = "daily-pnl"   # one chart of every day: it keeps its zoom as new days arrive
 STRATEGY_PNL_ZOOM_KEY = "strategy-pnl"
+SIGNED_DOLLARS = "+$,.2f"   # Plotly's axis format for P&L: +$12.50, -$3.00
 # A line per strategy: none of them green or red, which mean profit and loss here
 STRATEGY_COLOURS = ["#3ad7f0", "#f5d547", "#e879f9", "#fb923c", "#a78bfa", "#94a3b8"]
 
@@ -246,10 +247,23 @@ def _layout(zoom_key: str, height: int = CHART_HEIGHT) -> dict:
 
 def equity_figure(curves: list[tuple[str, pd.DataFrame, str]], zoom_key: str) -> dict:
     """curves: (name, equity frame, colour). zoom_key: see _layout, usually the day shown."""
-    data = [{"type": "scatter", "mode": "lines", "name": name, "x": list(frame["time"]),
-             "y": [round(v, 2) for v in frame["equity"]], "line": {"color": colour, "width": 1.5, "shape": "hv"}}
-            for name, frame, colour in curves if not frame.empty]
+    data = [_line(name, frame["time"], frame["equity"], colour) for name, frame, colour in curves if not frame.empty]
     return {"data": data, "layout": {**_layout(zoom_key), "showlegend": len(data) > 1}}
+
+
+def pnl_since_start_figure(curves: list[tuple[str, pd.DataFrame, str]], zoom_key: str) -> dict:
+    """Each equity curve as the P&L since its own first minute, so runs that began with different money
+    (a backtest's starting capital, the live account) all start at $0 and can be compared line against line."""
+    data = [_line(name, frame["time"], frame["equity"] - frame["equity"].iloc[0], colour)
+            for name, frame, colour in curves if not frame.empty]
+    layout = _layout(zoom_key)
+    layout["yaxis"] = {**layout["yaxis"], "tickprefix": "", "tickformat": SIGNED_DOLLARS}
+    return {"data": data, "layout": {**layout, "showlegend": len(data) > 1}}
+
+
+def _line(name: str, times: pd.Series, values: pd.Series, colour: str) -> dict:
+    return {"type": "scatter", "mode": "lines", "name": name, "x": list(times), "y": [round(v, 2) for v in values],
+            "line": {"color": colour, "width": 1.5, "shape": "hv"}}
 
 
 def daily_pnl_figure(history: pd.DataFrame) -> dict:
@@ -297,8 +311,10 @@ def fills_table(result: dict) -> Table:
 
 
 def comparison_figure(result: dict) -> dict:
-    return equity_figure([("Live", result["live_equity"], LIVE_COLOUR),
-                          ("Backtest", result["backtest_equity"], BACKTEST_COLOUR)], result["day"])
+    """Live and the backtest as P&L since the day's start: the backtest begins with its starting capital,
+    live with whatever the account held, and only how each day went is worth comparing."""
+    return pnl_since_start_figure([("Live", result["live_equity"], LIVE_COLOUR),
+                                   ("Backtest", result["backtest_equity"], BACKTEST_COLOUR)], result["day"])
 
 
 # ---------- History ----------
