@@ -79,6 +79,8 @@ bars instead of Alpaca's stream, with a simulated broker filling the orders and 
 ./build/app/algo_trader_app --backtest                     # the latest day saved for every portfolio stock
 ./build/app/algo_trader_app --backtest 2026-10-15 --days 3 # three trading days from 15 Oct
 ./build/app/algo_trader_app --backtest 2026-10-01 --days 31 --capital 25000   # starting with $25,000
+./build/app/algo_trader_app --backtest 2026-11-09 --capital 99012.50 --positions KO:10@58.20,PEP:-5@170.10
+                                                           # starting as the live account did that day
 ./build/app/algo_trader_app --backtest --speed 60          # 60 minutes a second, to watch it (default 0: as fast as possible)
 ./build/app/algo_trader_app --backtest 2025-11-03 --days 250 --quiet   # just the recap
 ```
@@ -87,7 +89,9 @@ Nothing is sent to Alpaca. Bars for the chosen days (and the few days before, wh
 that aren't saved yet are downloaded first into `data/minute/<TICKER>/`, using the keys in `.env`. Fills are at
 each bar's close with 0.01% slippage against us (`"backtest_slippage_percent"` in config/general.json), and every
 sell pays the SEC and FINRA fees Alpaca passes on (`"regulatory_fees"`, same file; Alpaca charges no commission). Records go to
-`data/backtest/<day>/` (fresh each run), so `data/live/` and the paper account are untouched. At the end it
+`data/backtest/<day>/` (fresh each run), so `data/live/` and the paper account are untouched. The dashboard's RUN BACKTEST
+starts each day's backtest as the live account did: its equity at that day's first minute and the positions it
+carried in. At the end it
 prints the simulated equity, P&L, fills per stock and the most capital in use.
 
 #### Stocks and strategies (`"portfolio"`)

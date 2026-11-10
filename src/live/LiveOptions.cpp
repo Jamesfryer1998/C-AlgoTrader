@@ -1,8 +1,50 @@
 #include "LiveOptions.hpp"
 
 #include <algorithm>
+#include <sstream>
 #include <stdexcept>
 #include "../util/CommandLine.hpp"
+
+namespace
+{
+    // --positions KO:10@58.20,PEP:-5@170.10
+    const char POSITION_SEPARATOR = ',';
+    const char QUANTITY_SEPARATOR = ':';
+    const char PRICE_SEPARATOR = '@';
+    const std::string POSITIONS_EXAMPLE = "--positions KO:10@58.20,PEP:-5@170.10 (quantity, - for short, @ average price)";
+
+    CarriedPosition parsePosition(const std::string& text)
+    {
+        size_t colon = text.find(QUANTITY_SEPARATOR), at = text.find(PRICE_SEPARATOR);
+        if (colon == std::string::npos || at == std::string::npos || colon == 0 || at < colon)
+            throw std::invalid_argument("Can't read the position \"" + text + "\": use " + POSITIONS_EXAMPLE);
+        CarriedPosition position;
+        position.ticker = text.substr(0, colon);
+        try
+        {
+            position.quantity = std::stod(text.substr(colon + 1, at - colon - 1));
+            position.averagePrice = std::stod(text.substr(at + 1));
+        }
+        catch (const std::exception&)
+        {
+            throw std::invalid_argument("Can't read the position \"" + text + "\": use " + POSITIONS_EXAMPLE);
+        }
+        if (position.quantity == 0 || position.averagePrice <= 0)
+            throw std::invalid_argument("The position \"" + text + "\" needs a quantity and a price above 0");
+        return position;
+    }
+
+    std::vector<CarriedPosition> parsePositions(const std::string& list)
+    {
+        std::vector<CarriedPosition> positions;
+        std::istringstream items(list);
+        std::string item;
+        while (std::getline(items, item, POSITION_SEPARATOR))
+            if (!item.empty())
+                positions.push_back(parsePosition(item));
+        return positions;
+    }
+}
 
 LiveOptions
 LiveOptions::parse(int argc, char* argv[])
@@ -33,12 +75,17 @@ LiveOptions::parse(int argc, char* argv[])
             if (options.backtestCapital <= 0)
                 throw std::invalid_argument("--capital needs an amount above 0, e.g. --capital 25000");
         }
+        else if (args.is("--positions"))
+            options.backtestPositions = parsePositions(args.text());
         else
             args.rejectOption();
     }
     if (options.backtestCapital > 0 && !options.backtest)
         throw std::invalid_argument("--capital only works with --backtest: live trading uses the Alpaca account's "
                                     "own money");
+    if (!options.backtestPositions.empty() && !options.backtest)
+        throw std::invalid_argument("--positions only works with --backtest: live trading holds what the Alpaca "
+                                    "account holds");
     return options;
 }
 
@@ -56,6 +103,10 @@ Usage: algo_trader_app [options]
   --speed 10                simulated minutes per second, to watch it run (default 0: as fast as possible)
   --capital 25000           the backtest's starting capital in $ (default: "starting_capital" in
                             config/general.json)
+  --positions KO:10@58.20,PEP:-5@170.10
+                            start the backtest holding these (quantity, - for short, @ average price), e.g.
+                            what the live account carried into that day. Their value at the last close
+                            before the backtest comes out of the starting capital's cash
   --quiet                   no minute tables, just the recap at the end
   --verbose                 also show each start-up step (config files, connections, back-fill)
 )";

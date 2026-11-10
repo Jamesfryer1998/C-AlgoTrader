@@ -14,6 +14,8 @@ namespace
 
     // Strategy name on trades that record a change the broker made by itself
     const std::string BROKER_ADJUSTMENT = "broker";
+    const std::string CARRIED_OVER = "carried";   // a backtest's starting position (--positions)
+    const std::string CARRIED_OVER_NOTE = "held at the start (carried over from the day before)";
 
     // Position sizes closer than this are the same (float rounding)
     const double SAME_QUANTITY = 1e-6;
@@ -195,6 +197,17 @@ void OrderManagement::syncPosition(const string& ticker)
 
     if (store)
         store->savePositions(positions);
+}
+
+void OrderManagement::recordCarriedPosition(const string& ticker, float quantity, float averagePrice)
+{
+    Order carried(quantity > 0 ? OrderType::BUY : OrderType::SELL, ticker, std::fabs(quantity), averagePrice);
+    carried.setStrategy(CARRIED_OVER);
+    TradeRecord trade = makeRecord(carried, latestOrderId++);
+    trade.sentAtUtc = utcNowMillis();
+    trade.status = TradeStatus::ADJUSTMENT;
+    trade.note = CARRIED_OVER_NOTE;
+    saveTrade(trade);   // which also puts it in the P&L book
 }
 
 void OrderManagement::enablePersistence(TradeStore* tradeStore, PerformanceTracker* performanceTracker)

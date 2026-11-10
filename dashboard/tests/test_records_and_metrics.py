@@ -159,6 +159,29 @@ def test_each_strategy_owns_the_trades_it_opened(tmp_path):
         ("RSI", "KO", 20.0), ("MACD", "KO", 1.0), ("MACD", "PEP", -5.0)]
 
 
+def test_what_live_held_going_into_a_day(tmp_path):
+    write_trades(tmp_path, [("2026-10-27 10:00:00", "KO", "buy", 10, 100, "sent"),
+                            ("2026-10-27 11:00:00", "KO", "buy", 10, 110, "sent"),      # average 105
+                            ("2026-10-28 10:00:00", "PEP", "sell", 5, 170, "sent"),     # short
+                            ("2026-10-28 11:00:00", "AAPL", "buy", 2, 60, "sent"),
+                            ("2026-10-28 15:00:00", "AAPL", "sell", 2, 61, "adjustment"),  # closed at the broker
+                            ("2026-10-29 10:00:00", "KO", "sell", 20, 120, "sent")])    # that day: not carried in
+    trades = records.trades(tmp_path)
+    assert metrics.held_before(trades, "2026-10-29") == [("KO", 20.0, 105.0), ("PEP", -5.0, 170.0)]
+    assert metrics.held_before(trades, "2026-10-28") == [("KO", 20.0, 105.0)]
+    assert metrics.held_before(trades, "2026-10-27") == []
+    assert metrics.held_before(trades, "2026-10-30") == [("PEP", -5.0, 170.0)]
+
+
+def test_equity_at_the_start_of_a_day(tmp_path):
+    (tmp_path / records.EQUITY_FILE).write_text("time,equity\n2026-10-28 15:59:00,99500\n"
+                                                "2026-10-29 09:30:00,99012.5\n2026-10-29 15:59:00,99100\n")
+    equity = records.equity(tmp_path)
+    assert metrics.equity_at_start(equity, "2026-10-29") == 99012.5   # its first minute
+    assert metrics.equity_at_start(equity, "2026-10-30") == 99100     # no minutes yet: the last close
+    assert metrics.equity_at_start(equity, "2026-10-27") is None
+
+
 def test_day_history(tmp_path):
     (tmp_path / records.EQUITY_FILE).write_text("time,equity\n"
                                                 "2026-10-28 10:00:00,100000\n2026-10-28 15:59:00,100500\n"

@@ -100,9 +100,13 @@ class BacktestSession : public BrokerSession
         size_t fills() const override { return simulated.getFilledOrders().size(); }
         void printSummary(std::ostream& out, const std::vector<std::string>& tickers) override;
 
+        // Start holding a position (--positions), valued at `price`, the last close before the backtest
+        void startWithPosition(const std::string& ticker, double quantity, double averagePrice, double price);
+
     private:
         json config;
         std::string firstDay;
+        size_t carriedPositions = 0;
         MarketData latestBars;          // what the simulated broker prices orders off
         SimulatedBroker simulated;
         SimulatedAccountMonitor monitor;

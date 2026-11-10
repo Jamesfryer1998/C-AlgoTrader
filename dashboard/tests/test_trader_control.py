@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from dashboard import records
-from dashboard.trader import TraderControl, is_trader_process
+from dashboard.trader import BacktestStart, TraderControl, is_trader_process
 
 FAKE_TRADER = """#!/usr/bin/env python3
 import json, signal, sys, time
@@ -29,7 +29,7 @@ if args[:1] == ["--backtest"]:
     folder = Path("data/backtest") / args[1]
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "equity.csv").write_text("time,equity\\n" + args[1] + " 09:30:00,100000\\n")
-    print("backtested", args[1])
+    print("backtested", " ".join(args[1:]))
     sys.exit(0)
 
 def stop(signum, frame):
@@ -128,3 +128,14 @@ def test_a_backtest_runs_in_the_background(control):
     assert job.state == "done"
     assert "backtested 2026-10-29" in job.output
     assert (control.project.backtest_records("2026-10-29") / "equity.csv").exists()
+
+
+def test_a_backtest_can_start_with_the_live_accounts_money_and_positions(control):
+    start = BacktestStart(capital=99012.5, positions=[("KO", 10.0, 58.2), ("PEP", -5.0, 170.1)])
+    assert start.arguments() == ["--capital", "99012.50", "--positions", "KO:10@58.2000,PEP:-5@170.1000"]
+    assert start.describe() == "from $99,012.50 holding KO 10, PEP -5"
+    assert BacktestStart().arguments() == [] and BacktestStart().describe() == "from the configured capital"
+
+    job = control.run_backtest("2026-10-29", start)
+    assert wait_for(lambda: job.state != "running")
+    assert "backtested 2026-10-29 --quiet --capital 99012.50 --positions KO:10@58.2000,PEP:-5@170.1000" in job.output

@@ -29,6 +29,11 @@ class OrderManagement
         // What we hold in a stock now (+ long, - short), by our own records
         float heldQuantity(const string& ticker) const;
         void syncPosition(const string& ticker);
+
+        // A backtest that starts holding a position (carried over from the live account): recorded as an
+        // adjustment, so the records show where it came from and the P&L book knows what it cost.
+        // setMarketData must point at its stock first (the record takes that stock's time).
+        void recordCarriedPosition(const string& ticker, float quantity, float averagePrice);
         void addPosition(Position &position);
         vector<Order> getOrders(){ return orders; };
         void reset() { orders.clear(); positions.clear(); };

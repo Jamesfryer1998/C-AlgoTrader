@@ -173,6 +173,43 @@ TEST_F(LiveTraderBacktestTests, CapitalOptionSetsTheStartingCapital)
     EXPECT_LT(trader.getResult().endingEquity, 25000);   // the same losing trade
 }
 
+TEST_F(LiveTraderBacktestTests, StartsHoldingThePositionsCarriedIn)
+{
+    LiveOptions flatStart = backtest(FIRST_DAY);
+    flatStart.backtestCapital = 50000;
+    LiveTrader withoutPositions(config(), flatStart, dataRoot);
+    ASSERT_EQ(withoutPositions.run(), 0);
+
+    LiveOptions carried = flatStart;
+    carried.backtestPositions = {{"PEP", 20, 90.0}, {"MSFT", 5, 300.0}};   // MSFT isn't in the portfolio
+    LiveTrader withPositions(config(), carried, dataRoot);
+    ASSERT_EQ(withPositions.run(), 0);
+
+    // The account starts at its capital (PEP's value at the last close came out of the cash), give or take
+    // PEP's move from that close to the first bar, when the starting equity is measured
+    EXPECT_NEAR(withPositions.getResult().startingEquity, 50000, 20 * 0.10 + 0.01);
+    // PEP hardly moves all day (100.00 / 100.10), so holding it changes the result by cents at most
+    EXPECT_NEAR(withPositions.getResult().endingEquity, withoutPositions.getResult().endingEquity, 20 * 0.10 + 0.01);
+
+    // Recorded once, as carried in (no "broker holds" correction), and still held at the end
+    std::vector<TradeRecord> records = trades(FIRST_DAY);
+    ASSERT_FALSE(records.empty());
+    EXPECT_EQ(records[0].strategy, "carried");
+    EXPECT_EQ(records[0].ticker, "PEP");
+    EXPECT_EQ(records[0].side, "buy");
+    EXPECT_DOUBLE_EQ(records[0].quantity, 20);
+    EXPECT_DOUBLE_EQ(records[0].price, 90.0);
+    for (const auto& record : records)
+    {
+        EXPECT_NE(record.ticker, "MSFT");
+        EXPECT_FALSE(record.ticker == "PEP" && record.strategy == "broker") << record.note;
+    }
+    bool holdsPep = false;
+    for (const auto& position : TradeStore(dataRoot + "backtest/" + FIRST_DAY).loadPositions())
+        holdsPep |= position.getTicker() == "PEP" && position.getQuantity() == 20;
+    EXPECT_TRUE(holdsPep);
+}
+
 TEST_F(LiveTraderBacktestTests, EveryRunStartsFreshAndGivesTheSameResult)
 {
     LiveTrader first(config(), backtest(FIRST_DAY), dataRoot);

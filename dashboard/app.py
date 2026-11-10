@@ -295,7 +295,7 @@ def create_app(project: Project) -> Dash:
     def refresh_compare(day, _, __, active):
         """Redrawn when the day changes or its backtest starts, then every couple of seconds while it runs."""
         if ctx.triggered_id == "run-backtest" and day:
-            control.run_backtest(day)
+            control.run_backtest(day, comparison.live_start(project.live_records, day))
         job = control.jobs.get(day) if day else None
         backtesting = bool(job and job.state == "running")
         if active != COMPARE:
@@ -305,7 +305,7 @@ def create_app(project: Project) -> Dash:
         result = comparison.compare(project.live_records, project.backtest_records(day), day)
         notes = []
         if job and job.state == "running":
-            notes.append(html.Div(f"> Backtesting {day}...", className="warning-line"))
+            notes.append(html.Div(f"> Backtesting {day} {job.start.describe()}...", className="warning-line"))
         elif job and job.state == "failed":
             notes.append(panel(0, "Backtest failed", html.Pre(job.output[-2000:], className="log")))
         if not result["has_backtest"]:

@@ -183,7 +183,9 @@ LiveTrader::openFeed()
     if (!stream->load())
         return false;
     const auto& days = stream->getDays();
-    session = std::make_unique<BacktestSession>(config, days.front());
+    auto backtest = std::make_unique<BacktestSession>(config, days.front());
+    backtestSession = backtest.get();
+    session = std::move(backtest);
     result.firstDay = days.front();
     result.lastDay = days.back();
     feed = std::move(stream);
@@ -223,10 +225,35 @@ LiveTrader::openRecords()
     store = std::make_unique<TradeStore>(recordsDir);
     oms.setMarketData(lanes.front()->getMarketData());
     oms.enablePersistence(store.get(), &tracker);
+    carryPositionsIn();
     for (auto& lane : lanes)
     {
         oms.setMarketData(lane->getMarketData());
         oms.syncPosition(lane->getTicker());
+    }
+}
+
+// A backtest given --positions starts holding them, each valued at its last close before the backtest (the
+// back-filled bars), so the account starts at its capital as the live one did
+void
+LiveTrader::carryPositionsIn()
+{
+    if (!backtestSession)
+        return;
+    for (const auto& carried : options.backtestPositions)
+    {
+        auto lane = laneByTicker.find(carried.ticker);
+        if (lane == laneByTicker.end())
+        {
+            std::cerr << "WARNING - " << carried.ticker << " isn't in config/strategy.json's portfolio, so the "
+                      << "backtest doesn't hold it" << std::endl;
+            continue;
+        }
+        const MarketData& bars = lane->second->getMarketData();
+        double lastClose = bars.getData().empty() ? carried.averagePrice : bars.getLastClosePrice();
+        backtestSession->startWithPosition(carried.ticker, carried.quantity, carried.averagePrice, lastClose);
+        oms.setMarketData(bars);
+        oms.recordCarriedPosition(carried.ticker, carried.quantity, carried.averagePrice);
     }
 }
 

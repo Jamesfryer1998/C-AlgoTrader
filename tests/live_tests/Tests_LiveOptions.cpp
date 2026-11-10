@@ -39,6 +39,22 @@ TEST(LiveOptionsTests, CapitalMustBeAboveZeroAndOnlyForBacktests)
     EXPECT_THROW(parse({"--capital", "25000"}), std::invalid_argument);   // live uses Alpaca's own money
 }
 
+TEST(LiveOptionsTests, PositionsToStartABacktestWith)
+{
+    LiveOptions options = parse({"--backtest", "2026-11-09", "--positions", "KO:10@58.20,PEP:-5@170.1"});
+    ASSERT_EQ(options.backtestPositions.size(), 2u);
+    EXPECT_EQ(options.backtestPositions[0].ticker, "KO");
+    EXPECT_DOUBLE_EQ(options.backtestPositions[0].quantity, 10);
+    EXPECT_DOUBLE_EQ(options.backtestPositions[0].averagePrice, 58.20);
+    EXPECT_DOUBLE_EQ(options.backtestPositions[1].quantity, -5);   // short
+    EXPECT_TRUE(parse({"--backtest"}).backtestPositions.empty());
+
+    EXPECT_THROW(parse({"--backtest", "--positions", "KO10"}), std::invalid_argument);
+    EXPECT_THROW(parse({"--backtest", "--positions", "KO:ten@58"}), std::invalid_argument);
+    EXPECT_THROW(parse({"--backtest", "--positions", "KO:0@58"}), std::invalid_argument);
+    EXPECT_THROW(parse({"--positions", "KO:10@58"}), std::invalid_argument);   // live holds what Alpaca holds
+}
+
 TEST(LiveOptionsTests, EveryOption)
 {
     LiveOptions options = parse({"--backtest", "--speed", "10", "--quiet", "--verbose"});

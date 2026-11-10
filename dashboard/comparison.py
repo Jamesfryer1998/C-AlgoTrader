@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import metrics, records
+from .trader import BacktestStart
 
 MATCH, LIVE_ONLY, BACKTEST_ONLY = "matched", "live only", "backtest only"
 
@@ -61,6 +62,13 @@ def compare(live_folder: Path, backtest_folder: Path, day: str) -> dict:
         "backtest_only": int((fills["result"] == BACKTEST_ONLY).sum()),
         "has_backtest": not test_equity[test_equity["day"] == day].empty,
     }
+
+
+def live_start(live_folder: Path, day: str) -> BacktestStart:
+    """What the live account had going into `day`, so its backtest starts the same: the equity at the first
+    minute, and the positions carried over from the day before."""
+    return BacktestStart(capital=metrics.equity_at_start(records.equity(live_folder), day),
+                         positions=metrics.held_before(records.trades(live_folder), day))
 
 
 def traded_days(live_folder: Path) -> list[str]:

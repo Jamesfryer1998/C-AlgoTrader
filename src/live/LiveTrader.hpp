@@ -85,6 +85,7 @@ class LiveTrader
         bool connectBroker();
         void backfillLanes();
         void openRecords();
+        void carryPositionsIn();
         void printStartup();
         std::string describeRecords() const;
 
@@ -134,6 +135,7 @@ class LiveTrader
         // Where bars come from and where orders go
         std::unique_ptr<BarFeed> feed;
         std::unique_ptr<BrokerSession> session;
+        BacktestSession* backtestSession = nullptr;   // the same session when backtesting, for --positions
         OrderManagement oms;
         std::atomic<bool> feedFinished{false};
 

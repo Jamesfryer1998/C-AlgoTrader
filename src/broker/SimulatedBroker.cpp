@@ -631,6 +631,13 @@ SimulatedBroker::setStartingCapital(double capital)
 }
 
 void
+SimulatedBroker::startWithPosition(const std::string& ticker, double quantity, double averagePrice, double price)
+{
+    positionsByTicker[ticker] = Position(ticker, quantity, averagePrice);
+    currentCash -= quantity * price;
+}
+
+void
 SimulatedBroker::setMarketData(MarketData& MarketData) 
 {
     marketData = MarketData;

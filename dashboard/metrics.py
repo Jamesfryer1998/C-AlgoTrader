@@ -181,44 +181,79 @@ def exposure(status: dict, risk_config: dict) -> tuple[pd.DataFrame, dict]:
 
 # ---------- Closed trades and days ----------
 
-def closed_trades(trades: pd.DataFrame) -> pd.DataFrame:
-    """Each position closed (or reduced), with its P&L, by replaying the orders that changed what we held
-    through an average-cost book (as the trader's own P&L tracker does).
+class PositionBook:
+    """What we hold in each stock, replaying the orders that changed it through an average-cost book (as the
+    trader's own P&L tracker does). Each order that closes or reduces a position gives a closed trade.
 
-    `strategy` is the one that opened the position: a stop loss or take profit filled at the broker shows up as
-    a "broker" adjustment, but the trade is still that strategy's.
+    A closed trade belongs to the strategy that opened the position: a stop loss or take profit filled at the
+    broker shows up as a "broker" adjustment, but the trade is still that strategy's.
     """
-    held: dict[str, tuple[float, float]] = {}   # ticker -> (quantity, average price)
-    opened_by: dict[str, str] = {}              # ticker -> the strategy that opened what we hold
-    rows = []
-    for trade in trades[trades["status"].isin(records.CHANGED_POSITION)].itertuples():
+
+    CLOSED_COLUMNS = ["day", "time", "ticker", "strategy", "quantity", "entry", "exit", "pnl", "return_percent"]
+
+    def __init__(self):
+        self.held: dict[str, tuple[float, float]] = {}   # ticker -> (quantity: + long / - short, average price)
+        self.opened_by: dict[str, str] = {}              # ticker -> the strategy that opened what we hold
+        self.closed: list[dict] = []
+
+    def replay(self, trades: pd.DataFrame) -> "PositionBook":
+        for trade in trades[trades["status"].isin(records.CHANGED_POSITION)].itertuples():
+            self.apply(trade)
+        return self
+
+    def apply(self, trade) -> None:
         quantity = float(trade.quantity or 0)
         if quantity <= 0 or pd.isna(trade.price):
-            continue
+            return
         signed = quantity if trade.side == "buy" else -quantity
-        current, average = held.get(trade.ticker, (0.0, 0.0))
+        current, average = self.held.get(trade.ticker, (0.0, 0.0))
         if current == 0 or (current > 0) == (signed > 0):
             total = abs(current) + quantity
-            held[trade.ticker] = (current + signed, (abs(current) * average + quantity * trade.price) / total)
+            self.held[trade.ticker] = (current + signed, (abs(current) * average + quantity * trade.price) / total)
             if current == 0:
-                opened_by[trade.ticker] = trade.strategy
-            continue
+                self.opened_by[trade.ticker] = trade.strategy
+            return
         closing = min(quantity, abs(current))
         direction = 1.0 if current > 0 else -1.0
-        pnl = closing * (trade.price - average) * direction
-        rows.append({"day": trade.day, "time": trade.time, "ticker": trade.ticker,
-                     "strategy": opened_by.get(trade.ticker, trade.strategy), "quantity": closing,
-                     "entry": average, "exit": float(trade.price), "pnl": pnl,
-                     "return_percent": (trade.price - average) / average * 100 * direction if average else 0.0})
+        self.closed.append({"day": trade.day, "time": trade.time, "ticker": trade.ticker,
+                            "strategy": self.opened_by.get(trade.ticker, trade.strategy), "quantity": closing,
+                            "entry": average, "exit": float(trade.price),
+                            "pnl": closing * (trade.price - average) * direction,
+                            "return_percent": (trade.price - average) / average * 100 * direction if average else 0.0})
         left = current + (closing if signed > 0 else -closing)
         remaining = quantity - closing
         if remaining > 0:   # flipped from long to short (or back): this order opened the new position
-            held[trade.ticker] = (remaining if signed > 0 else -remaining, float(trade.price))
-            opened_by[trade.ticker] = trade.strategy
+            self.held[trade.ticker] = (remaining if signed > 0 else -remaining, float(trade.price))
+            self.opened_by[trade.ticker] = trade.strategy
         else:
-            held[trade.ticker] = (left, average if abs(left) > SAME_QUANTITY else 0.0)
-    return pd.DataFrame(rows, columns=["day", "time", "ticker", "strategy", "quantity", "entry", "exit", "pnl",
-                                       "return_percent"])
+            self.held[trade.ticker] = (left, average if abs(left) > SAME_QUANTITY else 0.0)
+
+    def open_positions(self) -> list[tuple[str, float, float]]:
+        """(ticker, quantity, average price) of each position still held, by ticker."""
+        return [(ticker, quantity, average) for ticker, (quantity, average) in sorted(self.held.items())
+                if abs(quantity) > SAME_QUANTITY]
+
+    def closed_trades(self) -> pd.DataFrame:
+        return pd.DataFrame(self.closed, columns=self.CLOSED_COLUMNS)
+
+
+def closed_trades(trades: pd.DataFrame) -> pd.DataFrame:
+    """Each position closed (or reduced), with its P&L and the strategy that opened it (see PositionBook)."""
+    return PositionBook().replay(trades).closed_trades()
+
+
+def held_before(trades: pd.DataFrame, day: str) -> list[tuple[str, float, float]]:
+    """(ticker, quantity, average price) of what we held going into `day`: every order before it, replayed."""
+    return PositionBook().replay(trades[trades["day"] < day]).open_positions()
+
+
+def equity_at_start(equity: pd.DataFrame, day: str) -> float | None:
+    """The account's value at `day`'s first recorded minute (else its last value before that day)."""
+    that_day = equity[equity["day"] == day]["equity"]
+    if not that_day.empty:
+        return float(that_day.iloc[0])
+    before = equity[equity["day"] < day]["equity"]
+    return float(before.iloc[-1]) if not before.empty else None
 
 
 # ---------- Strategies ----------

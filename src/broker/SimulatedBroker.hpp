@@ -79,6 +79,10 @@ class SimulatedBroker : public BrokerBase {
         // Custom order handling
         void setSlippage(double slippagePerc);
         void setStartingCapital(double capital);
+
+        // Start already holding a position (e.g. carried over from the live account). Its value at `price`
+        // (the last close before the backtest) comes out of cash, so the account still starts at its capital.
+        void startWithPosition(const std::string& ticker, double quantity, double averagePrice, double price);
         void setMarketData(MarketData& marketData);
         void setCommission(double commissionPerTrade);
 

@@ -25,6 +25,8 @@ TRADER_PROCESS_NAME = "algo_trader_app"
 BACKTEST_TIMEOUT_SECONDS = 600
 QUIET = "--quiet"
 BACKTEST = "--backtest"
+CAPITAL = "--capital"
+POSITIONS = "--positions"   # KO:10@58.2000,PEP:-5@170.1000
 
 
 def is_trader_process(pid: int) -> bool:
@@ -45,8 +47,30 @@ def is_trader_process(pid: int) -> bool:
 
 
 @dataclass
+class BacktestStart:
+    """What a backtest starts with, e.g. what the live account had going into that day."""
+    capital: float | None = None                                       # None: config's starting_capital
+    positions: list[tuple[str, float, float]] = field(default_factory=list)   # (ticker, quantity, average price)
+
+    def arguments(self) -> list[str]:
+        arguments = [CAPITAL, f"{self.capital:.2f}"] if self.capital else []
+        if self.positions:
+            arguments += [POSITIONS, ",".join(f"{ticker}:{quantity:g}@{price:.4f}"
+                                              for ticker, quantity, price in self.positions)]
+        return arguments
+
+    def describe(self) -> str:
+        """For the Backtest vs live tab, e.g. from $99,012.50 holding KO 10, PEP -5"""
+        text = f"from ${self.capital:,.2f}" if self.capital else "from the configured capital"
+        if self.positions:
+            text += " holding " + ", ".join(f"{ticker} {quantity:g}" for ticker, quantity, _ in self.positions)
+        return text
+
+
+@dataclass
 class BacktestJob:
     day: str
+    start: BacktestStart = field(default_factory=BacktestStart)
     state: str = "running"     # running / done / failed
     output: str = ""
     started: float = field(default_factory=time.time)
@@ -98,20 +122,21 @@ class TraderControl:
 
     # ---------- Backtests ----------
 
-    def run_backtest(self, day: str) -> BacktestJob:
-        """Backtest one day in the background (downloading its bars if they're missing)."""
+    def run_backtest(self, day: str, start: BacktestStart | None = None) -> BacktestJob:
+        """Backtest one day in the background (downloading its bars if they're missing), starting with `start`."""
         with self.lock:
             job = self.jobs.get(day)
             if job and job.state == "running":
                 return job
-            job = BacktestJob(day)
+            job = BacktestJob(day, start or BacktestStart())
             self.jobs[day] = job
         threading.Thread(target=self._backtest, args=(job,), daemon=True).start()
         return job
 
     def _backtest(self, job: BacktestJob) -> None:
         try:
-            done = subprocess.run([str(self.project.trader_app), BACKTEST, job.day, QUIET], cwd=self.project.root,
+            done = subprocess.run([str(self.project.trader_app), BACKTEST, job.day, QUIET, *job.start.arguments()],
+                                  cwd=self.project.root,
                                   capture_output=True, text=True, timeout=BACKTEST_TIMEOUT_SECONDS)
             job.output = (done.stdout + done.stderr).strip()
             job.state = "done" if done.returncode == 0 else "failed"

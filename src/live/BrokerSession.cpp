@@ -174,6 +174,13 @@ BacktestSession::connect()
     return true;   // the simulated broker connects itself when it's created
 }
 
+void
+BacktestSession::startWithPosition(const std::string& ticker, double quantity, double averagePrice, double price)
+{
+    simulated.startWithPosition(ticker, quantity, averagePrice, price);
+    carriedPositions++;
+}
+
 std::string
 BacktestSession::recordsFolder() const
 {
@@ -190,7 +197,8 @@ BacktestSession::describeMode() const
 std::string
 BacktestSession::describeAccount() const
 {
-    return "simulated, " + Format::dollars(simulated.getStartingCapital()) + " to start, "
+    std::string holding = carriedPositions ? " (" + std::to_string(carriedPositions) + " position(s) carried in)" : "";
+    return "simulated, " + Format::dollars(simulated.getStartingCapital()) + " to start" + holding + ", "
          + Format::number(simulated.getSlippagePercentage() * PERCENT, 2) + "% slippage a fill, SEC and FINRA fees on sells";
 }
 
