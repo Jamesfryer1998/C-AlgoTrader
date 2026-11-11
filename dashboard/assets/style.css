@@ -112,3 +112,4 @@ html, body { background: var(--black); color: var(--text); font-family: var(--mo
 .modal-text { padding: 14px 12px; }
 .modal-keys { display: flex; justify-content: flex-end; gap: 8px; padding: 0 12px 12px; }
 .modal-backdrop.show { opacity: 0.7; }
+.source-picker { width: 260px; }

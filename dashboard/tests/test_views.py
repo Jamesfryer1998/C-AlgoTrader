@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from dashboard import comparison, metrics, records, views
+from dashboard import comparison, metrics, records, report, views
 from dashboard.tests.conftest import BACKTEST_DAY
 from dashboard.tests.test_records_and_metrics import write_trades
 
@@ -169,3 +169,54 @@ def test_config_views(project):
         {"portfolio": [{"ticker": "KO", "strategy": {"name": "RSI", "active": 1, "period": 14}}]}))
     assert texts(views.portfolio_table(project)) == [["KO", "RSI", "period 14"]]
     assert "KELLY" in views.risk_text(project)
+
+
+def report_days(count: int):
+    """`count` trading days of an equity curve that wobbles up."""
+    closes, value = {}, 100000.0
+    for i in range(count):
+        day = (pd.Timestamp("2026-09-01") + pd.offsets.BDay(i)).strftime("%Y-%m-%d")
+        start = value
+        value *= 1 + (0.004 if i % 3 else -0.006)
+        closes[day] = [start, value]
+    rows = [{"time": f"{day} 09:{30 + j:02d}:00", "equity": v, "day": day}
+            for day, values in closes.items() for j, v in enumerate(values)]
+    return report.daily(pd.DataFrame(rows))
+
+
+def test_report_charts():
+    days = report_days(60)
+    figures = [views.growth_figure(days, "k"), views.drawdown_figure(days, "k"),
+               views.monthly_heatmap(report.monthly_returns(days), "k"), views.daily_returns_figure(days, "k"),
+               views.distribution_figure(days, "k"), views.qq_figure(days, "k"),
+               views.rolling_figure(report.rolling(days), days, "k")]
+    for figure in figures:
+        json.dumps(figure)                                    # plain data Dash can send
+        assert figure["data"] and figure["layout"]["uirevision"] == "k"
+    heatmap = figures[2]["data"][0]
+    assert heatmap["y"] == ["2026"] and heatmap["zmid"] == 0
+    assert heatmap["text"][0][8].startswith(("+", "-"))       # September's cell carries its signed return
+    bars = figures[3]["data"][0]
+    assert {colour for colour in bars["marker"]["color"]} == {views.UP_COLOUR, views.DOWN_COLOUR}
+    assert [trace["name"] for trace in figures[6]["data"]] == ["20-day return", "20-day volatility (annualised)"]
+
+
+def test_report_charts_say_when_there_are_too_few_days():
+    days = report_days(3)
+    assert views.growth_figure(days, "k")["data"]               # a curve from day one
+    for figure in [views.distribution_figure(days, "k"), views.qq_figure(days, "k"),
+                   views.rolling_figure(report.rolling(days), days, "k")]:
+        assert figure["data"] == [] and "NEEDS AT LEAST" in figure["layout"]["annotations"][0]["text"]
+    assert views.growth_figure(report.daily(pd.DataFrame(columns=["time", "equity", "day"])), "k")["data"] == []
+    kpis = {k.title: k for k in views.report_kpis(report.summary(days))}
+    assert kpis["Days"].value == "3" and kpis["Sharpe"].value == "-"      # too short to annualise
+
+
+def test_strategy_lines_never_reuse_a_colour():
+    names = [f"S{i}" for i in range(len(views.STRATEGY_COLOURS) + 2)]
+    closed = pd.DataFrame({"strategy": names, "time": [f"{BACKTEST_DAY} 10:0{i}:00" for i in range(len(names))],
+                           "pnl": [1.0] * len(names)})
+    lines = views.strategy_pnl_figure(closed)["data"]
+    assert [line["name"] for line in lines] == names[:len(views.STRATEGY_COLOURS)] + [views.OTHER_STRATEGIES]
+    assert len({line["line"]["color"] for line in lines}) == len(lines)
+    assert lines[-1]["y"] == [1.0, 2.0]                                   # the two extra strategies, added up

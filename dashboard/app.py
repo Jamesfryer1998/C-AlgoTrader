@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import dash_bootstrap_components as dbc
 from dash import ClientsideFunction, Dash, Input, Output, State, ctx, dcc, html, no_update
 
-from . import comparison, metrics, records, views
+from . import comparison, metrics, records, report, views
 from .project import Project
 from .trader import TraderControl
 
@@ -36,9 +36,9 @@ SEPARATOR = "◆"
 
 GRAPH_CONFIG = {"displayModeBar": False}   # drag to zoom, double-click to zoom back out
 
-LIVE, COMPARE, HISTORY, STRATEGIES, SYSTEM = "live", "compare", "history", "strategies", "system"
+LIVE, COMPARE, HISTORY, STRATEGIES, REPORT, SYSTEM = "live", "compare", "history", "strategies", "report", "system"
 TABS = [(LIVE, "1 LIVE"), (COMPARE, "2 BACKTEST VS LIVE"), (HISTORY, "3 HISTORY"), (STRATEGIES, "4 STRATEGIES"),
-        (SYSTEM, "5 SYSTEM")]
+        (REPORT, "5 REPORT"), (SYSTEM, "6 SYSTEM")]
 
 
 # ---------- Building blocks ----------
@@ -128,6 +128,28 @@ def confirm(id_: str, title: str, body: str, button: str, tone: str) -> dbc.Moda
 
 # ---------- Layout ----------
 
+REPORT_CHARTS = ["growth", "drawdown", "monthly", "daily", "distribution", "qq", "rolling"]
+
+
+def report_tab() -> html.Div:
+    """A tear sheet of one equity curve, the live account's or a backtest's, day by day."""
+    controls = html.Div([html.Span("SOURCE", className="label"),
+                         dbc.Select(id="report-source", className="day-picker source-picker")], className="controls")
+    rolling = f"Rolling {report.ROLLING_DAYS} days"
+    return html.Div([
+        controls,
+        html.Div(id="report-stats", className="stat-line"),
+        dbc.Row([dbc.Col([panel(1, "Return since the start", graph("report-growth")),
+                          panel(2, "Drawdown from the high", graph("report-drawdown"))], lg=8),
+                 dbc.Col(panel(3, "Monthly returns", graph("report-monthly")), lg=4)], className="g-2"),
+        dbc.Row([dbc.Col(panel(4, "Daily returns", graph("report-daily")), lg=6),
+                 dbc.Col(panel(5, "Distribution of daily returns", graph("report-distribution")), lg=6)],
+                className="g-2"),
+        dbc.Row([dbc.Col(panel(6, "Normal distribution Q-Q", graph("report-qq")), lg=4),
+                 dbc.Col(panel(7, rolling, graph("report-rolling")), lg=8)], className="g-2"),
+    ], id="report-tab", style={"display": "none"})
+
+
 def layout() -> html.Div:
     status_bar = html.Div([
         html.Div([html.Div(segments([html.Span(TITLE.upper(), className="brand"), html.Span(id="mode"),
@@ -180,6 +202,7 @@ def layout() -> html.Div:
         html.Div([compare_controls, html.Div(id="compare-body")], id="compare-tab", style={"display": "none"}),
         history_tab,
         strategies_tab,
+        report_tab(),
         html.Div(id="system-tab", style={"display": "none"}),
         confirm("start", "Start trading", "", "Start", views.POSITIVE),
         confirm("flatten", "Flatten and stop",
@@ -191,6 +214,7 @@ def layout() -> html.Div:
         dcc.Store(id="live-sent"),
         dcc.Store(id="history-sent"),
         dcc.Store(id="strategies-sent"),
+        dcc.Store(id="report-sent"),
     ], className="page")
 
 
@@ -359,6 +383,41 @@ def create_app(project: Project) -> Dash:
         return (sent.update("pnl", closed.values.tolist(), lambda _: views.strategy_pnl_figure(closed)),
                 sent.update("by-stock", views.strategy_stock_table(metrics.strategy_by_stock(trades)), table),
                 sent.update("table", views.strategies_table(metrics.strategy_performance(trades)), table),
+                sent.fingerprints)
+
+    # ----- Report -----
+
+    @app.callback(Output("report-source", "options"), Output("report-source", "value"),
+                  Input("tabs", "active_tab"), State("report-source", "value"))
+    def report_sources(active, chosen):
+        if active != REPORT:
+            return no_update, no_update
+        sources = report.sources(project)
+        values = [value for value, _ in sources]
+        return ([{"label": label, "value": value} for value, label in sources],
+                chosen if chosen in values else report.LIVE_SOURCE)
+
+    @app.callback(Output("report-stats", "children"),
+                  *[Output(f"report-{chart}", "figure") for chart in REPORT_CHARTS], Output("report-sent", "data"),
+                  Input("report-source", "value"), Input("tabs", "active_tab"), Input("slow", "n_intervals"),
+                  State("report-sent", "data"))
+    def refresh_report(source, active, _, sent_before):
+        if active != REPORT or not source:
+            return (*[no_update] * (1 + len(REPORT_CHARTS)), sent_before)
+        sent = SentParts(sent_before)
+        days = report.daily(records.equity(report.folder_of(project, source)))
+        key = source   # each source keeps its own zoom
+        figures = {"growth": lambda: views.growth_figure(days, key),
+                   "drawdown": lambda: views.drawdown_figure(days, key),
+                   "monthly": lambda: views.monthly_heatmap(report.monthly_returns(days), key),
+                   "daily": lambda: views.daily_returns_figure(days, key),
+                   "distribution": lambda: views.distribution_figure(days, key),
+                   "qq": lambda: views.qq_figure(days, key),
+                   "rolling": lambda: views.rolling_figure(report.rolling(days), days, key)}
+        data = (source, days.values.tolist())
+        return (sent.update("stats", views.report_kpis(report.summary(days)),
+                            lambda kpis: segments([kpi_segment(k) for k in kpis])),
+                *[sent.update(chart, data, lambda _, build=figures[chart]: build()) for chart in REPORT_CHARTS],
                 sent.fingerprints)
 
     # ----- System: config and the trader's output -----

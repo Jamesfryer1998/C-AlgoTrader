@@ -11,7 +11,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from . import comparison, metrics, records
+from . import comparison, metrics, records, report
 from .project import Project
 
 # Tones the stylesheet colours (assets/style.css)
@@ -22,18 +22,27 @@ NOTHING = "-"
 PANEL = "#000000"
 GRID = "#141a1f"
 TEXT = "#9aa5ad"
-LIVE_COLOUR = "#3ad7f0"
-BACKTEST_COLOUR = "#f5d547"
+# Chart lines are the theme's hues stepped into the band that reads on black (checked with the dataviz skill's
+# validator: lightness, colour-blind separation and contrast all pass). The frames stay the brighter cyan.
+LIVE_COLOUR = "#1aa3b8"
+BACKTEST_COLOUR = "#b38612"
+# Profit and loss. Red against green is hard for some colour-blind viewers, so a chart never shows the sign by
+# colour alone: bars sit above or below zero, and heatmap cells carry their signed value.
 UP_COLOUR = "#4ade80"
 DOWN_COLOUR = "#f87171"
+NEUTRAL_COLOUR = "#2b3238"   # the middle of the red-to-green scale: "nothing" is grey, never a hue
+REFERENCE_COLOUR = "#6b7680"  # reference lines (a mean, the normal line on the Q-Q plot)
 CHART_FONT = "JetBrains Mono, Menlo, monospace"
 CHART_MARGIN = {"l": 8, "r": 64, "t": 10, "b": 28}
 CHART_HEIGHT = 300
 DAILY_PNL_ZOOM_KEY = "daily-pnl"   # one chart of every day: it keeps its zoom as new days arrive
 STRATEGY_PNL_ZOOM_KEY = "strategy-pnl"
 SIGNED_DOLLARS = "+$,.2f"   # Plotly's axis format for P&L: +$12.50, -$3.00
-# A line per strategy: none of them green or red, which mean profit and loss here
-STRATEGY_COLOURS = ["#3ad7f0", "#f5d547", "#e879f9", "#fb923c", "#a78bfa", "#94a3b8"]
+# A line per strategy, in this order (validated as a set): none green or red, which mean profit and loss here.
+# More strategies than colours fold into one "Other" line rather than reusing a colour.
+STRATEGY_COLOURS = ["#1aa3b8", "#d9702a", "#c45bd1", "#b38612", "#3987e5"]
+OTHER_STRATEGIES = "Other"
+OTHER_COLOUR = "#6b7680"
 
 # The tape: an arrow for each side, as on a trading terminal
 BUY_ARROW, SELL_ARROW = "▲", "▼"
@@ -364,13 +373,180 @@ def strategy_stock_table(by_stock: pd.DataFrame) -> Table:
 
 
 def strategy_pnl_figure(closed: pd.DataFrame) -> dict:
-    """Each strategy's realised P&L adding up, trade by trade."""
-    data = []
-    for i, (name, exits) in enumerate(closed.groupby("strategy", sort=True)):
-        data.append({"type": "scatter", "mode": "lines", "name": name, "x": list(exits["time"]),
-                     "y": [round(v, 2) for v in exits["pnl"].cumsum()],
-                     "line": {"color": STRATEGY_COLOURS[i % len(STRATEGY_COLOURS)], "width": 1.5, "shape": "hv"}})
+    """Each strategy's realised P&L adding up, trade by trade. Colours go to strategies by name, so a strategy
+    keeps its colour; past the palette, the rest add up in one "Other" line."""
+    names = sorted(closed["strategy"].dropna().unique())
+    own_line = names[:len(STRATEGY_COLOURS)]
+    data = [_line(name, closed[closed["strategy"] == name]["time"], closed[closed["strategy"] == name]["pnl"].cumsum(),
+                  colour) for name, colour in zip(own_line, STRATEGY_COLOURS)]
+    others = closed[closed["strategy"].isin(names[len(STRATEGY_COLOURS):])]
+    if not others.empty:
+        data.append(_line(OTHER_STRATEGIES, others["time"], others["pnl"].cumsum(), OTHER_COLOUR))
     return {"data": data, "layout": {**_layout(STRATEGY_PNL_ZOOM_KEY), "showlegend": True}}
+
+
+# ---------- Report ----------
+
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+PERCENT_AXIS = ".1%"
+SIGNED_PERCENT_AXIS = "+.1%"
+SIGNED_PERCENT_HOVER = "%{y:+.2%}"
+HISTOGRAM_BINS = 30
+QQ_MARKER_SIZE = 8
+GAP_PIXELS = 2   # between heatmap cells and bars, so neighbouring fills stay apart
+
+
+def report_kpis(summary: report.Summary) -> list[Kpi]:
+    """The headline numbers above the report's charts."""
+    def signed(value):
+        return percent(None if value is None else value * 100, 2, signed=True)
+
+    def ratio(value):
+        return number(value) if value is not None else NOTHING
+    too_short = f"needs {report.MIN_DAYS_TO_ANNUALISE} days"
+    return [Kpi("Days", str(summary.days)),
+            Kpi("Total return", signed(summary.total_return), "", tone_of(summary.total_return)),
+            Kpi("Annualised", signed(summary.annualised_return), too_short, tone_of(summary.annualised_return)),
+            Kpi("Volatility", percent(None if summary.volatility is None else summary.volatility * 100, 1),
+                "annualised; " + too_short),
+            Kpi("Sharpe", ratio(summary.sharpe), "annualised, no risk-free rate; " + too_short),
+            Kpi("Sortino", ratio(summary.sortino), "annualised; " + too_short),
+            Kpi("Max drawdown", signed(summary.max_drawdown), "from a closing high", tone_of(summary.max_drawdown)),
+            Kpi("Best day", signed(summary.best_day), "", tone_of(summary.best_day)),
+            Kpi("Worst day", signed(summary.worst_day), "", tone_of(summary.worst_day)),
+            Kpi("Winning days", percent(None if summary.winning_days is None else summary.winning_days * 100, 0))]
+
+
+def _percent_layout(zoom_key: str, signed: bool = True) -> dict:
+    layout = _layout(zoom_key)
+    layout["yaxis"] = {**layout["yaxis"], "tickprefix": "", "tickformat": SIGNED_PERCENT_AXIS if signed else PERCENT_AXIS}
+    return layout
+
+
+def _note_figure(text: str, zoom_key: str) -> dict:
+    """An empty chart that says why it's empty."""
+    layout = _layout(zoom_key)
+    layout["xaxis"] = {**layout["xaxis"], "visible": False}
+    layout["yaxis"] = {**layout["yaxis"], "visible": False}
+    layout["annotations"] = [{"text": text.upper(), "showarrow": False, "font": {"color": REFERENCE_COLOUR},
+                              "xref": "paper", "yref": "paper", "x": 0.5, "y": 0.5}]
+    return {"data": [], "layout": layout}
+
+
+def _too_short(days: pd.DataFrame, needed: int, zoom_key: str) -> dict | None:
+    if len(days) >= needed:
+        return None
+    return _note_figure(f"Needs at least {needed} days ({len(days)} so far)", zoom_key)
+
+
+def growth_figure(days: pd.DataFrame, zoom_key: str) -> dict:
+    """The return since the start, each day's close."""
+    if days.empty:
+        return _note_figure("No equity recorded yet", zoom_key)
+    line = _line("Return", days["day"], days["growth"], LIVE_COLOUR)
+    line["hovertemplate"] = "%{x}  " + SIGNED_PERCENT_HOVER + "<extra></extra>"
+    return {"data": [line], "layout": {**_percent_layout(zoom_key), "showlegend": False}}
+
+
+def drawdown_figure(days: pd.DataFrame, zoom_key: str) -> dict:
+    """How far each close sits below the highest close before it."""
+    if days.empty:
+        return _note_figure("No equity recorded yet", zoom_key)
+    line = _line("Drawdown", days["day"], days["drawdown"], DOWN_COLOUR)
+    line.update({"fill": "tozeroy", "fillcolor": "rgba(248,113,113,0.15)",
+                 "hovertemplate": "%{x}  " + SIGNED_PERCENT_HOVER + "<extra></extra>"})
+    return {"data": [line], "layout": {**_percent_layout(zoom_key), "showlegend": False}}
+
+
+def monthly_heatmap(months: pd.DataFrame, zoom_key: str) -> dict:
+    """A cell per month, red to green through grey, each labelled with its return."""
+    if months.empty:
+        return _note_figure("No equity recorded yet", zoom_key)
+    values = [[None if pd.isna(v) else round(float(v), 6) for v in row] for row in months.values]
+    labels = [["" if v is None else f"{v:+.1%}" for v in row] for row in values]
+    biggest = max([abs(v) for row in values for v in row if v is not None] or [1])
+    heatmap = {"type": "heatmap", "z": values, "x": MONTHS, "y": [str(year) for year in months.index],
+               "text": labels, "texttemplate": "%{text}", "textfont": {"family": CHART_FONT, "size": 10},
+               "colorscale": [[0, DOWN_COLOUR], [0.5, NEUTRAL_COLOUR], [1, UP_COLOUR]],
+               "zmid": 0, "zmin": -biggest, "zmax": biggest, "showscale": False,
+               "xgap": GAP_PIXELS, "ygap": GAP_PIXELS, "hoverongaps": False,
+               "hovertemplate": "%{x} %{y}  %{z:+.2%}<extra></extra>"}
+    layout = _layout(zoom_key)
+    layout["yaxis"] = {**layout["yaxis"], "tickprefix": "", "type": "category", "autorange": "reversed"}
+    layout["xaxis"] = {**layout["xaxis"], "type": "category", "showgrid": False}
+    layout["hovermode"] = "closest"
+    return {"data": [heatmap], "layout": layout}
+
+
+def daily_returns_figure(days: pd.DataFrame, zoom_key: str) -> dict:
+    """Each day's return as a bar above or below zero, with the mean dashed across."""
+    if days.empty:
+        return _note_figure("No equity recorded yet", zoom_key)
+    bars = {"type": "bar", "x": list(days["day"]), "y": [round(v, 6) for v in days["return"]], "name": "Day",
+            "marker": {"color": [UP_COLOUR if v >= 0 else DOWN_COLOUR for v in days["return"]]},
+            "hovertemplate": "%{x}  " + SIGNED_PERCENT_HOVER + "<extra></extra>"}
+    layout = _percent_layout(zoom_key)
+    layout.update({"bargap": 0.25, "showlegend": False, "hovermode": "closest",
+                   "shapes": [_mean_line("y", float(days["return"].mean()))]})
+    return {"data": [bars], "layout": layout}
+
+
+def distribution_figure(days: pd.DataFrame, zoom_key: str) -> dict:
+    """How the daily returns spread, with their mean."""
+    short = _too_short(days, report.MIN_DAYS_FOR_SHAPE, zoom_key)
+    if short:
+        return short
+    histogram = {"type": "histogram", "x": [round(v, 6) for v in days["return"]], "nbinsx": HISTOGRAM_BINS,
+                 "marker": {"color": LIVE_COLOUR, "line": {"color": PANEL, "width": GAP_PIXELS}},
+                 "hovertemplate": "%{x}  %{y} days<extra></extra>"}
+    layout = _layout(zoom_key)
+    layout["xaxis"] = {**layout["xaxis"], "tickformat": SIGNED_PERCENT_AXIS}
+    layout["yaxis"] = {**layout["yaxis"], "tickprefix": "", "title": {"text": "days"}}
+    layout.update({"showlegend": False, "hovermode": "closest", "shapes": [_mean_line("x", float(days["return"].mean()))]})
+    return {"data": [histogram], "layout": layout}
+
+
+def qq_figure(days: pd.DataFrame, zoom_key: str) -> dict:
+    """The sorted daily returns against where a normal distribution would put them: on the line means normal,
+    ends bending away mean fatter tails (bigger days, good and bad, than a normal curve expects)."""
+    short = _too_short(days, report.MIN_DAYS_FOR_SHAPE, zoom_key)
+    if short:
+        return short
+    observed = sorted(days["return"])
+    expected = report.normal_quantiles(len(observed))
+    mean, deviation = float(days["return"].mean()), float(days["return"].std())
+    points = {"type": "scatter", "mode": "markers", "x": [round(q, 3) for q in expected],
+              "y": [round(v, 6) for v in observed], "name": "Days",
+              "marker": {"color": LIVE_COLOUR, "size": QQ_MARKER_SIZE, "line": {"color": PANEL, "width": GAP_PIXELS}},
+              "hovertemplate": "normal %{x:.2f}  actual " + SIGNED_PERCENT_HOVER + "<extra></extra>"}
+    normal = {"type": "scatter", "mode": "lines", "x": [expected[0], expected[-1]],
+              "y": [mean + deviation * expected[0], mean + deviation * expected[-1]], "name": "Normal",
+              "line": {"color": REFERENCE_COLOUR, "width": 1, "dash": "dash"}, "hoverinfo": "skip"}
+    layout = _percent_layout(zoom_key)
+    layout["xaxis"] = {**layout["xaxis"], "title": {"text": "normal quantile"}}
+    layout.update({"showlegend": False, "hovermode": "closest"})
+    return {"data": [normal, points], "layout": layout}
+
+
+def rolling_figure(window: pd.DataFrame, days: pd.DataFrame, zoom_key: str) -> dict:
+    """The return over the last N days and their annualised volatility, both in %, on one axis."""
+    short = _too_short(days, report.ROLLING_DAYS, zoom_key)
+    if short:
+        return short
+    data = [_line(f"{report.ROLLING_DAYS}-day return", window["day"], window["return"], LIVE_COLOUR),
+            _line(f"{report.ROLLING_DAYS}-day volatility (annualised)", window["day"], window["volatility"],
+                  BACKTEST_COLOUR)]
+    for line in data:
+        line["hovertemplate"] = SIGNED_PERCENT_HOVER + "<extra>%{fullData.name}</extra>"
+    return {"data": data, "layout": {**_percent_layout(zoom_key), "showlegend": True}}
+
+
+def _mean_line(axis: str, mean: float) -> dict:
+    """A dashed line across the chart at the mean (axis "y": horizontal, "x": vertical)."""
+    across = "x" if axis == "y" else "y"
+    return {"type": "line", "xref": "x" if axis == "x" else "paper", "yref": "y" if axis == "y" else "paper",
+            f"{axis}0": mean, f"{axis}1": mean, f"{across}0": 0, f"{across}1": 1,
+            "line": {"color": REFERENCE_COLOUR, "width": 1, "dash": "dash"}}
 
 
 def _signed_or_nothing(value) -> tuple[str, str]:
