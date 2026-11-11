@@ -18,6 +18,7 @@ import dash_bootstrap_components as dbc
 from dash import ClientsideFunction, Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from . import comparison, metrics, records, report, views
+from .end_of_day import EndOfDayBacktests
 from .project import Project
 from .trader import TraderControl
 
@@ -220,8 +221,11 @@ def layout() -> html.Div:
 
 # ---------- The app ----------
 
-def create_app(project: Project) -> Dash:
+def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
+    """end_of_day_backtests: backtest each day live traded once it's over (end_of_day.py), as the server does."""
     control = TraderControl(project)
+    if end_of_day_backtests:
+        EndOfDayBacktests(project, control).start()
     app = Dash(__name__, title=TITLE, update_title=None, external_stylesheets=[dbc.themes.BOOTSTRAP, FONTS],
                suppress_callback_exceptions=True)
     app.layout = layout
@@ -444,4 +448,4 @@ def main() -> None:
     project = Project.find()
     logging.getLogger(REQUEST_LOGGER).setLevel(logging.ERROR)
     print(f"Dashboard for {project.root} on http://{HOST}:{args.port}")
-    create_app(project).run(host=HOST, port=args.port, debug=False)
+    create_app(project, end_of_day_backtests=True).run(host=HOST, port=args.port, debug=False)

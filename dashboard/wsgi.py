@@ -9,4 +9,4 @@ On your own computer, python -m dashboard (or ./run_dashboard.sh) is still the w
 from .app import create_app
 from .project import Project
 
-server = create_app(Project.find()).server
+server = create_app(Project.find(), end_of_day_backtests=True).server

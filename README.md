@@ -178,7 +178,9 @@ python -m pip install -r dashboard/requirements.txt
 python -m pytest -q dashboard/tests
 ```
 The trader doesn't need it: every app still runs from the command line, and a trader started from the
-dashboard keeps running if the dashboard is closed.
+dashboard keeps running if the dashboard is closed. While it runs, the dashboard also backtests each day the
+live account traded, about 20 minutes after the close, starting as the live account did
+(`dashboard/end_of_day.py`), ready to compare on the Backtest vs live tab.
 
 ### CI and the home server
 GitHub Actions builds and tests everything on every push (`.github/workflows/ci.yml`). Once CI passes on
