@@ -55,6 +55,16 @@ TEST(LiveOptionsTests, PositionsToStartABacktestWith)
     EXPECT_THROW(parse({"--positions", "KO:10@58"}), std::invalid_argument);   // live holds what Alpaca holds
 }
 
+TEST(LiveOptionsTests, AnotherPortfolioAndRecordsFolderForABacktest)
+{
+    LiveOptions options = parse({"--backtest", "2026-11-10", "--portfolio", "data/picks/2026-11-07/top_picks_config.json",
+                                 "--records", "picks/backtest/2026-11-10"});
+    EXPECT_EQ(options.backtestPortfolio, "data/picks/2026-11-07/top_picks_config.json");
+    EXPECT_EQ(options.backtestRecords, "picks/backtest/2026-11-10");
+    EXPECT_THROW(parse({"--portfolio", "picks.json"}), std::invalid_argument);   // live uses config/strategy.json
+    EXPECT_THROW(parse({"--records", "elsewhere"}), std::invalid_argument);
+}
+
 TEST(LiveOptionsTests, EveryOption)
 {
     LiveOptions options = parse({"--backtest", "--speed", "10", "--quiet", "--verbose"});

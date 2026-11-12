@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <ctime>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -38,6 +39,7 @@ namespace
     const std::string BARS_LABEL = "Bars";
     const std::string RISK_LABEL = "Risk";
     const std::string RECORDS_LABEL = "Records";
+    const std::string PORTFOLIO = "portfolio";   // the stocks-and-strategies list in strategy.json (and --portfolio)
     const std::string RISK_KEY = "risk";
     const std::string STARTING_CAPITAL_KEY = "starting_capital";
 
@@ -121,16 +123,42 @@ LiveTrader::run()
 
 // ---------- Setting up ----------
 
+// A backtest given --portfolio trades that file's stocks and strategies instead of config/strategy.json's
+void
+LiveTrader::useOtherPortfolio(const std::string& path)
+{
+    std::ifstream file(path);
+    if (!file)
+        throw std::runtime_error("Can't open the portfolio file " + path);
+    json other = json::parse(file, nullptr, true, true);
+    config[PORTFOLIO] = other.is_array() ? other : other.at(PORTFOLIO);
+}
+
+// Where this run's records go, under the data folder: the session's own, or a backtest's --records
+std::string
+LiveTrader::recordsFolder() const
+{
+    if (options.backtestRecords.empty())
+        return session->recordsFolder();
+    std::string folder = options.backtestRecords;
+    while (!folder.empty() && folder.back() == '/')
+        folder.pop_back();
+    return folder;
+}
+
 bool
 LiveTrader::loadPortfolio()
 {
     try
     {
+        if (!options.backtestPortfolio.empty())
+            useOtherPortfolio(options.backtestPortfolio);
         portfolio = Portfolio::fromConfig(config);
     }
     catch (const std::exception& e)
     {
-        std::cerr << "ERROR - " << e.what() << " (" << ConfigFiles::STRATEGY << ")" << std::endl;
+        std::string file = options.backtestPortfolio.empty() ? ConfigFiles::STRATEGY : options.backtestPortfolio;
+        std::cerr << "ERROR - " << e.what() << " (" << file << ")" << std::endl;
         return false;
     }
 
@@ -218,7 +246,7 @@ LiveTrader::backfillLanes()
 void
 LiveTrader::openRecords()
 {
-    recordsDir = dataRoot + session->recordsFolder();
+    recordsDir = dataRoot + recordsFolder();
     if (options.backtest)
         TradeStore::removeFiles(recordsDir);
 
@@ -352,7 +380,7 @@ LiveTrader::flattenAll()
 std::string
 LiveTrader::describeRecords() const
 {
-    std::string folder = config.value("marketDataBasePath", std::string(Defaults::DATA_FOLDER)) + session->recordsFolder();
+    std::string folder = config.value("marketDataBasePath", std::string(Defaults::DATA_FOLDER)) + recordsFolder();
     if (options.backtest)
         return folder;
     size_t orders = oms.getRestoredOrders(), positions = oms.getRestoredPositions();

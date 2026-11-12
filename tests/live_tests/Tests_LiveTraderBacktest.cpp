@@ -210,6 +210,26 @@ TEST_F(LiveTraderBacktestTests, StartsHoldingThePositionsCarriedIn)
     EXPECT_TRUE(holdsPep);
 }
 
+TEST_F(LiveTraderBacktestTests, BacktestsAnotherPortfolioIntoItsOwnFolder)
+{
+    std::string picks = dataRoot + "picks.json";
+    std::ofstream(picks) << R"({"portfolio": [{"ticker": "PEP", "strategy": {"name": "RSI", "active": 1, "period": 14,
+                                "oversold_threshold": 30, "overbought_threshold": 70}}]})";
+    LiveOptions options = backtest(FIRST_DAY);
+    options.backtestPortfolio = picks;
+    options.backtestRecords = "picks/backtest/" + FIRST_DAY;
+    LiveTrader trader(config(), options, dataRoot);
+    ASSERT_EQ(trader.run(), 0);
+
+    EXPECT_TRUE(fs::is_directory(dataRoot + "picks/backtest/" + FIRST_DAY));
+    EXPECT_FALSE(fs::exists(dataRoot + "backtest/" + FIRST_DAY));                 // the usual folder untouched
+    for (const auto& record : TradeStore(dataRoot + "picks/backtest/" + FIRST_DAY).loadTrades())
+        EXPECT_EQ(record.ticker, "PEP");                                          // only the file's stock
+
+    options.backtestPortfolio = dataRoot + "missing.json";
+    EXPECT_NE(LiveTrader(config(), options, dataRoot).run(), 0);
+}
+
 TEST_F(LiveTraderBacktestTests, EveryRunStartsFreshAndGivesTheSameResult)
 {
     LiveTrader first(config(), backtest(FIRST_DAY), dataRoot);

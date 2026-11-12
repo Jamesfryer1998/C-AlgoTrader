@@ -86,6 +86,8 @@ class LiveTrader
         void backfillLanes();
         void openRecords();
         void carryPositionsIn();
+        void useOtherPortfolio(const std::string& path);
+        std::string recordsFolder() const;
         void printStartup();
         std::string describeRecords() const;
 

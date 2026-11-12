@@ -77,6 +77,10 @@ LiveOptions::parse(int argc, char* argv[])
         }
         else if (args.is("--positions"))
             options.backtestPositions = parsePositions(args.text());
+        else if (args.is("--portfolio"))
+            options.backtestPortfolio = args.text();
+        else if (args.is("--records"))
+            options.backtestRecords = args.text();
         else
             args.rejectOption();
     }
@@ -86,6 +90,9 @@ LiveOptions::parse(int argc, char* argv[])
     if (!options.backtestPositions.empty() && !options.backtest)
         throw std::invalid_argument("--positions only works with --backtest: live trading holds what the Alpaca "
                                     "account holds");
+    if ((!options.backtestPortfolio.empty() || !options.backtestRecords.empty()) && !options.backtest)
+        throw std::invalid_argument("--portfolio and --records only work with --backtest: live trading uses "
+                                    "config/strategy.json and its own records");
     return options;
 }
 
@@ -107,6 +114,10 @@ Usage: algo_trader_app [options]
                             start the backtest holding these (quantity, - for short, @ average price), e.g.
                             what the live account carried into that day. Their value at the last close
                             before the backtest comes out of the starting capital's cash
+  --portfolio picks.json    backtest the stocks and strategies in this file (a "portfolio" list, like
+                            config/strategy.json's or screen_app's top_picks_config.json) instead
+  --records picks/2026-11-10
+                            keep the backtest's records here, under data/ (default: backtest/<first day>)
   --quiet                   no minute tables, just the recap at the end
   --verbose                 also show each start-up step (config files, connections, back-fill)
 )";
