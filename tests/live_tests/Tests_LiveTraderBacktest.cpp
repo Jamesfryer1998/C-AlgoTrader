@@ -230,6 +230,30 @@ TEST_F(LiveTraderBacktestTests, BacktestsAnotherPortfolioIntoItsOwnFolder)
     EXPECT_NE(LiveTrader(config(), options, dataRoot).run(), 0);
 }
 
+TEST_F(LiveTraderBacktestTests, TradesTheChosenPortfolioInTheDataFolder)
+{
+    // As the dashboard's "Trade these picks" leaves it: config/strategy.json's portfolio is left alone
+    std::ofstream(dataRoot + "portfolio.json") << R"({"source": "picks from 2026-11-07", "portfolio": [
+        {"ticker": "PEP", "strategy": {"name": "RSI", "active": 1, "period": 14,
+                                       "oversold_threshold": 30, "overbought_threshold": 70}}]})";
+    LiveTrader chosen(config(), backtest(FIRST_DAY), dataRoot);
+    ASSERT_EQ(chosen.run(), 0);
+    for (const auto& record : trades(FIRST_DAY))
+        EXPECT_EQ(record.ticker, "PEP");
+
+    // A backtest's own --portfolio still wins
+    std::string other = dataRoot + "other.json";
+    std::ofstream(other) << R"([{"ticker": "KO", "strategy": {"name": "RSI", "active": 1, "period": 14,
+                                "oversold_threshold": 30, "overbought_threshold": 70}}])";
+    LiveOptions options = backtest(FIRST_DAY);
+    options.backtestPortfolio = other;
+    LiveTrader given(config(), options, dataRoot);
+    ASSERT_EQ(given.run(), 0);
+    for (const auto& record : trades(FIRST_DAY))
+        EXPECT_EQ(record.ticker, "KO");
+    fs::remove(dataRoot + "portfolio.json");
+}
+
 TEST_F(LiveTraderBacktestTests, EveryRunStartsFreshAndGivesTheSameResult)
 {
     LiveTrader first(config(), backtest(FIRST_DAY), dataRoot);

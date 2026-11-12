@@ -260,3 +260,9 @@ def test_latency_views():
     assert rows[1][3:7] == ["-", "-", "-", "-"]                        # not recorded apart then
     detail = views._latency_detail({**by_day.iloc[0].to_dict()})
     assert detail.startswith("entries 100.0 ms, exits 280.0 ms (3 requests)")
+
+
+def test_portfolio_status_line():
+    assert views.portfolio_status(None, "config/strategy.json") == "STOPPED  ◆  NEXT START config/strategy.json"
+    assert views.portfolio_status("config/strategy.json", "picks from 2026-11-07") == \
+        "TRADING config/strategy.json  ◆  NEXT START picks from 2026-11-07"

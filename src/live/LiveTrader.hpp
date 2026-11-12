@@ -87,6 +87,7 @@ class LiveTrader
         void openRecords();
         void carryPositionsIn();
         void useOtherPortfolio(const std::string& path);
+        std::string otherPortfolioFile() const;
         std::string recordsFolder() const;
         void printStartup();
         std::string describeRecords() const;
@@ -127,6 +128,7 @@ class LiveTrader
         json config;
         LiveOptions options;
         std::string dataRoot;
+        std::string portfolioSource = "config/strategy.json";   // what the portfolio came from, for the dashboard
 
         // What we trade
         std::vector<PortfolioEntry> portfolio;

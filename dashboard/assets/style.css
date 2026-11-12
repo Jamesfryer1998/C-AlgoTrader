@@ -116,3 +116,10 @@ html, body { background: var(--black); color: var(--text); font-family: var(--mo
 .progress-track { width: 220px; height: 10px; border: 1px solid var(--frame); background: var(--black); }
 .progress-fill { height: 100%; width: 0; background: var(--frame); transition: width 0.5s; }
 .panel-note { color: var(--muted); font-size: 10px; background: var(--black); padding: 0 6px; }
+
+/* ----- Picks: each week's "Trade these" ----- */
+.panel-actions { display: flex; align-items: center; gap: 6px; background: var(--black); }
+.panel-actions .key, .previous-heading .key { font-size: 10px; padding: 0 6px; line-height: 16px; }
+.previous-run + .previous-run { margin-top: 10px; }
+.previous-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.portfolio-line { color: var(--text); font-size: 11px; }

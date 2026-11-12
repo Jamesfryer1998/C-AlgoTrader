@@ -649,13 +649,20 @@ def _signed_or_nothing(value) -> tuple[str, str]:
 # ---------- Config ----------
 
 def portfolio_table(project: Project) -> Table:
+    """What the trader's next Start will trade: config/strategy.json's portfolio, or the picks chosen instead."""
     table = Table(["Stock", "Strategy", "Settings"], empty="No portfolio in config/strategy.json")
-    for stock in project.strategy.get("portfolio", []):
+    for stock in picks.portfolio_list(project):
         strategies = stock.get("strategy", stock.get("strategies", []))
         for strategy in strategies if isinstance(strategies, list) else [strategies]:
             settings = ", ".join(f"{k} {v}" for k, v in strategy.items() if k not in ("name", "active"))
             table.add(stock.get("ticker", NOTHING), strategy.get("name", NOTHING), settings)
     return table
+
+
+def portfolio_status(running: str | None, upcoming: str) -> str:
+    """"TRADING config/strategy.json  ◆  NEXT START picks from 2026-11-07" (running: None when stopped)."""
+    now = f"TRADING {running}" if running else "STOPPED"
+    return f"{now}  ◆  NEXT START {upcoming}"
 
 
 def risk_text(project: Project) -> str:

@@ -88,3 +88,40 @@ def test_which_picks_a_day_trades_and_the_comparison(project):
     row = picks.comparison(project, [day]).iloc[0]
     assert (row["live"], row["live_backtest"], row["picks"]) == (100, 50, 300)
     assert row["picks_minus_live"] == 200 and row["picks_run"] == "2026-11-07"
+
+
+def save_picks(project, run, portfolio):
+    folder = picks.picks_root(project) / run
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / picks.PICKS_PORTFOLIO).write_text(json.dumps(portfolio))
+
+
+def test_trading_a_weeks_picks_and_going_back_to_the_config(project):
+    (project.root / "config" / "strategy.json").write_text(json.dumps(
+        {"portfolio": [{"ticker": "SBUX", "strategy": {"name": "MACD"}}]}))
+    week = [{"ticker": "KO", "strategy": {"name": "RSI", "period": 14}},
+            {"ticker": "PEP", "strategy": [{"name": "SCALP"}, {"name": "VWAP"}]}]
+    save_picks(project, "2026-11-07", week)
+    assert picks.next_portfolio(project) == picks.CONFIG_PORTFOLIO
+    assert picks.portfolio_list(project)[0]["ticker"] == "SBUX"
+
+    message = picks.trade_picks(project, "2026-11-07")
+    assert "picks from 2026-11-07" in message
+    saved = json.loads(picks.chosen_portfolio_file(project).read_text())
+    assert saved[picks.PORTFOLIO] == week and saved[picks.SOURCE] == "picks from 2026-11-07"
+    assert picks.next_portfolio(project) == "picks from 2026-11-07"
+    assert picks.portfolio_list(project) == week
+    assert picks.describe_portfolio(week) == "KO RSI, PEP SCALP + VWAP"
+    assert json.loads((project.root / "config" / "strategy.json").read_text())["portfolio"][0]["ticker"] == "SBUX"
+
+    picks.trade_config(project)
+    assert not picks.chosen_portfolio_file(project).exists()
+    assert picks.next_portfolio(project) == picks.CONFIG_PORTFOLIO
+    picks.trade_config(project)   # already back: nothing to remove, no error
+
+
+def test_picks_that_cant_be_read_are_not_traded(project):
+    assert "Can't read" in picks.trade_picks(project, "2026-01-01")
+    save_picks(project, "2026-11-07", [])
+    assert "Can't read" in picks.trade_picks(project, "2026-11-07")   # nothing to trade
+    assert not picks.chosen_portfolio_file(project).exists()

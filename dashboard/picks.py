@@ -7,7 +7,9 @@
                                                 live account's money (data/picks/backtest/<day>/), next to live
                                                 and live's own portfolio backtested (end_of_day.py)
 
-Nothing here changes config/strategy.json: the picks are a suggestion to compare, until you choose to use them.
+Nothing here changes config/strategy.json. To trade a week's picks, "Trade these" saves them as data/portfolio.json,
+which the trader uses instead of config/strategy.json's portfolio from its next Start (deploys replace config/
+from the repo, but never touch data/). "Back to config/strategy.json" removes it.
 """
 
 from __future__ import annotations
@@ -44,6 +46,9 @@ SAVED_FILES = [PICKS_CSV, PICKS_PORTFOLIO, RESULTS_CSV, LOG_FILE]
 SCREENING, FINISHED, FAILED = "screening", "finished", "failed"
 STALE_AFTER = timedelta(minutes=30)      # a screen that hasn't moved for this long has died
 SCREEN_TIMEOUT_SECONDS = 6 * 3600
+CHOSEN_PORTFOLIO = "portfolio.json"     # under data/: traded instead of config/strategy.json's portfolio
+CONFIG_PORTFOLIO = "config/strategy.json"
+SOURCE, PORTFOLIO, CHOSEN_AT = "source", "portfolio", "chosen_utc"
 WEEKEND_FROM = (5, 6)                    # the weekly screen runs from Saturday 06:00 UTC (Saturday = weekday 5)
 SCREEN_NICENESS = 10                     # a lower CPU priority, so a screen run in trading hours never slows the trader
 
@@ -93,6 +98,71 @@ def _settings_text(parameters: str) -> str:
 
 def backtest_folder(project: Project, day: str) -> Path:
     return project.data_root / PICKS_BACKTESTS / day
+
+
+# ---------- Choosing what the trader trades ----------
+
+def chosen_portfolio_file(project: Project) -> Path:
+    return project.data_root / CHOSEN_PORTFOLIO
+
+
+def picks_source(run: str) -> str:
+    return f"picks from {run}"
+
+
+def next_portfolio(project: Project) -> str:
+    """What the trader will trade from its next Start: a week's picks, or config/strategy.json's portfolio."""
+    try:
+        return json.loads(chosen_portfolio_file(project).read_text()).get(SOURCE, CHOSEN_PORTFOLIO)
+    except (OSError, ValueError):
+        return CONFIG_PORTFOLIO
+
+
+def portfolio_list(project: Project) -> list[dict]:
+    """The stocks and strategies the trader's next Start will trade."""
+    try:
+        return json.loads(chosen_portfolio_file(project).read_text()).get(PORTFOLIO, [])
+    except (OSError, ValueError):
+        return project.strategy.get(PORTFOLIO, [])
+
+
+def picks_portfolio(project: Project, run: str) -> list[dict] | None:
+    """A saved week's picks as portfolio blocks (ticker + strategy), or None if they can't be read."""
+    try:
+        chosen = json.loads(portfolio_file(project, run).read_text())
+    except (OSError, ValueError):
+        return None
+    portfolio = chosen if isinstance(chosen, list) else chosen.get(PORTFOLIO)
+    return portfolio if isinstance(portfolio, list) else None
+
+
+def describe_portfolio(portfolio: list[dict]) -> str:
+    """[{"ticker": "KO", "strategy": {"name": "RSI"}}, ...] -> "KO RSI, ..."."""
+    def names(block: dict) -> str:
+        strategies = block.get("strategy", block.get("strategies", []))
+        strategies = strategies if isinstance(strategies, list) else [strategies]
+        return " + ".join(strategy.get("name", "") for strategy in strategies if isinstance(strategy, dict))
+    return ", ".join(f"{block.get('ticker', '?')} {names(block)}".strip() for block in portfolio)
+
+
+def trade_picks(project: Project, run: str) -> str:
+    """Make a saved week's picks the trader's portfolio from its next Start. Returns what happened."""
+    portfolio = picks_portfolio(project, run)
+    if not portfolio:
+        return f"Can't read the picks from {run}"
+    saved = {SOURCE: picks_source(run), CHOSEN_AT: datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+             PORTFOLIO: portfolio}
+    path = chosen_portfolio_file(project)
+    partial = path.with_suffix(".partial")
+    partial.write_text(json.dumps(saved, indent=2))
+    partial.replace(path)   # whole, or not at all: the trader may read it at any Start
+    return f"The trader will trade the {picks_source(run)} from its next Start"
+
+
+def trade_config(project: Project) -> str:
+    """Go back to config/strategy.json's portfolio from the trader's next Start."""
+    chosen_portfolio_file(project).unlink(missing_ok=True)
+    return f"The trader will trade {CONFIG_PORTFOLIO}'s portfolio from its next Start"
 
 
 # ---------- Running the screen ----------

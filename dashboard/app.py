@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import ClientsideFunction, Dash, Input, Output, State, ctx, dcc, html, no_update
+from dash import ALL, ClientsideFunction, Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from . import comparison, metrics, picks, records, report, views
 from .end_of_day import EndOfDayBacktests
@@ -133,6 +133,26 @@ def confirm(id_: str, title: str, body: str, button: str, tone: str) -> dbc.Moda
 # ---------- Layout ----------
 
 REPORT_CHARTS = ["growth", "drawdown", "monthly", "daily", "distribution", "qq", "rolling"]
+PREVIOUS_PICKS_SHOWN = 8
+TRADE_PICKS = "trade-picks"   # each saved week's "Trade these" button: {"type": TRADE_PICKS, "run": its date}
+
+
+def trade_picks_button(run: str) -> html.Button:
+    return html.Button("TRADE THESE", id={"type": TRADE_PICKS, "run": run}, className=f"key {views.POSITIVE}",
+                       n_clicks=0)
+
+
+def picks_heading(run: str) -> list:
+    return [html.Span(f"SCREENED {run}", className="panel-note"), trade_picks_button(run)]
+
+
+def previous_picks(project: Project, runs: list[str]):
+    """Each earlier week's picks, newest first, with a button to trade them."""
+    if not runs:
+        return html.Div("NO EARLIER SCREENS YET", className="empty")
+    return [html.Div([html.Div(picks_heading(run), className="previous-heading"),
+                      table(views.weekly_picks_table(picks.picks_table(project, run)))], className="previous-run")
+            for run in runs[:PREVIOUS_PICKS_SHOWN]]
 
 
 def picks_tab() -> html.Div:
@@ -140,17 +160,22 @@ def picks_tab() -> html.Div:
     controls = html.Div([key("RUN SCREEN NOW", "run-screen", views.WARNING),
                          html.Div(html.Div(id="screen-bar", className="progress-fill"), className="progress-track"),
                          html.Span(id="screen-status", className="muted")], className="controls")
+    portfolio = html.Div([html.Span(id="portfolio-status", className="portfolio-line"),
+                          key("BACK TO CONFIG/STRATEGY.JSON", "trade-config", views.MUTED)], className="controls")
     return html.Div([
         controls,
+        portfolio,
         html.Div(id="picks-stats", className="stat-line"),
         dbc.Row([dbc.Col(panel(1, "P&L added up: live vs picks", graph("picks-pnl")), lg=7),
-                 dbc.Col(panel(2, "This week's picks", html.Div(id="picks-table"),
-                               extra=html.Span(id="picks-run", className="panel-note")), lg=5)], className="g-2"),
-        panel(3, "Day by day", html.Div(id="picks-days")),
+                 dbc.Col([panel(2, "This week's picks", html.Div(id="picks-table"),
+                                extra=html.Div(id="picks-run", className="panel-actions")),
+                          panel(3, "Previous picks", html.Div(id="previous-picks"))], lg=5)], className="g-2"),
+        panel(4, "Day by day", html.Div(id="picks-days")),
         html.Div("Each weekend the screen tunes every strategy on every stock over the last months and keeps the "
                  "five that held up best on the final month it never saw. After each traded day's close, those "
-                 "picks are backtested on the day from the live account's money, starting flat. Nothing changes "
-                 "config/strategy.json: the picks are a suggestion to compare.", className="empty"),
+                 "picks are backtested on the day from the live account's money, starting flat. TRADE THESE makes "
+                 "a week's picks the trader's portfolio from its next Start (saved as data/portfolio.json, so "
+                 "deploys don't undo it); config/strategy.json itself is never changed.", className="empty"),
     ], id="picks-tab", style={"display": "none"})
 
 
@@ -229,6 +254,8 @@ def layout() -> html.Div:
         report_tab(),
         html.Div(id="system-tab", style={"display": "none"}),
         confirm("start", "Start trading", "", "Start", views.POSITIVE),
+        confirm("trade-picks", "Trade these picks", "", "Trade them", views.POSITIVE),
+        dcc.Store(id="trade-picks-choice"),
         confirm("flatten", "Flatten and stop",
                 "Send an order closing every position at market, then stop the trader?", "Flatten", views.NEGATIVE),
         dcc.Interval(id="fast", interval=LIVE_REFRESH_MS),
@@ -429,11 +456,12 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         return started + text, {"width": f"{fraction * 100:.1f}%"}, screen.running()
 
     @app.callback(Output("picks-stats", "children"), Output("picks-pnl", "figure"), Output("picks-table", "children"),
-                  Output("picks-run", "children"), Output("picks-days", "children"), Output("picks-sent", "data"),
+                  Output("picks-run", "children"), Output("previous-picks", "children"),
+                  Output("picks-days", "children"), Output("picks-sent", "data"),
                   Input("tabs", "active_tab"), Input("slow", "n_intervals"), State("picks-sent", "data"))
     def refresh_picks(active, _, sent_before):
         if active != PICKS:
-            return (*[no_update] * 5, sent_before)
+            return (*[no_update] * 6, sent_before)
         sent = SentParts(sent_before)
         days = picks.comparison(project, comparison.traded_days(project.live_records))
         runs = picks.saved_runs(project)
@@ -442,9 +470,44 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         return (sent.update("stats", views.picks_kpis(days), lambda kpis: segments([kpi_segment(k) for k in kpis])),
                 sent.update("pnl", days.values.tolist(), lambda _: views.picks_figure(days)),
                 sent.update("table", views.weekly_picks_table(chosen), table),
-                f"SCREENED {latest}" if latest else "",
+                sent.update("run", latest, lambda run: picks_heading(run) if run else ""),
+                sent.update("previous", runs[1:], lambda earlier: previous_picks(project, earlier)),
                 sent.update("days", views.picks_days_table(days), table),
                 sent.fingerprints)
+
+    @app.callback(Output("trade-picks-modal", "is_open"), Output("trade-picks-body", "children"),
+                  Output("trade-picks-choice", "data"), Output("portfolio-status", "children"),
+                  Output("trade-config", "disabled"),
+                  Input({"type": TRADE_PICKS, "run": ALL}, "n_clicks"), Input("trade-picks-cancel", "n_clicks"),
+                  Input("trade-picks-confirm", "n_clicks"), Input("trade-config", "n_clicks"),
+                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), State("trade-picks-choice", "data"))
+    def choose_portfolio(_, __, ___, ____, active, _____, choice):
+        """TRADE THESE asks first, then saves those picks as the next Start's portfolio; BACK TO CONFIG undoes it."""
+        clicked = ctx.triggered_id
+        pressed = bool(ctx.triggered and ctx.triggered[0]["value"])   # not just buttons appearing on the page
+        is_open, body, done = no_update, no_update, ""
+        if isinstance(clicked, dict) and pressed:
+            run = clicked["run"]
+            stocks = picks.describe_portfolio(picks.picks_portfolio(project, run) or [])
+            body = (f"Trade the picks from {run} ({stocks}) from the trader's next Start? Until then it keeps "
+                    f"what it trades now. config/strategy.json isn't changed: BACK TO CONFIG/STRATEGY.JSON undoes "
+                    f"this.")
+            return True, body, run, no_update, no_update
+        if clicked == "trade-picks-confirm" and pressed and choice:
+            done = picks.trade_picks(project, choice) + ". "
+            is_open = False
+        elif clicked == "trade-picks-cancel" and pressed:
+            is_open = False
+        elif clicked == "trade-config" and pressed:
+            done = picks.trade_config(project) + ". "
+        elif active != PICKS:
+            return no_update, no_update, no_update, no_update, no_update
+        running = None
+        if control.running_pid():   # a trader built before it reported this traded config/strategy.json
+            running = records.status(project.live_records).get("run", {}).get("portfolio", picks.CONFIG_PORTFOLIO)
+        upcoming = picks.next_portfolio(project)
+        return (is_open, body, no_update, done + views.portfolio_status(running, upcoming),
+                upcoming == picks.CONFIG_PORTFOLIO)
 
     # ----- Report -----
 
@@ -489,7 +552,7 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
             return no_update
         log = records.log_tail(project.live_records, LOG_LINES) or "No output yet"
         return html.Div([
-            dbc.Row([dbc.Col(panel(1, "Portfolio  config/strategy.json", table(views.portfolio_table(project))), lg=6),
+            dbc.Row([dbc.Col(panel(1, f"Portfolio  {picks.next_portfolio(project)}", table(views.portfolio_table(project))), lg=6),
                      dbc.Col(panel(2, "Risk  config/risk.json", html.Pre(views.risk_text(project), className="log")),
                              lg=6)], className="g-2"),
             panel(3, "Order latency by day (medians)",

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -40,6 +41,10 @@ namespace
     const std::string RISK_LABEL = "Risk";
     const std::string RECORDS_LABEL = "Records";
     const std::string PORTFOLIO = "portfolio";   // the stocks-and-strategies list in strategy.json (and --portfolio)
+    // A portfolio chosen to trade instead of config/strategy.json's (the dashboard's "Trade these picks"), kept in
+    // the data folder so deploys, which replace config/ from the repo, don't undo it: {"source": ..., "portfolio": [...]}
+    const std::string ACTIVE_PORTFOLIO_FILE = "portfolio.json";
+    const std::string PORTFOLIO_SOURCE = "source";
     const std::string RISK_KEY = "risk";
     const std::string STARTING_CAPITAL_KEY = "starting_capital";
 
@@ -123,7 +128,8 @@ LiveTrader::run()
 
 // ---------- Setting up ----------
 
-// A backtest given --portfolio trades that file's stocks and strategies instead of config/strategy.json's
+// Trade a file's stocks and strategies instead of config/strategy.json's: a backtest's --portfolio, or the
+// portfolio chosen on the dashboard (data/portfolio.json)
 void
 LiveTrader::useOtherPortfolio(const std::string& path)
 {
@@ -132,6 +138,18 @@ LiveTrader::useOtherPortfolio(const std::string& path)
         throw std::runtime_error("Can't open the portfolio file " + path);
     json other = json::parse(file, nullptr, true, true);
     config[PORTFOLIO] = other.is_array() ? other : other.at(PORTFOLIO);
+    portfolioSource = other.is_object() && other.contains(PORTFOLIO_SOURCE) ? other[PORTFOLIO_SOURCE].get<std::string>()
+                                                                            : path;
+}
+
+// The portfolio file to trade instead of config/strategy.json's, if any: --portfolio, else data/portfolio.json
+std::string
+LiveTrader::otherPortfolioFile() const
+{
+    if (!options.backtestPortfolio.empty())
+        return options.backtestPortfolio;
+    std::string chosen = dataRoot + ACTIVE_PORTFOLIO_FILE;
+    return std::filesystem::exists(chosen) ? chosen : "";
 }
 
 // Where this run's records go, under the data folder: the session's own, or a backtest's --records
@@ -149,18 +167,20 @@ LiveTrader::recordsFolder() const
 bool
 LiveTrader::loadPortfolio()
 {
+    std::string other = otherPortfolioFile();
     try
     {
-        if (!options.backtestPortfolio.empty())
-            useOtherPortfolio(options.backtestPortfolio);
+        if (!other.empty())
+            useOtherPortfolio(other);
         portfolio = Portfolio::fromConfig(config);
     }
     catch (const std::exception& e)
     {
-        std::string file = options.backtestPortfolio.empty() ? ConfigFiles::STRATEGY : options.backtestPortfolio;
-        std::cerr << "ERROR - " << e.what() << " (" << file << ")" << std::endl;
+        std::cerr << "ERROR - " << e.what() << " (" << (other.empty() ? ConfigFiles::STRATEGY : other) << ")" << std::endl;
         return false;
     }
+    if (options.backtestPortfolio.empty() && !other.empty())
+        screen() << "Trading " << portfolioSource << " (" << other << "), not config/strategy.json's portfolio" << std::endl;
 
     // Alpaca's test feed only streams its fake symbol
     bool testFeed = config.value("alpaca", json::object()).value("data_feed", "") == AlpacaApi::TEST_FEED;
@@ -317,7 +337,7 @@ LiveTrader::describeRunForStatus()
                    {"market", session->describeMarketHours()}, {"bars", feed->describe()},
                    {"risk", config.contains(RISK_KEY) ? StartupSummary::describeRisk(config[RISK_KEY])
                                                       : lanes.front()->describeRisk()},
-                   {"records", describeRecords()}, {"backtest", options.backtest},
+                   {"records", describeRecords()}, {"backtest", options.backtest}, {"portfolio", portfolioSource},
                    {"starting_capital", config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL)},
                    {"started_utc", MarketTime::formatUtc(std::time(nullptr))}, {"stocks", stocks}});
     status.setMarketClock(session->marketClock());
