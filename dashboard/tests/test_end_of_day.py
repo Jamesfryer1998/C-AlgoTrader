@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 
-from dashboard import end_of_day, records
+from dashboard import end_of_day, picks, records
 from dashboard.trader import BacktestJob
 from dashboard.tests.test_records_and_metrics import write_trades
 
@@ -17,10 +17,22 @@ class FakeControl:
         self.jobs: dict[str, BacktestJob] = {}
         self.started = []
 
-    def run_backtest(self, day, start):
-        self.started.append((day, start))
-        self.jobs[day] = BacktestJob(day, start)
-        return self.jobs[day]
+    def run_backtest(self, day, start, name=None):
+        name = name or day
+        self.started.append((name, start))
+        self.jobs[name] = BacktestJob(day, start)
+        return self.jobs[name]
+
+
+class FakeScreen:
+    def __init__(self):
+        self.runs = 0
+
+    def running(self):
+        return False
+
+    def run(self):
+        self.runs += 1
 
 
 def traded(project, *days):
@@ -77,3 +89,44 @@ def test_a_failed_backtest_is_tried_again_an_hour_later(project):
     assert backtests.check(AFTER_THE_CLOSE) is None                 # not straight away
     later = AFTER_THE_CLOSE + end_of_day.RETRY_AFTER
     assert backtests.check(later) == DAY
+
+
+def saved_picks(project, run):
+    folder = picks.picks_root(project) / run
+    folder.mkdir(parents=True)
+    (folder / picks.PICKS_PORTFOLIO).write_text('[{"ticker": "KO", "strategy": {"name": "RSI", "active": 1}}]')
+
+
+def test_the_weeks_picks_are_backtested_after_the_live_one(project):
+    traded(project, DAY)
+    saved_picks(project, "2026-11-07")                                   # the Saturday before
+    control = FakeControl()
+    backtests = end_of_day.EndOfDayBacktests(project, control)
+
+    assert backtests.check(AFTER_THE_CLOSE) == DAY                       # live's own portfolio first
+    control.jobs[DAY].state = "done"
+    backtested(project, DAY, AFTER_THE_CLOSE)
+    assert backtests.check(AFTER_THE_CLOSE) == f"picks {DAY}"
+    name, start = control.started[-1]
+    assert start.capital == 99000 and start.positions == []              # live's money, starting flat
+    assert start.portfolio == picks.portfolio_file(project, "2026-11-07")
+    assert start.records == f"picks/backtest/{DAY}"
+    assert "--portfolio" in start.arguments() and "--records" in start.arguments()
+
+
+def test_no_picks_backtest_without_picks_from_before_the_day(project):
+    traded(project, DAY)
+    saved_picks(project, DAY)                       # screened that same day: not what the day would have traded
+    assert end_of_day.due_picks_days(project, AFTER_THE_CLOSE) == []
+
+
+def test_the_weekly_screen_starts_at_the_weekend_once(project):
+    screen = FakeScreen()
+    backtests = end_of_day.EndOfDayBacktests(project, FakeControl(), screen)
+    friday = datetime(2026, 11, 13, 22, 0, tzinfo=timezone.utc)
+    saturday_morning = datetime(2026, 11, 14, 7, 0, tzinfo=timezone.utc)
+    assert backtests.check(friday) is None and screen.runs == 0
+    assert backtests.check(saturday_morning) == "weekly screen" and screen.runs == 1
+    saved_picks(project, "2026-11-14")
+    assert not picks.weekend_screen_due(project, datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc))   # done
+    assert picks.weekend_screen_due(project, datetime(2026, 11, 21, 7, 0, tzinfo=timezone.utc))        # next week

@@ -27,6 +27,8 @@ QUIET = "--quiet"
 BACKTEST = "--backtest"
 CAPITAL = "--capital"
 POSITIONS = "--positions"   # KO:10@58.2000,PEP:-5@170.1000
+PORTFOLIO = "--portfolio"   # another portfolio file instead of config/strategy.json's
+RECORDS = "--records"       # where under data/ the backtest's records go
 
 
 def is_trader_process(pid: int) -> bool:
@@ -51,12 +53,18 @@ class BacktestStart:
     """What a backtest starts with, e.g. what the live account had going into that day."""
     capital: float | None = None                                       # None: config's starting_capital
     positions: list[tuple[str, float, float]] = field(default_factory=list)   # (ticker, quantity, average price)
+    portfolio: Path | None = None   # trade this portfolio file instead of config/strategy.json's
+    records: str | None = None      # keep the records here under data/ instead of backtest/<day>
 
     def arguments(self) -> list[str]:
         arguments = [CAPITAL, f"{self.capital:.2f}"] if self.capital else []
         if self.positions:
             arguments += [POSITIONS, ",".join(f"{ticker}:{quantity:g}@{price:.4f}"
                                               for ticker, quantity, price in self.positions)]
+        if self.portfolio:
+            arguments += [PORTFOLIO, str(self.portfolio)]
+        if self.records:
+            arguments += [RECORDS, self.records]
         return arguments
 
     def describe(self) -> str:
@@ -122,14 +130,16 @@ class TraderControl:
 
     # ---------- Backtests ----------
 
-    def run_backtest(self, day: str, start: BacktestStart | None = None) -> BacktestJob:
-        """Backtest one day in the background (downloading its bars if they're missing), starting with `start`."""
+    def run_backtest(self, day: str, start: BacktestStart | None = None, name: str | None = None) -> BacktestJob:
+        """Backtest one day in the background (downloading its bars if they're missing), starting with `start`.
+        `name`: what the job is known by in `jobs` (default the day; the picks' backtest of a day has its own)."""
+        name = name or day
         with self.lock:
-            job = self.jobs.get(day)
+            job = self.jobs.get(name)
             if job and job.state == "running":
                 return job
             job = BacktestJob(day, start or BacktestStart())
-            self.jobs[day] = job
+            self.jobs[name] = job
         threading.Thread(target=self._backtest, args=(job,), daemon=True).start()
         return job
 
