@@ -18,6 +18,7 @@ struct ScreenOptions
 
     bool showHelp = false;
     bool daily = false;                 // daily bars since 2016 instead of 1-minute bars
+    bool weekly = false;                // the short rolling screen behind the dashboard's weekly picks
     std::vector<std::string> symbols;   // empty: screen.json's universe
     std::vector<std::string> strategies;   // empty: every strategy in screen.json
     int months = NOT_GIVEN;             // minute bars: months of history

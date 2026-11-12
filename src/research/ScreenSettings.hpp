@@ -19,7 +19,7 @@ using json = nlohmann::json;
 struct ScreenSettings
 {
     json settings;      // what the Screener reads (with "test_start" filled in)
-    std::string mode;   // "minute" or "daily": the screen.json section, and the results folder
+    std::string mode;   // "minute", "daily" or "weekly": the screen.json section, and the results folder
     bool daily = false;
     std::string start, testStart, end;
     std::vector<std::string> symbols;

@@ -1,7 +1,9 @@
 #include "StockScreen.hpp"
 
 #include <chrono>
+#include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -18,6 +20,9 @@ namespace
 {
     const std::string RESULTS_FOLDER = "screen/";                    // under data/, then minute/ or daily/
     const std::string RESULTS_FILE = "/screen_results.csv";
+    const std::string PROGRESS_FILE = "/progress.json";   // how far a screen has got, for the dashboard
+    const std::string SCREENING = "screening";
+    const std::string FINISHED = "finished";
 
     double secondsSince(std::chrono::steady_clock::time_point start)
     {
@@ -76,6 +81,22 @@ StockScreen::downloadAll()
     }
 }
 
+// progress.json: {"state": "screening" / "finished", "done": 12, "total": 100, "stock": "KO", "started": <unix time>,
+// "updated": <unix time>}. Stocks skipped for no data count as done. Written whole, then renamed over the old one.
+void
+StockScreen::saveProgress(const std::string& state, size_t done, const std::string& stock, std::time_t startedAt) const
+{
+    json progress = {{"state", state}, {"done", done}, {"total", screen.symbols.size()}, {"stock", stock},
+                     {"started", startedAt}, {"updated", std::time(nullptr)}};
+    std::string path = resultsFolder + PROGRESS_FILE, partial = path + ".partial";
+    {
+        std::ofstream file(partial);
+        file << progress.dump();
+    }
+    std::error_code error;
+    std::filesystem::rename(partial, path, error);
+}
+
 std::vector<Screener::Row>
 StockScreen::screenAll()
 {
@@ -101,6 +122,8 @@ StockScreen::screenAll()
 
     std::vector<std::string> skipped;
     auto started = std::chrono::steady_clock::now();
+    std::time_t startedAt = std::time(nullptr);
+    saveProgress(SCREENING, 0, "", startedAt);
     for (size_t i = 0; i < screen.symbols.size(); i++)
     {
         const std::string& symbol = screen.symbols[i];
@@ -125,7 +148,9 @@ StockScreen::screenAll()
 
         rows.insert(rows.end(), stockRows.begin(), stockRows.end());
         Screener::writeCsv(resultsPath, rows);   // saved as we go, so --resume can pick up from here
+        saveProgress(SCREENING, i + 1, symbol, startedAt);
     }
+    saveProgress(FINISHED, screen.symbols.size(), "", startedAt);
 
     std::cout << "Sharpe shown as training -> test. Finished in " << number(secondsSince(started) / 60.0, 1) << " minutes.\n";
     if (!skipped.empty())

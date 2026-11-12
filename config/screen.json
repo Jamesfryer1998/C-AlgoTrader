@@ -50,6 +50,15 @@
             }
         }
     },
+    "weekly": {
+        "_comment": "screen_app --weekly: the short rolling screen the dashboard runs every weekend (and from the Picks tab's button) to suggest next week's portfolio. 1-minute bars with the \"minute\" section's grids, and these settings on top: tune on the last history_months months but the final one, test on that final month. A sample of max_combinations settings per strategy keeps it to well under an hour on the server.",
+        "history_months": 6,
+        "test_months": 1,
+        "min_train_days": 60,
+        "min_test_days": 15,
+        "min_closed_trades": 10,
+        "max_combinations": 150
+    },
     "daily": {
         "_comment": "Daily bars since start (saved in data/daily/). Training is before test_start. Periods are in days.",
         "start": "2016-01-01",

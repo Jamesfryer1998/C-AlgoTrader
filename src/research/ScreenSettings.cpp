@@ -15,15 +15,20 @@ namespace
 
     const std::string MINUTE = "minute";
     const std::string DAILY = "daily";
+    const std::string WEEKLY = "weekly";   // minute bars, with the "weekly" section's settings on top
 
-    // The common settings with one section's settings on top
+    // The common settings with one section's settings on top (and the weekly section on top of the minute one)
     json mergeSection(const json& all, const std::string& section)
     {
         json merged = all;
         merged.erase(MINUTE);
         merged.erase(DAILY);
-        for (const auto& [key, value] : all.at(section).items())
+        merged.erase(WEEKLY);
+        for (const auto& [key, value] : all.at(section == WEEKLY ? MINUTE : section).items())
             merged[key] = value;
+        if (section == WEEKLY)
+            for (const auto& [key, value] : all.at(WEEKLY).items())
+                merged[key] = value;
         return merged;
     }
 }
@@ -38,7 +43,7 @@ ScreenSettings::load(const std::string& screenJsonPath, const ScreenOptions& opt
 
     ScreenSettings screen;
     screen.daily = options.daily;
-    screen.mode = options.daily ? DAILY : MINUTE;
+    screen.mode = options.daily ? DAILY : (options.weekly ? WEEKLY : MINUTE);
     screen.settings = mergeSection(all, screen.mode);
     json& settings = screen.settings;
 

@@ -23,6 +23,7 @@ ScreenOptions::parse(int argc, char* argv[])
     {
         if (args.is("--help"))                  options.showHelp = true;
         else if (args.is("--daily"))            options.daily = true;
+        else if (args.is("--weekly"))           options.weekly = true;
         else if (args.is("--symbols"))          options.symbols = args.list();
         else if (args.is("--strategies"))       options.strategies = args.list();
         else if (args.is("--months"))           options.months = std::max(MIN_HISTORY_MONTHS, args.integer());
@@ -38,6 +39,8 @@ ScreenOptions::parse(int argc, char* argv[])
         else if (args.is("--value"))            options.portfolioValue = args.number();
         else                                    args.rejectOption();
     }
+    if (options.weekly && options.daily)
+        throw std::invalid_argument("--weekly screens 1-minute bars, so it can't be used with --daily");
     return options;
 }
 
@@ -48,6 +51,9 @@ ScreenOptions::printUsage(std::ostream& out)
 
 Usage: screen_app [options]
   --daily                   daily bars since 2016 instead of 1-minute bars (settings then mean days)
+  --weekly                  the short rolling screen behind the dashboard's weekly picks: 1-minute bars with
+                            screen.json's "weekly" section on top (recent months, the last one as the test),
+                            results in data/screen/weekly
   --symbols AAPL,MSFT,...   stocks to screen (default: "universe" in config/screen.json, the S&P 100)
   --strategies RSI,MEANREV  strategies to try (default: all in screen.json)
   --months 24               minute bars: months of history (default: from screen.json)

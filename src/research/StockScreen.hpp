@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ctime>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
@@ -30,6 +31,7 @@ class StockScreen
 
     private:
         void downloadAll();
+        void saveProgress(const std::string& state, size_t done, const std::string& stock, std::time_t startedAt) const;
         std::vector<Screener::Row> screenAll();
         void printResults(const std::vector<Screener::Row>& rows);
         void printStockLine(size_t index, const std::string& symbol, const std::vector<Screener::Row>& stockRows,
