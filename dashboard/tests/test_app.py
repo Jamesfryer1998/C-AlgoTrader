@@ -37,4 +37,6 @@ def test_every_callback_uses_parts_of_the_page(project):
     on_page = component_ids(app.layout())
     for callback in app.callback_map.values():
         for dependency in callback["inputs"] + callback["state"]:
+            if dependency["id"].startswith("{"):   # a pattern (each week's TRADE THESE): drawn by a callback
+                continue
             assert dependency["id"] in on_page, f"{dependency['id']} isn't in the layout"
