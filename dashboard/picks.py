@@ -45,6 +45,7 @@ SCREENING, FINISHED, FAILED = "screening", "finished", "failed"
 STALE_AFTER = timedelta(minutes=30)      # a screen that hasn't moved for this long has died
 SCREEN_TIMEOUT_SECONDS = 6 * 3600
 WEEKEND_FROM = (5, 6)                    # the weekly screen runs from Saturday 06:00 UTC (Saturday = weekday 5)
+SCREEN_NICENESS = 10                     # a lower CPU priority, so a screen run in trading hours never slows the trader
 
 
 # ---------- Saved runs ----------
@@ -171,7 +172,7 @@ class ScreenControl:
             with log.open("w") as output:
                 done = subprocess.run([str(app), WEEKLY, TOP, str(TOP_PICKS), THREADS, str(os.cpu_count() or 1)],
                                       cwd=self.project.root, stdout=output, stderr=subprocess.STDOUT,
-                                      timeout=SCREEN_TIMEOUT_SECONDS)
+                                      timeout=SCREEN_TIMEOUT_SECONDS, preexec_fn=_lower_priority)
             if done.returncode != 0 or not (self.results / PICKS_PORTFOLIO).exists():
                 self.last_error = f"screen_app stopped with code {done.returncode}: see {log}"
             else:
@@ -189,6 +190,10 @@ class ScreenControl:
             if (self.results / name).exists():
                 shutil.copy2(self.results / name, folder / name)
         return folder
+
+
+def _lower_priority() -> None:
+    os.nice(SCREEN_NICENESS)
 
 
 def weekend_screen_due(project: Project, now: datetime) -> bool:
