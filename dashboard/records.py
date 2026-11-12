@@ -29,7 +29,8 @@ CHANGED_POSITION = {SENT, ADJUSTMENT, DRY_RUN}   # the orders that changed what 
 
 TRADE_COLUMNS = ["our_id", "time", "sent_at_utc", "strategy", "ticker", "side", "type", "order_class", "quantity",
                  "price", "stop_loss", "take_profit", "status", "broker_status", "client_order_id",
-                 "broker_order_id", "round_trip_ms", "note"]
+                 "broker_order_id", "round_trip_ms", "note", "order_path", "requests", "send_ms", "connect_ms"]
+ENTRY, EXIT = "entry", "exit"   # order_path: an exit cancels the position's stop loss and take profit first
 EQUITY_COLUMNS = ["time", "equity"]
 POSITION_COLUMNS = ["ticker", "quantity", "avg_price"]
 
@@ -63,7 +64,7 @@ def performance(folder: Path) -> dict:
 def trades(folder: Path) -> pd.DataFrame:
     """Every order, oldest first, with `day` (New York date) and numbers as numbers."""
     frame = read_csv(folder / TRADES_FILE, TRADE_COLUMNS)
-    for column in ["quantity", "price", "stop_loss", "take_profit", "round_trip_ms"]:
+    for column in ["quantity", "price", "stop_loss", "take_profit", "round_trip_ms", "requests", "send_ms", "connect_ms"]:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame["time"] = frame["time"].astype(str)
     frame["day"] = frame["time"].str[:10]

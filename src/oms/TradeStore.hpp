@@ -58,6 +58,10 @@ struct TradeRecord
     std::string clientOrderId;    // id we sent to the broker
     std::string brokerOrderId;    // id the broker gave the order
     double roundTripMs = 0;       // time to send the order and get the broker's reply
+    std::string orderPath;        // entry / exit (an exit cancels the position's stop loss and take profit first)
+    int requests = 0;             // requests to the broker it took
+    double sendMs = 0;            // the order request alone
+    double connectMs = 0;         // time opening connections (0: all were already open)
     std::string note;             // reason for blocked / rejected / adjustment
 
     bool isBuy() const { return side == BUY_SIDE; }

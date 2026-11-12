@@ -241,3 +241,25 @@ def test_where_the_records_are(project):
     (project.root / "config" / "general.json").write_text(__import__("json").dumps(general))
     assert project.live_records.name == "live_dry_run"
     assert Project.find(project.root / "data" / "live") == project
+
+
+def test_latency_apart_for_entries_and_exits_and_by_day(tmp_path):
+    header = ",".join(records.TRADE_COLUMNS)
+    row = "{id},{time},,RSI,KO,{side},X,simple,1,60,0,0,sent,,,,{ms},,{path},{requests},{send},{connect}"
+    lines = [header,
+             row.format(id=1, time="2026-11-12 10:00:00", side="buy", ms=500, path="", requests="", send="", connect=""),
+             row.format(id=2, time="2026-11-13 10:00:00", side="buy", ms=95, path="entry", requests=1, send=95, connect=0),
+             row.format(id=3, time="2026-11-13 10:05:00", side="sell", ms=280, path="exit", requests=3, send=90,
+                        connect=0),
+             row.format(id=4, time="2026-11-13 10:07:00", side="buy", ms=105, path="entry", requests=1, send=105,
+                        connect=0)]
+    (tmp_path / records.TRADES_FILE).write_text("\n".join(lines) + "\n")
+    trades = records.trades(tmp_path)
+
+    today = metrics.latency(trades[trades["day"] == "2026-11-13"])
+    assert (today["entry"], today["exit"], today["exit_requests"], today["send"]) == (100, 280, 3, 95)
+    before = metrics.latency(trades[trades["day"] == "2026-11-12"])    # recorded before entries and exits were
+    assert before["median"] == 500 and before["entry"] is None and before["send"] is None
+
+    by_day = metrics.latency_by_day(trades)
+    assert list(by_day["day"]) == ["2026-11-13", "2026-11-12"] and list(by_day["orders"]) == [3, 1]

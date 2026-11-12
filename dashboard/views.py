@@ -189,9 +189,7 @@ def live_kpis(status: dict, trades: pd.DataFrame, day: str) -> list[Kpi]:
         Kpi("Positions", str(len(held)), f"{money(gross, 0)} gross"),
         Kpi("Orders", str(sent), f"{blocked} blocked, {rejected} rejected",
             WARNING if rejected else PLAIN),
-        Kpi("Latency", milliseconds(latency["median"]),
-            f"p95 {milliseconds(latency['p95'])}, max {milliseconds(latency['max'])}" if latency["orders"] else
-            "no orders yet"),
+        Kpi("Latency", milliseconds(latency["median"]), _latency_detail(latency)),
     ]
 
 
@@ -616,6 +614,31 @@ def picks_days_table(days: pd.DataFrame) -> Table:
     for row in days.iloc[::-1].itertuples():   # newest first
         table.add(row.day, _signed_or_nothing(row.live), _signed_or_nothing(row.live_backtest),
                   _signed_or_nothing(row.picks), _signed_or_nothing(row.picks_minus_live), row.picks_run or NOTHING)
+    return table
+
+
+def _latency_detail(latency: dict) -> str:
+    """The Latency figure's hover text: entries and exits apart (when recorded), then the slow end."""
+    if not latency["orders"]:
+        return "no orders yet"
+    parts = []
+    if latency["entry"] is not None:
+        parts.append(f"entries {milliseconds(latency['entry'])}")
+    if latency["exit"] is not None:
+        parts.append(f"exits {milliseconds(latency['exit'])} ({number(latency['exit_requests'], 0)} requests)")
+    parts.append(f"p95 {milliseconds(latency['p95'])}, max {milliseconds(latency['max'])}")
+    return ", ".join(parts)
+
+
+def latency_table(by_day: pd.DataFrame) -> Table:
+    """Order latency day by day (medians), to see what a change to the trader did. Days before entries and exits
+    were recorded apart show only the overall figures."""
+    table = Table(["Day", "Orders", "All", "Entries", "Exits", "Requests / exit", "Order request", "p95", "Max"],
+                  empty="NO ORDERS SENT YET")
+    for row in by_day.itertuples():
+        table.add(row.day, number(row.orders, 0), milliseconds(row.median), milliseconds(row.entry),
+                  milliseconds(row.exit), number(row.exit_requests, 0) if not missing(row.exit_requests) else NOTHING,
+                  milliseconds(row.send), milliseconds(row.p95), milliseconds(row.max))
     return table
 
 

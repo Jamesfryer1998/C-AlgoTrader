@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <thread>
+#include <ixwebsocket/IXUrlParser.h>
 
 namespace
 {
@@ -14,9 +15,18 @@ namespace
     const std::string KEY_ID_HEADER = "APCA-API-KEY-ID";
     const std::string SECRET_KEY_HEADER = "APCA-API-SECRET-KEY";
     const std::string JSON_CONTENT_TYPE = "application/json";
+    const std::string CONTENT_TYPE_HEADER = "Content-Type";
 
     const int CONNECT_TIMEOUT_SECONDS = 5;
     const int TRANSFER_TIMEOUT_SECONDS = 10;
+
+    const std::string HTTPS = "https";
+    const std::string GET = "GET";
+    const std::string POST = "POST";
+    const std::string DELETE = "DELETE";
+
+    // A connection idle this long gets a cheap request, well inside the time servers close idle ones
+    const std::chrono::seconds KEEP_WARM_AFTER{20};
 }
 
 static std::string readEnv(const char* name)
@@ -43,34 +53,60 @@ AlpacaClient::wait(std::chrono::milliseconds duration)
     std::this_thread::sleep_for(duration);
 }
 
-ix::HttpRequestArgsPtr
-AlpacaClient::makeArgs()
+// The connection to `url`'s host (opened on first use), and the part of the URL after the host
+PersistentConnection*
+AlpacaClient::connectionFor(const std::string& url, std::string& pathAndQuery)
 {
-    ix::HttpRequestArgsPtr args = http.createRequest();
-    args->extraHeaders[KEY_ID_HEADER] = keyId;
-    args->extraHeaders[SECRET_KEY_HEADER] = secretKey;
-    args->extraHeaders["Content-Type"] = JSON_CONTENT_TYPE;
-    args->connectTimeout = CONNECT_TIMEOUT_SECONDS;
-    args->transferTimeout = TRANSFER_TIMEOUT_SECONDS;
-    return args;
+    std::string protocol, host, path, query;
+    int port = 0;
+    if (!ix::UrlParser::parse(url, protocol, host, path, query, port))
+        return nullptr;
+    pathAndQuery = path;
+    std::string key = protocol + "://" + host + ":" + std::to_string(port);
+    auto& connection = connections[key];
+    if (!connection)
+        connection = std::make_unique<PersistentConnection>(protocol == HTTPS, host, port,
+                                                            std::chrono::seconds(CONNECT_TIMEOUT_SECONDS),
+                                                            std::chrono::seconds(TRANSFER_TIMEOUT_SECONDS));
+    lastUsed[key] = std::chrono::steady_clock::now();
+    return connection.get();
 }
 
 HttpResult
-AlpacaClient::toResult(const ix::HttpResponsePtr& response)
+AlpacaClient::send(const std::string& method, const std::string& url, const std::string& body)
+{
+    std::lock_guard<std::mutex> guard(lock);
+    std::string pathAndQuery;
+    PersistentConnection* connection = connectionFor(url, pathAndQuery);
+    if (!connection)
+    {
+        HttpResult bad;
+        bad.error = "Not a URL: " + url;
+        return bad;
+    }
+    PersistentConnection::Headers headers = {{KEY_ID_HEADER, keyId}, {SECRET_KEY_HEADER, secretKey},
+                                             {CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE}};
+    return toResult(connection->request(method, pathAndQuery, headers, body));
+}
+
+HttpResult
+AlpacaClient::toResult(const PersistentConnection::Response& response)
 {
     HttpResult result;
-    result.status = response->statusCode;
-    result.body = json::parse(response->body, nullptr, false); // false = don't throw on bad JSON
+    result.status = response.status;
+    result.totalMs = response.totalMs;
+    result.connectMs = response.connectMs;
+    result.body = json::parse(response.body, nullptr, false); // false = don't throw on bad JSON
 
     if (result.body.is_discarded())
         result.body = nullptr;
 
-    if (!response->errorMsg.empty())
-        result.error = response->errorMsg;
+    if (!response.error.empty())
+        result.error = response.error;
     else if (!result.ok() && result.body.is_object() && result.body.contains("message"))
         result.error = result.body["message"].get<std::string>();
     else if (!result.ok())
-        result.error = response->body;
+        result.error = response.body;
 
     return result;
 }
@@ -78,7 +114,7 @@ AlpacaClient::toResult(const ix::HttpResponsePtr& response)
 HttpResult
 AlpacaClient::get(const std::string& url)
 {
-    return toResult(http.get(url, makeArgs()));
+    return send(GET, url, "");
 }
 
 HttpResult
@@ -100,11 +136,28 @@ AlpacaClient::getWhenFree(const std::string& url, int maxAttempts, std::chrono::
 HttpResult
 AlpacaClient::post(const std::string& url, const json& body)
 {
-    return toResult(http.post(url, body.dump(), makeArgs()));
+    return send(POST, url, body.dump());
 }
 
 HttpResult
 AlpacaClient::del(const std::string& url)
 {
-    return toResult(http.Delete(url, makeArgs()));
+    return send(DELETE, url, "");
+}
+
+void
+AlpacaClient::keepWarm(const std::string& url)
+{
+    std::string protocol, host, path, query;
+    int port = 0;
+    if (!ix::UrlParser::parse(url, protocol, host, path, query, port))
+        return;
+    std::string key = protocol + "://" + host + ":" + std::to_string(port);
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        auto used = lastUsed.find(key);
+        if (used != lastUsed.end() && std::chrono::steady_clock::now() - used->second < KEEP_WARM_AFTER)
+            return;
+    }
+    get(url);
 }

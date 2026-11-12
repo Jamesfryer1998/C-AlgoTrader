@@ -248,3 +248,15 @@ def test_picks_against_live_views():
     rows = texts(views.picks_days_table(days))
     assert rows[0] == ["2026-11-10", "+$100.00", "-", "+$50.00", "-$50.00", "2026-11-07"]   # newest first
     assert views.weekly_picks_table(pd.DataFrame()).rows == []
+
+
+def test_latency_views():
+    by_day = pd.DataFrame([{"day": "2026-11-13", "orders": 3, "median": 105.0, "p95": 270.0, "max": 280.0,
+                            "entry": 100.0, "exit": 280.0, "exit_requests": 3.0, "send": 95.0},
+                           {"day": "2026-11-12", "orders": 1, "median": 500.0, "p95": 500.0, "max": 500.0,
+                            "entry": None, "exit": None, "exit_requests": None, "send": None}])
+    rows = texts(views.latency_table(by_day))
+    assert rows[0] == ["2026-11-13", "3", "105.0 ms", "100.0 ms", "280.0 ms", "3", "95.0 ms", "270.0 ms", "280.0 ms"]
+    assert rows[1][3:7] == ["-", "-", "-", "-"]                        # not recorded apart then
+    detail = views._latency_detail({**by_day.iloc[0].to_dict()})
+    assert detail.startswith("entries 100.0 ms, exits 280.0 ms (3 requests)")

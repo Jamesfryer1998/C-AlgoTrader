@@ -140,12 +140,32 @@ def _between(earlier: datetime, later: datetime) -> timedelta:
 # ---------- Orders ----------
 
 def latency(trades: pd.DataFrame) -> dict:
-    """How long Alpaca took to answer each order sent: count, median, 95th percentile, max (milliseconds)."""
-    sent = trades[(trades["status"] == records.SENT) & (trades["round_trip_ms"] > 0)]["round_trip_ms"]
+    """How long Alpaca took to answer each order sent: count, median, 95th percentile, max (milliseconds), and the
+    medians of entries and of exits (an exit cancels the position's stop loss and take profit first, so it's a
+    few requests: `exit_requests`), when the records say which is which."""
+    sent = trades[(trades["status"] == records.SENT) & (trades["round_trip_ms"] > 0)]
     if sent.empty:
-        return {"orders": 0, "median": None, "p95": None, "max": None}
-    return {"orders": int(sent.size), "median": float(sent.median()),
-            "p95": float(sent.quantile(LATENCY_PERCENTILE)), "max": float(sent.max())}
+        return {"orders": 0, "median": None, "p95": None, "max": None, "entry": None, "exit": None,
+                "exit_requests": None, "send": None}
+    times = sent["round_trip_ms"]
+    entries, exits = sent[sent["order_path"] == records.ENTRY], sent[sent["order_path"] == records.EXIT]
+    send = sent["send_ms"].dropna()
+    return {"orders": int(times.size), "median": float(times.median()),
+            "p95": float(times.quantile(LATENCY_PERCENTILE)), "max": float(times.max()),
+            "entry": float(entries["round_trip_ms"].median()) if len(entries) else None,
+            "exit": float(exits["round_trip_ms"].median()) if len(exits) else None,
+            "exit_requests": float(exits["requests"].median()) if len(exits) else None,
+            "send": float(send[send > 0].median()) if (send > 0).any() else None}
+
+
+def latency_by_day(trades: pd.DataFrame) -> pd.DataFrame:
+    """latency() for each day with orders sent, newest first: to compare one change to the trader against the days
+    before it."""
+    rows = [{"day": day, **latency(day_trades)} for day, day_trades in trades.groupby("day")]
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    return frame[frame["orders"] > 0].sort_values("day", ascending=False).reset_index(drop=True)
 
 
 # ---------- Exposure ----------

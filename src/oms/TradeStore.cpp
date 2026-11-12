@@ -23,7 +23,7 @@ static const char* UPGRADED_NOTE = "from older trades.csv format";
 const std::vector<std::string> TradeStore::TRADE_COLUMNS = {
     "our_id", "time", "sent_at_utc", "strategy", "ticker", "side", "type", "order_class",
     "quantity", "price", "stop_loss", "take_profit", "status", "broker_status",
-    "client_order_id", "broker_order_id", "round_trip_ms", "note"
+    "client_order_id", "broker_order_id", "round_trip_ms", "note", "order_path", "requests", "send_ms", "connect_ms"
 };
 
 namespace
@@ -65,7 +65,8 @@ namespace
             << t.ticker << "," << t.side << "," << t.type << "," << t.orderClass << ","
             << t.quantity << "," << t.price << "," << t.stopLoss << "," << t.takeProfit << ","
             << t.status << "," << clean(t.brokerStatus) << "," << t.clientOrderId << "," << t.brokerOrderId << ","
-            << std::setprecision(1) << t.roundTripMs << "," << clean(t.note) << "\n";
+            << std::setprecision(1) << t.roundTripMs << "," << clean(t.note) << "," << t.orderPath << "," << t.requests
+            << "," << t.sendMs << "," << t.connectMs << "\n";
         return out.str();
     }
 
@@ -124,6 +125,10 @@ namespace
             t.brokerOrderId = get("broker_order_id");
             t.roundTripMs = toDouble(get("round_trip_ms"));
             t.note = get("note");
+            t.orderPath = get("order_path");                       // older files have none of these four
+            t.requests = static_cast<int>(toDouble(get("requests")));
+            t.sendMs = toDouble(get("send_ms"));
+            t.connectMs = toDouble(get("connect_ms"));
 
             if (t.ticker.empty() || t.quantity <= 0)
             {

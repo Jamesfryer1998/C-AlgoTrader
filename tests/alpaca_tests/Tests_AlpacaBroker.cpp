@@ -185,15 +185,89 @@ TEST_F(AlpacaBrokerRequestTests, AnExitIsTriedAgainWhileTheSharesAreStillReserve
     EXPECT_EQ(alpaca->waits.size(), 1u);   // waited once (not slept, in the fake)
 }
 
-TEST_F(AlpacaBrokerRequestTests, AnExitGivesUpAfterThreeTries)
+TEST_F(AlpacaBrokerRequestTests, AnExitGivesUpAfterEightQuickTries)
 {
     alpaca->reply("GET", ORDERS + "?status=open", 200, json::array());
     alpaca->reply("POST", ORDERS, 403, {{"message", "insufficient qty available for order"}});
     AlpacaBroker broker(paperConfig(), alpaca);
 
     EXPECT_EQ(broker.placeOrder(sellPartOf(10, 10)), 0);
-    EXPECT_EQ(alpaca->sent("POST", ORDERS).size(), 3u);
+    EXPECT_EQ(alpaca->sent("POST", ORDERS).size(), 8u);
     EXPECT_EQ(broker.lastReceipt.brokerStatus, BrokerBase::REJECTED);
+}
+
+TEST_F(AlpacaBrokerRequestTests, AnExitCancelsTheProtectionItKnowsWithoutListingOrders)
+{
+    // The entry's reply names its bracket's stop loss and take profit orders
+    alpaca->reply("POST", ORDERS, 200, {{"id", "entry-1"}, {"status", "accepted"}, {"order_class", "bracket"},
+                                        {"legs", json::array({{{"id", "stop-1"}}, {{"id", "target-1"}}})}});
+    alpaca->reply("POST", ORDERS, 200, {{"id", "exit-1"}, {"status", "accepted"}});
+    AlpacaBroker broker(paperConfig(), alpaca);
+    ASSERT_EQ(broker.placeOrder(buyWithBracket()), 1);
+    EXPECT_EQ(broker.lastReceipt.path, "entry");
+    EXPECT_EQ(broker.lastReceipt.requests, 1);
+
+    EXPECT_EQ(broker.placeOrder(sellPartOf(10, 10)), 1);
+    EXPECT_TRUE(alpaca->sent("GET").empty());                       // no "which orders are open?" first
+    std::vector<FakeAlpacaClient::Request> cancelled = alpaca->sent("DELETE");
+    ASSERT_EQ(cancelled.size(), 2u);
+    EXPECT_EQ(cancelled[0].url, PAPER + ORDERS + "/stop-1");
+    EXPECT_EQ(cancelled[1].url, PAPER + ORDERS + "/target-1");
+    EXPECT_TRUE(alpaca->waits.empty());                             // and no waiting for the cancels to confirm
+    EXPECT_EQ(broker.lastReceipt.path, "exit");
+    EXPECT_EQ(broker.lastReceipt.requests, 3);                     // two cancels and the exit
+}
+
+TEST_F(AlpacaBrokerRequestTests, AnEntryReplyWithoutItsLegsLeavesTheExitToLookThemUp)
+{
+    alpaca->reply("POST", ORDERS, 200, {{"id", "entry-1"}, {"status", "accepted"}, {"legs", nullptr}});
+    alpaca->reply("GET", ORDERS + "?status=open", 200, json::array({{{"id", "stop-1"}}}));
+    alpaca->reply("POST", ORDERS, 200, {{"id", "exit-1"}, {"status", "accepted"}});
+    AlpacaBroker broker(paperConfig(), alpaca);
+    broker.placeOrder(buyWithBracket());
+
+    EXPECT_EQ(broker.placeOrder(sellPartOf(10, 10)), 1);
+    EXPECT_EQ(alpaca->sent("GET").size(), 1u);
+    EXPECT_EQ(alpaca->sent("DELETE")[0].url, PAPER + ORDERS + "/stop-1");
+}
+
+TEST_F(AlpacaBrokerRequestTests, StillReservedAfterCancellingTheKnownIdsLooksUpTheRest)
+{
+    // The known legs were replaced since (or one was missed): the shares stay reserved until the open orders
+    // are looked up and cancelled too
+    alpaca->reply("POST", ORDERS, 200, {{"id", "entry-1"}, {"status", "accepted"}, {"order_class", "bracket"},
+                                        {"legs", json::array({{{"id", "old-stop"}}})}});
+    for (int i = 0; i < 3; i++)
+        alpaca->reply("POST", ORDERS, 403, {{"message", "insufficient qty available for order"}});
+    alpaca->reply("GET", ORDERS + "?status=open", 200, json::array({{{"id", "new-stop"}}}));
+    alpaca->reply("POST", ORDERS, 200, {{"id", "exit-1"}, {"status", "accepted"}});
+    AlpacaBroker broker(paperConfig(), alpaca);
+    broker.placeOrder(buyWithBracket());
+
+    EXPECT_EQ(broker.placeOrder(sellPartOf(10, 10)), 1);
+    std::vector<FakeAlpacaClient::Request> cancelled = alpaca->sent("DELETE");
+    ASSERT_EQ(cancelled.size(), 2u);
+    EXPECT_EQ(cancelled[0].url, PAPER + ORDERS + "/old-stop");
+    EXPECT_EQ(cancelled[1].url, PAPER + ORDERS + "/new-stop");
+    EXPECT_EQ(broker.lastReceipt.brokerOrderId, "exit-1");
+}
+
+TEST_F(AlpacaBrokerRequestTests, AReProtectionIsCancelledByTheNextExit)
+{
+    alpaca->reply("GET", ORDERS + "?status=open", 200, json::array());
+    alpaca->reply("POST", ORDERS, 200, {{"id", "exit-1"}, {"status", "accepted"}});
+    alpaca->reply("POST", ORDERS, 200, {{"id", "oco-1"}, {"order_class", "oco"},
+                                        {"legs", json::array({{{"id", "oco-stop"}}})}});
+    alpaca->reply("POST", ORDERS, 200, {{"id", "exit-2"}, {"status", "accepted"}});
+    AlpacaBroker broker(paperConfig(), alpaca);
+
+    ASSERT_EQ(broker.placeOrder(sellPartOf(10, 4)), 1);   // sells 4, protects the other 6
+    ASSERT_EQ(broker.placeOrder(sellPartOf(6, 6)), 1);    // sells those
+    std::vector<FakeAlpacaClient::Request> cancelled = alpaca->sent("DELETE");
+    ASSERT_EQ(cancelled.size(), 2u);
+    EXPECT_EQ(cancelled[0].url, PAPER + ORDERS + "/oco-1");
+    EXPECT_EQ(cancelled[1].url, PAPER + ORDERS + "/oco-stop");
+    EXPECT_EQ(alpaca->sent("GET").size(), 1u);             // only the first exit had to look its orders up
 }
 
 // ---------- Orders still filling ----------

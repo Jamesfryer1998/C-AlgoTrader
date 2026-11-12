@@ -492,7 +492,9 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
             dbc.Row([dbc.Col(panel(1, "Portfolio  config/strategy.json", table(views.portfolio_table(project))), lg=6),
                      dbc.Col(panel(2, "Risk  config/risk.json", html.Pre(views.risk_text(project), className="log")),
                              lg=6)], className="g-2"),
-            panel(3, "Trader log", html.Pre(log, className="log")),
+            panel(3, "Order latency by day (medians)",
+                  table(views.latency_table(metrics.latency_by_day(records.trades(project.live_records))))),
+            panel(4, "Trader log", html.Pre(log, className="log")),
         ])
 
     return app

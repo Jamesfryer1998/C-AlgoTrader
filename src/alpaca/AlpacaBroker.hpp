@@ -67,6 +67,9 @@ class AlpacaBroker : public BrokerBase
         };
         MarketClock getMarketClock();
 
+        // A cheap request when the connection to Alpaca has been idle a while, so it stays open for the next order
+        void keepConnectionWarm();
+
         // Alpaca's position details from the last getLatestPosition() call
         // (qty, avg_entry_price, current_price, market_value, unrealized_pl, unrealized_plpc, ...);
         // empty object when flat
@@ -97,9 +100,15 @@ class AlpacaBroker : public BrokerBase
         AccountStatus connectedAccount;
         json lastPosition = json::object();
         std::map<std::string, std::string> pendingOrderIds;   // ticker -> our latest order's Alpaca id
+        // ticker -> the ids of the stop loss / take profit orders holding its shares, from the replies to the
+        // orders that placed them (a bracket entry's legs, a re-protection). Unknown after a restart.
+        std::map<std::string, std::vector<std::string>> protectionIds;
 
-        // Cancel every open order for a ticker (e.g. the stop loss / take profit legs of earlier brackets) and
-        // wait briefly until Alpaca confirms. Returns false if some are still open.
-        bool cancelOpenOrders(const std::string& ticker);
+        // Cancel the stop loss / take profit orders holding a ticker's shares, so an exit can sell them: by the
+        // ids we know, or (unknown, or lookUp) every open order for the ticker. Doesn't wait for Alpaca to
+        // confirm: the exit is retried while the shares are still reserved.
+        void cancelProtection(const std::string& ticker, bool lookUp = false);
+        void rememberProtection(const std::string& ticker, const json& reply);
         int sendExit(Order& order, json body);
+        HttpResult counted(HttpResult result);   // one more request to this order, and its connect time
 };

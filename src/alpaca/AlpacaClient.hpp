@@ -1,11 +1,13 @@
 #pragma once
 
 #include <chrono>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <ctime>
 #include <string>
-#include <ixwebsocket/IXHttpClient.h>
 #include <nlohmann/json.hpp>
+#include "PersistentConnection.hpp"
 
 using json = nlohmann::json;
 
@@ -14,6 +16,8 @@ using json = nlohmann::json;
  *
  * Tiny HTTPS helper shared by AlpacaStream and AlpacaBroker.
  * It adds the Alpaca API key headers to every request and turns the reply into JSON.
+ * It keeps one connection open to each Alpaca host (PersistentConnection), so a request doesn't pay the
+ * TCP and TLS handshakes every time: one at a time per client, from any thread.
  *
  * Keys are read from the environment variables APCA_API_KEY_ID and APCA_API_SECRET_KEY.
  * main() loads these from the git-ignored .env file (see .env.example).
@@ -26,6 +30,8 @@ struct HttpResult
     int status = 0;         // HTTP status code (0 = could not connect)
     json body;              // Parsed JSON body (null if the body was not JSON)
     std::string error;      // Network error or Alpaca's error message
+    double totalMs = 0;     // the whole request
+    double connectMs = 0;   // of which opening a connection (0 when an open one was reused)
 
     bool ok() const { return status >= 200 && status < 300; }
 
@@ -54,15 +60,22 @@ class AlpacaClient
         // Pause between retries
         virtual void wait(std::chrono::milliseconds duration);
 
+        // Keep the connection to `url`'s host open: a cheap GET when it has been idle a while (the trader calls
+        // this between orders, so an order never pays for a connection the server closed meanwhile)
+        virtual void keepWarm(const std::string& url);
+
     protected:
         // Keys given directly (for tests), not read from the environment
         AlpacaClient(const std::string& keyId, const std::string& secretKey);
 
     private:
-        HttpResult toResult(const ix::HttpResponsePtr& response);
-        ix::HttpRequestArgsPtr makeArgs();
+        HttpResult send(const std::string& method, const std::string& url, const std::string& body);
+        HttpResult toResult(const PersistentConnection::Response& response);
+        PersistentConnection* connectionFor(const std::string& url, std::string& pathAndQuery);
 
         std::string keyId;
         std::string secretKey;
-        ix::HttpClient http;
+        std::mutex lock;                                                        // one request at a time
+        std::map<std::string, std::unique_ptr<PersistentConnection>> connections;   // by "https://host:port"
+        std::map<std::string, std::chrono::steady_clock::time_point> lastUsed;      // by the same
 };

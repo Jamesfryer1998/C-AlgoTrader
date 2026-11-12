@@ -84,6 +84,7 @@ TEST_F(TradeStoreTests, TradesRoundTripWithAllColumns)
     t.stopLoss = 192.15; t.takeProfit = 234.85; t.status = "sent"; t.brokerStatus = "accepted";
     t.clientOrderId = "algo-7-1793300000"; t.brokerOrderId = "b1f2"; t.roundTripMs = 143.2;
     t.note = "has, commas\nand newlines";
+    t.orderPath = "exit"; t.requests = 3; t.sendMs = 95.4; t.connectMs = 0;
     {
         TradeStore store(dir);
         store.appendTrade(t);
@@ -104,6 +105,9 @@ TEST_F(TradeStoreTests, TradesRoundTripWithAllColumns)
     EXPECT_EQ(r.brokerOrderId, "b1f2");
     EXPECT_NEAR(r.roundTripMs, 143.2, 0.05);
     EXPECT_EQ(r.note, "has; commas;and newlines");   // can't break the CSV
+    EXPECT_EQ(r.orderPath, "exit");
+    EXPECT_EQ(r.requests, 3);
+    EXPECT_NEAR(r.sendMs, 95.4, 0.05);
 }
 
 TEST_F(TradeStoreTests, WritesHappenInTheBackgroundAndFlushWaits)

@@ -48,6 +48,9 @@ class BrokerSession
         // For the dashboard: {"known", "is_open", "next_open_utc", "next_close_utc"}; not known in a backtest
         virtual json marketClock() { return {{"known", false}}; }
 
+        // Between orders: keep the connection to the broker open, so the next order doesn't wait to open one
+        virtual void keepConnectionWarm() {}
+
         virtual void beforeDecision(const MarketCondition& bar) {}
         virtual void afterDecision() {}
 
@@ -74,6 +77,7 @@ class AlpacaSession : public BrokerSession
         std::string describeAccount() const override;
         std::string describeMarketHours() override;
         json marketClock() override;
+        void keepConnectionWarm() override { alpaca.keepConnectionWarm(); }
         void printSummary(std::ostream& out, const std::vector<std::string>& tickers) override;
 
     private:

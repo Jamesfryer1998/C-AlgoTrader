@@ -37,7 +37,11 @@ class BrokerBase
             std::string brokerStatus;    // e.g. "accepted", "new", "rejected"
             std::string orderClass;      // e.g. "simple", "bracket"
             std::string error;           // why the broker refused it, if it did
-            double roundTripMs = 0;      // time to send the order and get the reply
+            double roundTripMs = 0;      // time to send the order and get the reply (an exit's cancels included)
+            std::string path;            // "entry" (one request) or "exit" (cancel its protection, then send)
+            int requests = 0;            // requests to the broker it took
+            double sendMs = 0;           // the order request alone
+            double connectMs = 0;        // of the round trip, time opening connections (0: all were open)
         };
         OrderReceipt lastReceipt;
 

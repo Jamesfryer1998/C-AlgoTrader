@@ -28,15 +28,17 @@ namespace
                                                     "accepted_for_bidding", "pending_replace", "pending_cancel",
                                                     "calculated", "replaced"};
 
-    // After cancelling orders, check this many times, this far apart, for Alpaca to confirm
-    const int CANCEL_CHECKS = 10;
-    const std::chrono::milliseconds CANCEL_CHECK_INTERVAL{200};
-
     // Shares can stay reserved for a moment after a cancel: Alpaca then rejects the exit with this message,
-    // so try again shortly
+    // so try again shortly (rather than first polling until the cancels are confirmed)
     const std::string SHARES_STILL_RESERVED = "insufficient qty";
-    const int EXIT_ATTEMPTS = 3;
-    const std::chrono::milliseconds EXIT_RETRY_WAIT{300};
+    const int EXIT_ATTEMPTS = 8;
+    const std::chrono::milliseconds EXIT_RETRY_WAIT{100};
+    // Still reserved after this many tries: the ids we cancelled weren't all of them (missing from a reply,
+    // replaced since), so look up every open order for the stock and cancel those too
+    const int RESERVED_TRIES_BEFORE_LOOKUP = 3;
+
+    const std::string ENTRY_PATH = "entry";
+    const std::string EXIT_PATH = "exit";
 
     // Less than this left after an exit counts as nothing (float rounding)
     const float NOTHING_LEFT = 1e-6f;
@@ -225,30 +227,55 @@ AlpacaBroker::hasPendingOrder(const std::string& ticker)
     return false;
 }
 
-bool
-AlpacaBroker::cancelOpenOrders(const std::string& ticker)
+HttpResult
+AlpacaBroker::counted(HttpResult result)
 {
-    std::string listUrl = tradingUrl + AlpacaApi::ORDERS_PATH + "?status=open&symbols=" + ticker;
-    HttpResult open = client->get(listUrl);
-    if (!open.ok() || !open.body.is_array())
-        return false;
-    if (open.body.empty())
-        return true;
+    lastReceipt.requests++;
+    lastReceipt.connectMs += result.connectMs;
+    return result;
+}
 
-    for (const auto& item : open.body)
-        client->del(tradingUrl + AlpacaApi::ORDERS_PATH + "/" + item.value("id", ""));
-    std::cout << "Cancelled " << open.body.size() << " open " << ticker
-              << " order(s) (earlier stop loss / take profit) so the exit can go through" << std::endl;
+// Keep the ids of the orders holding a position's shares: a bracket's legs, or an OCO re-protection and its leg
+void
+AlpacaBroker::rememberProtection(const std::string& ticker, const json& reply)
+{
+    if (!reply.is_object())
+        return;
+    std::vector<std::string> found;
+    if (reply.value("order_class", "") == "oco")
+        found.push_back(reply.value("id", ""));
+    if (reply.contains("legs") && reply["legs"].is_array())
+        for (const auto& leg : reply["legs"])
+            if (leg.is_object() && !leg.value("id", "").empty())
+                found.push_back(leg.value("id", ""));
+    // No ids in the reply: leave it unknown, so the exit looks the open orders up instead
+    if (!found.empty())
+        protectionIds[ticker].insert(protectionIds[ticker].end(), found.begin(), found.end());
+}
 
-    // Cancels are usually immediate, but give Alpaca a couple of seconds to confirm
-    for (int attempt = 0; attempt < CANCEL_CHECKS; attempt++)
+void
+AlpacaBroker::cancelProtection(const std::string& ticker, bool lookUp)
+{
+    std::vector<std::string> ids;
+    auto known = protectionIds.find(ticker);
+    if (known != protectionIds.end() && !lookUp)
+        ids = known->second;
+    else
     {
-        HttpResult check = client->get(listUrl);
-        if (check.ok() && check.body.is_array() && check.body.empty())
-            return true;
-        client->wait(CANCEL_CHECK_INTERVAL);
+        std::string listUrl = tradingUrl + AlpacaApi::ORDERS_PATH + "?status=open&symbols=" + ticker;
+        HttpResult open = counted(client->get(listUrl));
+        if (open.ok() && open.body.is_array())
+            for (const auto& item : open.body)
+                ids.push_back(item.value("id", ""));
     }
-    return false;
+    // An order already filled or cancelled answers with an error: there was nothing to cancel, so carry on
+    for (const auto& id : ids)
+        if (!id.empty())
+            counted(client->del(tradingUrl + AlpacaApi::ORDERS_PATH + "/" + id));
+    protectionIds.erase(ticker);
+    if (!ids.empty())
+        std::cout << "Cancelled " << ticker << "'s stop loss / take profit (" << ids.size()
+                  << " order(s)) so the exit can go through" << std::endl;
 }
 
 // Reduce or close a position: cancel the stop loss / take profit orders holding the shares, send a plain
@@ -257,18 +284,22 @@ int
 AlpacaBroker::sendExit(Order& order, json body)
 {
     auto started = std::chrono::steady_clock::now();
-    if (!cancelOpenOrders(order.getTicker()))
-        std::cerr << "WARNING - " << order.getTicker() << " still has open orders; trying the exit anyway" << std::endl;
+    lastReceipt.path = EXIT_PATH;
+    cancelProtection(order.getTicker());
 
     HttpResult result;
     for (int attempt = 1; attempt <= EXIT_ATTEMPTS; attempt++)
     {
-        result = client->post(tradingUrl + AlpacaApi::ORDERS_PATH, body);
+        result = counted(client->post(tradingUrl + AlpacaApi::ORDERS_PATH, body));
+        lastReceipt.sendMs = result.totalMs;
         // Shares can stay reserved for a moment after a cancel: try again shortly
         bool reserved = result.status == HTTP_FORBIDDEN && result.error.find(SHARES_STILL_RESERVED) != std::string::npos;
         if (!reserved)
             break;
-        client->wait(EXIT_RETRY_WAIT);
+        if (attempt == RESERVED_TRIES_BEFORE_LOOKUP)
+            cancelProtection(order.getTicker(), true);
+        else
+            client->wait(EXIT_RETRY_WAIT);
     }
     lastReceipt.roundTripMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
 
@@ -293,6 +324,8 @@ AlpacaBroker::sendExit(Order& order, json body)
     {
         HttpResult protect = client->post(tradingUrl + AlpacaApi::ORDERS_PATH, protection);
         if (protect.ok())
+            rememberProtection(order.getTicker(), protect.body);
+        if (protect.ok())
             std::cout << "Re-protected the remaining " << protection.value("qty", "") << " " << order.getTicker()
                       << ": stop " << protection["stop_loss"].value("stop_price", "") << ", target "
                       << protection["take_profit"].value("limit_price", "") << std::endl;
@@ -301,6 +334,13 @@ AlpacaBroker::sendExit(Order& order, json body)
                       << " (" << protect.status << "): " << protect.error << std::endl;
     }
     return 1;
+}
+
+void
+AlpacaBroker::keepConnectionWarm()
+{
+    if (!dryRun)
+        client->keepWarm(tradingUrl + AlpacaApi::CLOCK_PATH);
 }
 
 int
@@ -321,8 +361,10 @@ AlpacaBroker::placeOrder(Order order)
         return sendExit(order, body);
 
     auto started = std::chrono::steady_clock::now();
-    HttpResult result = client->post(tradingUrl + AlpacaApi::ORDERS_PATH, body);
+    lastReceipt.path = ENTRY_PATH;
+    HttpResult result = counted(client->post(tradingUrl + AlpacaApi::ORDERS_PATH, body));
     lastReceipt.roundTripMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    lastReceipt.sendMs = result.totalMs;
 
     if (!result.ok())
     {
@@ -336,6 +378,8 @@ AlpacaBroker::placeOrder(Order order)
     lastReceipt.brokerOrderId = result.body.value("id", "");
     lastReceipt.brokerStatus = result.body.value("status", "");
     pendingOrderIds[order.getTicker()] = lastReceipt.brokerOrderId;
+    if (lastReceipt.orderClass == "bracket")
+        rememberProtection(order.getTicker(), result.body);
 
     std::cout << "Order sent to Alpaca: " << body.value("side", "") << " " << body.value("qty", "")
               << " " << order.getTicker()

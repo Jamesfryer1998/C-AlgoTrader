@@ -129,6 +129,10 @@ void OrderManagement::sendOrder(Order& order)
     trade.brokerOrderId = receipt.brokerOrderId;
     trade.brokerStatus = receipt.brokerStatus;
     trade.roundTripMs = receipt.roundTripMs;
+    trade.orderPath = receipt.path;
+    trade.requests = receipt.requests;
+    trade.sendMs = receipt.sendMs;
+    trade.connectMs = receipt.connectMs;
     trade.note = receipt.error;
     trade.status = !accepted ? TradeStatus::REJECTED
                  : (receipt.brokerStatus == BrokerBase::DRY_RUN ? TradeStatus::DRY_RUN : TradeStatus::SENT);

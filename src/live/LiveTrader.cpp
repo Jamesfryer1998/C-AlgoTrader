@@ -418,6 +418,7 @@ LiveTrader::waitUntilFinished()
                 report->print(screen());
         }
         keepStatusFresh();
+        session->keepConnectionWarm();
     }
 }
 
