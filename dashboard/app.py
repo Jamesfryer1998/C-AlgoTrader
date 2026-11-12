@@ -12,12 +12,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import logging
+import time
 from datetime import datetime, timezone
 
 import dash_bootstrap_components as dbc
+import pandas as pd
 from dash import ClientsideFunction, Dash, Input, Output, State, ctx, dcc, html, no_update
 
-from . import comparison, metrics, records, report, views
+from . import comparison, metrics, picks, records, report, views
 from .end_of_day import EndOfDayBacktests
 from .project import Project
 from .trader import TraderControl
@@ -37,9 +39,10 @@ SEPARATOR = "◆"
 
 GRAPH_CONFIG = {"displayModeBar": False}   # drag to zoom, double-click to zoom back out
 
-LIVE, COMPARE, HISTORY, STRATEGIES, REPORT, SYSTEM = "live", "compare", "history", "strategies", "report", "system"
+LIVE, COMPARE, HISTORY, STRATEGIES, PICKS, REPORT, SYSTEM = ("live", "compare", "history", "strategies", "picks",
+                                                             "report", "system")
 TABS = [(LIVE, "1 LIVE"), (COMPARE, "2 BACKTEST VS LIVE"), (HISTORY, "3 HISTORY"), (STRATEGIES, "4 STRATEGIES"),
-        (REPORT, "5 REPORT"), (SYSTEM, "6 SYSTEM")]
+        (PICKS, "5 PICKS"), (REPORT, "6 REPORT"), (SYSTEM, "7 SYSTEM")]
 
 
 # ---------- Building blocks ----------
@@ -132,6 +135,25 @@ def confirm(id_: str, title: str, body: str, button: str, tone: str) -> dbc.Moda
 REPORT_CHARTS = ["growth", "drawdown", "monthly", "daily", "distribution", "qq", "rolling"]
 
 
+def picks_tab() -> html.Div:
+    """The weekly screen's suggested portfolio, backtested each traded day next to live (picks.py)."""
+    controls = html.Div([key("RUN SCREEN NOW", "run-screen", views.WARNING),
+                         html.Div(html.Div(id="screen-bar", className="progress-fill"), className="progress-track"),
+                         html.Span(id="screen-status", className="muted")], className="controls")
+    return html.Div([
+        controls,
+        html.Div(id="picks-stats", className="stat-line"),
+        dbc.Row([dbc.Col(panel(1, "P&L added up: live vs picks", graph("picks-pnl")), lg=7),
+                 dbc.Col(panel(2, "This week's picks", html.Div(id="picks-table"),
+                               extra=html.Span(id="picks-run", className="panel-note")), lg=5)], className="g-2"),
+        panel(3, "Day by day", html.Div(id="picks-days")),
+        html.Div("Each weekend the screen tunes every strategy on every stock over the last months and keeps the "
+                 "five that held up best on the final month it never saw. After each traded day's close, those "
+                 "picks are backtested on the day from the live account's money, starting flat. Nothing changes "
+                 "config/strategy.json: the picks are a suggestion to compare.", className="empty"),
+    ], id="picks-tab", style={"display": "none"})
+
+
 def report_tab() -> html.Div:
     """A tear sheet of one equity curve, the live account's or a backtest's, day by day."""
     controls = html.Div([html.Span("SOURCE", className="label"),
@@ -203,6 +225,7 @@ def layout() -> html.Div:
         html.Div([compare_controls, html.Div(id="compare-body")], id="compare-tab", style={"display": "none"}),
         history_tab,
         strategies_tab,
+        picks_tab(),
         report_tab(),
         html.Div(id="system-tab", style={"display": "none"}),
         confirm("start", "Start trading", "", "Start", views.POSITIVE),
@@ -216,6 +239,7 @@ def layout() -> html.Div:
         dcc.Store(id="history-sent"),
         dcc.Store(id="strategies-sent"),
         dcc.Store(id="report-sent"),
+        dcc.Store(id="picks-sent"),
     ], className="page")
 
 
@@ -224,8 +248,9 @@ def layout() -> html.Div:
 def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
     """end_of_day_backtests: backtest each day live traded once it's over (end_of_day.py), as the server does."""
     control = TraderControl(project)
+    screen = picks.ScreenControl(project)
     if end_of_day_backtests:
-        EndOfDayBacktests(project, control).start()
+        EndOfDayBacktests(project, control, screen).start()
     app = Dash(__name__, title=TITLE, update_title=None, external_stylesheets=[dbc.themes.BOOTSTRAP, FONTS],
                suppress_callback_exceptions=True)
     app.layout = layout
@@ -387,6 +412,38 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         return (sent.update("pnl", closed.values.tolist(), lambda _: views.strategy_pnl_figure(closed)),
                 sent.update("by-stock", views.strategy_stock_table(metrics.strategy_by_stock(trades)), table),
                 sent.update("table", views.strategies_table(metrics.strategy_performance(trades)), table),
+                sent.fingerprints)
+
+    # ----- Picks -----
+
+    @app.callback(Output("screen-status", "children"), Output("screen-bar", "style"), Output("run-screen", "disabled"),
+                  Input("fast", "n_intervals"), Input("run-screen", "n_clicks"), State("tabs", "active_tab"))
+    def screen_progress(_, __, active):
+        """The screen's progress bar and time left, every couple of seconds while the tab is open."""
+        started = ""
+        if ctx.triggered_id == "run-screen":
+            started = screen.run() + ". "
+        elif active != PICKS:
+            return no_update, no_update, no_update
+        text, fraction = views.screen_status(screen.progress(), picks.saved_runs(project), time.time())
+        return started + text, {"width": f"{fraction * 100:.1f}%"}, screen.running()
+
+    @app.callback(Output("picks-stats", "children"), Output("picks-pnl", "figure"), Output("picks-table", "children"),
+                  Output("picks-run", "children"), Output("picks-days", "children"), Output("picks-sent", "data"),
+                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), State("picks-sent", "data"))
+    def refresh_picks(active, _, sent_before):
+        if active != PICKS:
+            return (*[no_update] * 5, sent_before)
+        sent = SentParts(sent_before)
+        days = picks.comparison(project, comparison.traded_days(project.live_records))
+        runs = picks.saved_runs(project)
+        latest = runs[0] if runs else None
+        chosen = picks.picks_table(project, latest) if latest else pd.DataFrame()
+        return (sent.update("stats", views.picks_kpis(days), lambda kpis: segments([kpi_segment(k) for k in kpis])),
+                sent.update("pnl", days.values.tolist(), lambda _: views.picks_figure(days)),
+                sent.update("table", views.weekly_picks_table(chosen), table),
+                f"SCREENED {latest}" if latest else "",
+                sent.update("days", views.picks_days_table(days), table),
                 sent.fingerprints)
 
     # ----- Report -----

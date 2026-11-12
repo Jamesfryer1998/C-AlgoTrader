@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from dashboard import comparison, metrics, records, report, views
+from dashboard import comparison, metrics, picks, records, report, views
 from dashboard.tests.conftest import BACKTEST_DAY
 from dashboard.tests.test_records_and_metrics import write_trades
 
@@ -220,3 +220,31 @@ def test_strategy_lines_never_reuse_a_colour():
     assert [line["name"] for line in lines] == names[:len(views.STRATEGY_COLOURS)] + [views.OTHER_STRATEGIES]
     assert len({line["line"]["color"] for line in lines}) == len(lines)
     assert lines[-1]["y"] == [1.0, 2.0]                                   # the two extra strategies, added up
+
+
+def test_screen_status_line():
+    screening = picks.ScreenProgress(state=picks.SCREENING, done=25, total=100, stock="KO", started=1000.0)
+    text, fraction = views.screen_status(screening, ["2026-11-07"], now=1600.0)
+    assert text == "Screening 25 of 100 stocks on KO, about 30m left" and fraction == 0.25
+    text, _ = views.screen_status(picks.ScreenProgress(state=picks.FINISHED), ["2026-11-14", "2026-11-07"], 0)
+    assert text.startswith("Last screened 2026-11-14")
+    text, fraction = views.screen_status(picks.ScreenProgress(state=picks.FAILED), [], 0)
+    assert "failed" in text and fraction == 0.0
+
+
+def test_picks_against_live_views():
+    days = pd.DataFrame({"day": ["2026-11-09", "2026-11-10"], "live": [-80.0, 100.0], "live_backtest": [-60.0, None],
+                         "picks": [40.0, 50.0], "picks_run": ["2026-11-07", "2026-11-07"]})
+    days["picks_minus_live"] = days["picks"] - days["live"]
+    kpis = {k.title: k for k in views.picks_kpis(days)}
+    assert kpis["Live"].value == "+$20.00" and kpis["Picks"].value == "+$90.00"
+    assert kpis["Picks - live"].value == "+$70.00" and kpis["Picks ahead"].value == "1 of 2 days"
+
+    figure = views.picks_figure(days)
+    assert [line["name"] for line in figure["data"]] == ["Live", "Live's portfolio backtested", "Picks backtested"]
+    assert figure["data"][0]["y"] == [-80.0, 20.0]                    # added up day by day
+    assert figure["data"][1]["x"] == ["2026-11-09"]                   # a day without that backtest is left out
+    json.dumps(figure)
+    rows = texts(views.picks_days_table(days))
+    assert rows[0] == ["2026-11-10", "+$100.00", "-", "+$50.00", "-$50.00", "2026-11-07"]   # newest first
+    assert views.weekly_picks_table(pd.DataFrame()).rows == []

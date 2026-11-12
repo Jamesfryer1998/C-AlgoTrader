@@ -13,6 +13,7 @@ What runs where:
 | Dashboard | `algo-trader-dashboard.service`, gunicorn on port 8050 |
 | Trader | started and stopped from the dashboard (or by hand, see below). It keeps running if the dashboard restarts, and a deploy never stops it: it picks up a new build at its next Start |
 | End-of-day backtests | the dashboard backtests each day the live account traded, about 20 minutes after the close (once Alpaca has all its bars), starting as the live account did. See them on the Backtest vs live tab the next morning |
+| Weekly picks | the dashboard runs `screen_app --weekly` from Saturday 06:00 UTC (or the Picks tab's button) and backtests its picks after each traded day; results in `/var/lib/algo-trader/data/picks/`. The first screen also downloads ~6 months of minute bars for the S&P 100, so it takes longest |
 | Code and build | `/opt/algo-trader/app` (`build/` is kept between deploys, so builds are incremental) |
 | Bars and trading records | `/var/lib/algo-trader/data` (linked as `app/data`, never touched by deploys) |
 | Alpaca keys | `/etc/algo-trader.env` |

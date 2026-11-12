@@ -11,7 +11,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from . import comparison, metrics, records, report
+from . import comparison, metrics, picks, records, report
 from .project import Project
 
 # Tones the stylesheet colours (assets/style.css)
@@ -41,6 +41,8 @@ SIGNED_DOLLARS = "+$,.2f"   # Plotly's axis format for P&L: +$12.50, -$3.00
 # A line per strategy, in this order (validated as a set): none green or red, which mean profit and loss here.
 # More strategies than colours fold into one "Other" line rather than reusing a colour.
 STRATEGY_COLOURS = ["#1aa3b8", "#d9702a", "#c45bd1", "#b38612", "#3987e5"]
+PICKS_COLOUR = "#c45bd1"   # the weekly picks' line, beside LIVE_COLOUR and BACKTEST_COLOUR (validated as a set)
+PICKS_ZOOM_KEY = "picks"
 OTHER_STRATEGIES = "Other"
 OTHER_COLOUR = "#6b7680"
 
@@ -547,6 +549,74 @@ def _mean_line(axis: str, mean: float) -> dict:
     return {"type": "line", "xref": "x" if axis == "x" else "paper", "yref": "y" if axis == "y" else "paper",
             f"{axis}0": mean, f"{axis}1": mean, f"{across}0": 0, f"{across}1": 1,
             "line": {"color": REFERENCE_COLOUR, "width": 1, "dash": "dash"}}
+
+
+# ---------- Picks ----------
+
+def screen_status(progress: picks.ScreenProgress, runs: list[str], now: float) -> tuple[str, float]:
+    """The screen's line beside its button and how full its progress bar is (0 to 1)."""
+    if progress.state == picks.SCREENING:
+        left = progress.seconds_left(now)
+        eta = f", about {metrics.describe_duration(left)} left" if left is not None else ", working out the time left"
+        stock = f" on {progress.stock}" if progress.stock else ""
+        return f"Screening {progress.done} of {progress.total} stocks{stock}{eta}", progress.fraction
+    last = f"Last screened {runs[0]}" if runs else "Not screened yet"
+    if progress.state == picks.FAILED:
+        return f"The last screen failed (see data/screen/weekly/screen.log). {last}", 0.0
+    return f"{last}. Next: automatically at the weekend, or now with the button", 0.0
+
+
+def weekly_picks_table(table: pd.DataFrame) -> Table:
+    """A screen's top picks and why: how each did tuning, then on the test month it never saw."""
+    # Settings last: it's long, and the table trims its last column rather than push the numbers out of sight
+    view = Table(["#", "Stock", "Strategy", "Test Sharpe", "Train Sharpe", "Buy & hold", "Test trades", "Settings"],
+                 empty="NO PICKS YET: RUN A SCREEN")
+    for row in table.itertuples():
+        view.add(str(row.rank), row.symbol, row.strategy, (number(row.test_sharpe), tone_of(row.test_sharpe)),
+                 number(row.train_sharpe), number(row.buy_hold_sharpe), number(row.test_closed_trades, 0),
+                 row.parameters)
+    return view
+
+
+def picks_kpis(days: pd.DataFrame) -> list[Kpi]:
+    """Totals over the days the picks were backtested next to live."""
+    compared = days.dropna(subset=["live", "picks"])
+    ahead = int((compared["picks_minus_live"] > 0).sum())
+    live, chosen = float(compared["live"].sum()), float(compared["picks"].sum())
+    return [Kpi("Days compared", str(len(compared))),
+            Kpi("Live", signed_money(live), "the live account's P&L on those days", tone_of(live)),
+            Kpi("Picks", signed_money(chosen), "the week's picks backtested on them", tone_of(chosen)),
+            Kpi("Picks - live", signed_money(chosen - live), "", tone_of(chosen - live)),
+            Kpi("Picks ahead", f"{ahead} of {len(compared)} days")]
+
+
+def picks_figure(days: pd.DataFrame) -> dict:
+    """P&L added up day by day: live, live's portfolio backtested, the week's picks backtested."""
+    if days.empty:
+        return _note_figure("No traded days yet", PICKS_ZOOM_KEY)
+    lines = []
+    for name, column, colour in [("Live", "live", LIVE_COLOUR), ("Live's portfolio backtested", "live_backtest",
+                                                                  BACKTEST_COLOUR),
+                                 ("Picks backtested", "picks", PICKS_COLOUR)]:
+        known = days.dropna(subset=[column])
+        if not known.empty:
+            line = _line(name, known["day"], known[column].cumsum(), colour)
+            line.update({"mode": "lines+markers", "marker": {"size": 8, "line": {"color": PANEL, "width": 2}},
+                         "line": {**line["line"], "shape": "linear"},
+                         "hovertemplate": "%{y:+$,.2f}<extra>%{fullData.name}</extra>"})
+            lines.append(line)
+    layout = _layout(PICKS_ZOOM_KEY)
+    layout["yaxis"] = {**layout["yaxis"], "tickprefix": "", "tickformat": SIGNED_DOLLARS}
+    return {"data": lines, "layout": {**layout, "showlegend": True}}
+
+
+def picks_days_table(days: pd.DataFrame) -> Table:
+    table = Table(["Day", "Live", "Live backtested", "Picks backtested", "Picks - live", "Picks from"],
+                  empty="NO TRADED DAYS YET")
+    for row in days.iloc[::-1].itertuples():   # newest first
+        table.add(row.day, _signed_or_nothing(row.live), _signed_or_nothing(row.live_backtest),
+                  _signed_or_nothing(row.picks), _signed_or_nothing(row.picks_minus_live), row.picks_run or NOTHING)
+    return table
 
 
 def _signed_or_nothing(value) -> tuple[str, str]:

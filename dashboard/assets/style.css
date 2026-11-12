@@ -113,3 +113,6 @@ html, body { background: var(--black); color: var(--text); font-family: var(--mo
 .modal-keys { display: flex; justify-content: flex-end; gap: 8px; padding: 0 12px 12px; }
 .modal-backdrop.show { opacity: 0.7; }
 .source-picker { width: 260px; }
+.progress-track { width: 220px; height: 10px; border: 1px solid var(--frame); background: var(--black); }
+.progress-fill { height: 100%; width: 0; background: var(--frame); transition: width 0.5s; }
+.panel-note { color: var(--muted); font-size: 10px; background: var(--black); padding: 0 6px; }

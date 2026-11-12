@@ -182,6 +182,12 @@ dashboard keeps running if the dashboard is closed. While it runs, the dashboard
 live account traded, about 20 minutes after the close, starting as the live account did
 (`dashboard/end_of_day.py`), ready to compare on the Backtest vs live tab.
 
+The Picks tab is a weekly suggestion of what to trade: every weekend (or with its RUN SCREEN NOW button, with a
+progress bar and time left) `screen_app --weekly` tunes every strategy on every stock over the last months and
+keeps the five that held up on the final month it never saw. After each traded day, those picks are backtested
+on it from the live account's money, next to live. `config/strategy.json` is never changed: use the picks
+(`data/picks/<date>/top_picks_config.json`) when they've earned it.
+
 ### CI and the home server
 GitHub Actions builds and tests everything on every push (`.github/workflows/ci.yml`). Once CI passes on
 `main`, `.github/workflows/deploy.yml` deploys to the home server's container through a self-hosted runner:
