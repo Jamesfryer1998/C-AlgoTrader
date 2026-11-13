@@ -42,7 +42,8 @@ LOG_FILE = "screen.log"
 PICKS_CSV = "top_picks.csv"
 PICKS_PORTFOLIO = "top_picks_config.json"
 RESULTS_CSV = "screen_results.csv"
-SAVED_FILES = [PICKS_CSV, PICKS_PORTFOLIO, RESULTS_CSV, LOG_FILE]
+SCREENED_WITH_FILE = "screened_with.json"  # in a run's folder: {"strategies": [...]}, absent if it tried them all
+SAVED_FILES = [PICKS_CSV, PICKS_PORTFOLIO, RESULTS_CSV, LOG_FILE, SCREENED_WITH_FILE]
 SCREENING, FINISHED, FAILED = "screening", "finished", "failed"
 STALE_AFTER = timedelta(minutes=30)      # a screen that hasn't moved for this long has died
 SCREEN_TIMEOUT_SECONDS = 6 * 3600
@@ -50,6 +51,9 @@ CHOSEN_PORTFOLIO = "portfolio.json"     # under data/: traded instead of config/
 CONFIG_PORTFOLIO = "config/strategy.json"
 SOURCE, PORTFOLIO, CHOSEN_AT, RUN = "source", "portfolio", "chosen_utc", "run"
 WEEKEND_FROM = (5, 6)                    # the weekly screen runs from Saturday 06:00 UTC (Saturday = weekday 5)
+SCREEN_SETTINGS = "config/screen.json"
+WEEKLY_GRIDS = "minute"                  # the screen.json section whose strategies the weekly screen tunes
+STRATEGIES = "--strategies"
 SCREEN_NICENESS = 10                     # a lower CPU priority, so a screen run in trading hours never slows the trader
 
 
@@ -94,6 +98,22 @@ def _settings_text(parameters: str) -> str:
                          for name, value in json.loads(parameters).items())
     except (TypeError, ValueError):
         return str(parameters)
+
+
+def screen_strategies(project: Project) -> list[str]:
+    """The strategies the weekly screen can tune, from config/screen.json."""
+    try:
+        return list(json.loads((project.root / SCREEN_SETTINGS).read_text())[WEEKLY_GRIDS]["strategies"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+
+
+def screened_with(project: Project, run: str) -> list[str]:
+    """The strategies a saved run was limited to, or [] if it tried them all."""
+    try:
+        return json.loads((picks_root(project) / run / SCREENED_WITH_FILE).read_text()).get("strategies", [])
+    except (OSError, ValueError):
+        return []
 
 
 def backtest_folder(project: Project, day: str) -> Path:
@@ -232,8 +252,8 @@ class ScreenControl:
     def running(self) -> bool:
         return self.process_running or self.progress().state == SCREENING
 
-    def run(self) -> str:
-        """Start a screen now. Returns what happened."""
+    def run(self, strategies: list[str] | None = None) -> str:
+        """Start a screen now, of every strategy or just `strategies`. Returns what happened."""
         with self.lock:
             if self.running():
                 return "A screen is already running"
@@ -242,15 +262,22 @@ class ScreenControl:
                 return f"Not built yet: {app} is missing"
             self.process_running = True
             self.last_error = ""
-        threading.Thread(target=self._screen, args=(app,), daemon=True).start()
-        return "Screening started"
+        threading.Thread(target=self._screen, args=(app, strategies or []), daemon=True).start()
+        return f"Screening {' + '.join(strategies)} started" if strategies else "Screening started"
 
-    def _screen(self, app: Path) -> None:
+    def _screen(self, app: Path, strategies: list[str]) -> None:
         self.results.mkdir(parents=True, exist_ok=True)
         log = self.results / LOG_FILE
+        command = [str(app), WEEKLY, TOP, str(TOP_PICKS), THREADS, str(os.cpu_count() or 1)]
+        screened_with = self.results / SCREENED_WITH_FILE
+        if strategies:
+            command += [STRATEGIES, ",".join(strategies)]
+            screened_with.write_text(json.dumps({"strategies": strategies}))
+        else:
+            screened_with.unlink(missing_ok=True)
         try:
             with log.open("w") as output:
-                done = subprocess.run([str(app), WEEKLY, TOP, str(TOP_PICKS), THREADS, str(os.cpu_count() or 1)],
+                done = subprocess.run(command,
                                       cwd=self.project.root, stdout=output, stderr=subprocess.STDOUT,
                                       timeout=SCREEN_TIMEOUT_SECONDS, preexec_fn=_lower_priority)
             if done.returncode != 0 or not (self.results / PICKS_PORTFOLIO).exists():
@@ -269,6 +296,8 @@ class ScreenControl:
         for name in SAVED_FILES:
             if (self.results / name).exists():
                 shutil.copy2(self.results / name, folder / name)
+            else:   # a rerun the same day: don't keep the earlier run's files
+                (folder / name).unlink(missing_ok=True)
         return folder
 
 

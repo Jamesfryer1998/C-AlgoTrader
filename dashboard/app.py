@@ -135,6 +135,7 @@ def confirm(id_: str, title: str, body: str, button: str, tone: str) -> dbc.Moda
 REPORT_CHARTS = ["growth", "drawdown", "monthly", "daily", "distribution", "qq", "rolling"]
 PREVIOUS_PICKS_SHOWN = 8
 LOADED = "LOADED"
+ALL_STRATEGIES = "ALL STRATEGIES"
 TRADE_PICKS = "trade-picks"   # each saved week's "Trade these" button: {"type": TRADE_PICKS, "run": its date}
 
 
@@ -143,10 +144,16 @@ def trade_picks_button(run: str) -> html.Button:
                        n_clicks=0)
 
 
-def picks_heading(run: str, loaded: str | None) -> list:
+def screened_note(project: Project, run: str) -> str:
+    """"  SCALP ONLY" for a run limited to some strategies, else nothing."""
+    only = picks.screened_with(project, run)
+    return f"  {' + '.join(only)} ONLY" if only else ""
+
+
+def picks_heading(project: Project, run: str, loaded: str | None) -> list:
     """A week's date, and TRADE THESE, or LOADED if they're what the trader's next Start trades."""
     action = html.Span(LOADED, className=f"loaded {views.POSITIVE}") if run == loaded else trade_picks_button(run)
-    return [html.Span(f"SCREENED {run}", className="panel-note"), action]
+    return [html.Span(f"SCREENED {run}{screened_note(project, run)}", className="panel-note"), action]
 
 
 def loaded_portfolio(project: Project) -> html.Div:
@@ -158,7 +165,7 @@ def loaded_portfolio(project: Project) -> html.Div:
 
 def previous_picks(project: Project, runs: list[str], loaded: str | None) -> list:
     """What's loaded now, then each earlier week's picks, newest first, with a button to trade them."""
-    earlier = [html.Div([html.Div(picks_heading(run, loaded), className="previous-heading"),
+    earlier = [html.Div([html.Div(picks_heading(project, run, loaded), className="previous-heading"),
                          table(views.weekly_picks_table(picks.picks_table(project, run)))], className="previous-run")
                for run in runs[:PREVIOUS_PICKS_SHOWN]]
     return [loaded_portfolio(project), *(earlier or [html.Div("NO EARLIER SCREENS YET", className="empty")])]
@@ -166,7 +173,8 @@ def previous_picks(project: Project, runs: list[str], loaded: str | None) -> lis
 
 def picks_tab() -> html.Div:
     """The weekly screen's suggested portfolio, backtested each traded day next to live (picks.py)."""
-    controls = html.Div([key("RUN SCREEN NOW", "run-screen", views.WARNING),
+    controls = html.Div([dbc.Select(id="screen-strategy", className="day-picker source-picker"),
+                         key("RUN SCREEN NOW", "run-screen", views.WARNING),
                          html.Div(html.Div(id="screen-bar", className="progress-fill"), className="progress-track"),
                          html.Span(id="screen-status", className="muted")], className="controls")
     portfolio = html.Div([html.Span(id="portfolio-status", className="portfolio-line"),
@@ -454,16 +462,26 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
     # ----- Picks -----
 
     @app.callback(Output("screen-status", "children"), Output("screen-bar", "style"), Output("run-screen", "disabled"),
-                  Input("fast", "n_intervals"), Input("run-screen", "n_clicks"), State("tabs", "active_tab"))
-    def screen_progress(_, __, active):
+                  Input("fast", "n_intervals"), Input("run-screen", "n_clicks"), State("tabs", "active_tab"),
+                  State("screen-strategy", "value"))
+    def screen_progress(_, __, active, strategy):
         """The screen's progress bar and time left, every couple of seconds while the tab is open."""
         started = ""
         if ctx.triggered_id == "run-screen":
-            started = screen.run() + ". "
+            started = screen.run([strategy] if strategy and strategy != ALL_STRATEGIES else None) + ". "
         elif active != PICKS:
             return no_update, no_update, no_update
         text, fraction = views.screen_status(screen.progress(), picks.saved_runs(project), time.time())
         return started + text, {"width": f"{fraction * 100:.1f}%"}, screen.running()
+
+    @app.callback(Output("screen-strategy", "options"), Output("screen-strategy", "value"),
+                  Input("tabs", "active_tab"), State("screen-strategy", "value"))
+    def screen_strategy_choices(active, chosen):
+        """Screen every strategy, or just one (from config/screen.json)."""
+        if active != PICKS:
+            return no_update, no_update
+        choices = [ALL_STRATEGIES, *picks.screen_strategies(project)]
+        return [{"label": choice, "value": choice} for choice in choices], chosen or ALL_STRATEGIES
 
     @app.callback(Output("picks-stats", "children"), Output("picks-pnl", "figure"), Output("picks-table", "children"),
                   Output("picks-run", "children"), Output("previous-picks", "children"),
@@ -482,7 +500,8 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         return (sent.update("stats", views.picks_kpis(days), lambda kpis: segments([kpi_segment(k) for k in kpis])),
                 sent.update("pnl", days.values.tolist(), lambda _: views.picks_figure(days)),
                 sent.update("table", views.weekly_picks_table(chosen), table),
-                sent.update("run", (latest, loaded[0]), lambda _: picks_heading(latest, loaded[0]) if latest else ""),
+                sent.update("run", (latest, loaded[0], picks.screened_with(project, latest) if latest else []),
+                            lambda _: picks_heading(project, latest, loaded[0]) if latest else ""),
                 sent.update("previous", (runs[1:], loaded), lambda _: previous_picks(project, runs[1:], loaded[0])),
                 sent.update("days", views.picks_days_table(days), table),
                 sent.fingerprints)

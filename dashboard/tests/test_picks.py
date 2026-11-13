@@ -134,3 +134,23 @@ def test_which_week_is_loaded(project):
     assert picks.loaded_run(project) == "2026-11-07"
     picks.trade_config(project)
     assert picks.loaded_run(project) is None
+
+
+def test_screening_just_one_strategy_is_recorded_with_the_run(project):
+    install_fake_screen(project)
+    screen = picks.ScreenControl(project)
+    assert screen.run(["SCALP"]) == "Screening SCALP started"
+    assert wait_for(lambda: not screen.running())
+    run = picks.saved_runs(project)[0]
+    assert "--strategies SCALP" in (picks.picks_root(project) / run / picks.LOG_FILE).read_text()
+    assert picks.screened_with(project, run) == ["SCALP"]
+
+    assert screen.run() == "Screening started"                       # all of them again, the same day
+    assert wait_for(lambda: not screen.running())
+    assert picks.screened_with(project, run) == []
+
+
+def test_the_strategies_the_screen_can_tune(project):
+    (project.root / picks.SCREEN_SETTINGS).write_text(json.dumps(
+        {"minute": {"strategies": {"RSI": {}, "SCALP": {}}}}))
+    assert picks.screen_strategies(project) == ["RSI", "SCALP"]
