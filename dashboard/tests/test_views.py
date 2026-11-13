@@ -168,7 +168,6 @@ def test_config_views(project):
     (project.root / "config" / "strategy.json").write_text(json.dumps(
         {"portfolio": [{"ticker": "KO", "strategy": {"name": "RSI", "active": 1, "period": 14}}]}))
     assert texts(views.portfolio_table(project)) == [["KO", "RSI", "period 14"]]
-    assert "KELLY" in views.risk_text(project)
 
 
 def report_days(count: int):

@@ -4,7 +4,6 @@ tested without a browser or Dash."""
 
 from __future__ import annotations
 
-import json
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -665,7 +664,3 @@ def portfolio_status(running: str | None, upcoming: str) -> str:
     return f"{now}  ◆  NEXT START {upcoming}"
 
 
-def risk_text(project: Project) -> str:
-    risk = project.risk
-    shown = {key: value for key, value in risk.items() if not key.startswith("_") and key != "risk_tuning"}
-    return json.dumps(shown, indent=2)
