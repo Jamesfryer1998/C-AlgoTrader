@@ -188,7 +188,7 @@ def picks_tab() -> html.Div:
                                 extra=html.Div(id="picks-run", className="panel-actions")),
                           panel(3, "Previous picks", html.Div(id="previous-picks"))], lg=5)], className="g-2"),
         panel(4, "Day by day", html.Div(id="picks-days")),
-        html.Div("Each weekend the screen tunes every strategy on every stock over the last months and keeps the "
+        html.Div("Each weekend the screen tunes every strategy on every stock on about three years of 1-minute bars and keeps the "
                  "five that held up best on the final month it never saw. After each traded day's close, those "
                  "picks are backtested on the day from the live account's money, starting flat. TRADE THESE makes "
                  "a week's picks the trader's portfolio from its next Start (saved as data/portfolio.json, so "

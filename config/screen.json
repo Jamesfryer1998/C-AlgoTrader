@@ -52,10 +52,10 @@
         }
     },
     "weekly": {
-        "_comment": "screen_app --weekly: the short rolling screen the dashboard runs every weekend (and from the Picks tab's button) to suggest next week's portfolio. 1-minute bars with the \"minute\" section's grids, and these settings on top: tune on the last history_months months but the final one, test on that final month. A sample of max_combinations settings per strategy keeps it to well under an hour on the server.",
-        "history_months": 6,
+        "_comment": "screen_app --weekly: the rolling screen the dashboard runs every weekend (and from the Picks tab's button) to suggest next week's portfolio. 1-minute bars with the \"minute\" section's grids, and these settings on top: tune on the last history_months months but the final one (about three years, so a setting has to work through different markets, not one lucky stretch), test on that final month. A sample of max_combinations settings per strategy keeps it to about three hours on the server; the first run also downloads three years of bars (about 2 GB for 100 stocks).",
+        "history_months": 36,
         "test_months": 1,
-        "min_train_days": 60,
+        "min_train_days": 500,
         "min_test_days": 15,
         "min_closed_trades": 10,
         "max_combinations": 150
