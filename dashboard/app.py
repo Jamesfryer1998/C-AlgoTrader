@@ -63,6 +63,12 @@ def panel(number: int, title: str, body, extra=None, tall: bool = False) -> html
     return html.Div([tab, html.Div(body, className="panel-body")], className="panel tall" if tall else "panel")
 
 
+def side_by_side(wide, side) -> dbc.Row:
+    """Two columns, the same split on every tab (a chart, then the tables beside it) so boxes line up from tab to
+    tab; the boxes in a row reach the same bottom edge (style.css)."""
+    return dbc.Row([dbc.Col(wide, lg=WIDE_COLUMNS), dbc.Col(side, lg=SIDE_COLUMNS)], className="g-2")
+
+
 def chart(figure: dict) -> dcc.Graph:
     return dcc.Graph(figure=figure, config=GRAPH_CONFIG, className="chart")
 
@@ -132,6 +138,7 @@ def confirm(id_: str, title: str, body: str, button: str, tone: str) -> dbc.Moda
 
 # ---------- Layout ----------
 
+WIDE_COLUMNS, SIDE_COLUMNS = 7, 5   # of Bootstrap's 12: every tab's chart and the tables beside it
 REPORT_CHARTS = ["growth", "drawdown", "monthly", "daily", "distribution", "qq", "rolling"]
 LOADED = "LOADED"
 ALL_STRATEGIES = "ALL STRATEGIES"
@@ -173,10 +180,10 @@ def picks_tab() -> html.Div:
         controls,
         portfolio,
         html.Div(id="picks-stats", className="stat-line"),
-        dbc.Row([dbc.Col(panel(1, "P&L added up: live vs picks", graph("picks-pnl")), lg=7),
-                 dbc.Col([panel(2, "This week's picks", html.Div(id="picks-table"),
-                                extra=html.Div(id="picks-run", className="panel-actions")),
-                          panel(3, "Current picks", html.Div(id="current-picks"))], lg=5)], className="g-2"),
+        side_by_side(panel(1, "P&L added up: live vs picks", graph("picks-pnl")),
+                     [panel(2, "This week's picks", html.Div(id="picks-table"),
+                            extra=html.Div(id="picks-run", className="panel-actions")),
+                      panel(3, "Current picks", html.Div(id="current-picks"))]),
         panel(4, "Day by day", html.Div(id="picks-days")),
         html.Div("Each weekend the screen tunes every strategy on every stock on about three years of 1-minute bars and keeps the "
                  "five that held up best on the final month it never saw. After each traded day's close, those "
@@ -194,14 +201,13 @@ def report_tab() -> html.Div:
     return html.Div([
         controls,
         html.Div(id="report-stats", className="stat-line"),
-        dbc.Row([dbc.Col([panel(1, "Return since the start", graph("report-growth")),
-                          panel(2, "Drawdown from the high", graph("report-drawdown"))], lg=8),
-                 dbc.Col(panel(3, "Monthly returns", graph("report-monthly")), lg=4)], className="g-2"),
-        dbc.Row([dbc.Col(panel(4, "Daily returns", graph("report-daily")), lg=6),
-                 dbc.Col(panel(5, "Distribution of daily returns", graph("report-distribution")), lg=6)],
-                className="g-2"),
-        dbc.Row([dbc.Col(panel(6, "Normal distribution Q-Q", graph("report-qq")), lg=4),
-                 dbc.Col(panel(7, rolling, graph("report-rolling")), lg=8)], className="g-2"),
+        side_by_side(panel(1, "Return since the start", graph("report-growth")),
+                     panel(2, "Monthly returns", graph("report-monthly"))),
+        side_by_side(panel(3, "Drawdown from the high", graph("report-drawdown")),
+                     panel(4, "Distribution of daily returns", graph("report-distribution"))),
+        side_by_side(panel(5, "Daily returns", graph("report-daily")),
+                     panel(6, "Normal distribution Q-Q", graph("report-qq"))),
+        panel(7, rolling, graph("report-rolling")),
     ], id="report-tab", style={"display": "none"})
 
 
@@ -225,24 +231,23 @@ def layout() -> html.Div:
     ], className="controls")
 
     live_tab = html.Div([
-        dbc.Row([dbc.Col(panel(1, "Equity today", graph("live-equity"), tall=True), lg=8),
-                 dbc.Col([panel(2, "P&L today", html.Div(id="live-pnl")),
-                          panel(3, "Positions", html.Div(id="live-positions"))], lg=4)], className="g-2"),
-        dbc.Row([dbc.Col(panel(4, "Tape", html.Div(id="live-tape")), lg=8),
-                 dbc.Col([panel(5, "Strategies", html.Div(id="live-strategies")),
-                          panel(6, "Events", html.Div(id="live-events", className="events"))], lg=4)], className="g-2"),
+        side_by_side(panel(1, "Equity today", graph("live-equity"), tall=True),
+                     [panel(2, "P&L today", html.Div(id="live-pnl")),
+                      panel(3, "Positions", html.Div(id="live-positions"))]),
+        side_by_side(panel(4, "Tape", html.Div(id="live-tape")),
+                     [panel(5, "Strategies", html.Div(id="live-strategies")),
+                      panel(6, "Events", html.Div(id="live-events", className="events"))]),
     ], id="live-tab")
 
     history_tab = html.Div([
         html.Div(id="history-stats", className="stat-line"),
-        dbc.Row([dbc.Col(panel(1, "Daily P&L", graph("history-daily")), lg=7),
-                 dbc.Col(panel(2, "Days", html.Div(id="history-days")), lg=5)], className="g-2"),
+        side_by_side(panel(1, "Daily P&L", graph("history-daily")), panel(2, "Days", html.Div(id="history-days"))),
         panel(3, "One day", graph("history-day-equity"), extra=dbc.Select(id="history-day", className="day-picker")),
     ], id="history-tab", style={"display": "none"})
 
     strategies_tab = html.Div([
-        dbc.Row([dbc.Col(panel(1, "Realised P&L by strategy", graph("strategies-pnl")), lg=7),
-                 dbc.Col(panel(2, "By stock", html.Div(id="strategies-by-stock")), lg=5)], className="g-2"),
+        side_by_side(panel(1, "Realised P&L by strategy", graph("strategies-pnl")),
+                     panel(2, "By stock", html.Div(id="strategies-by-stock"))),
         panel(3, "Strategies, every recorded day", html.Div(id="strategies-table")),
         html.Div("Realised P&L of closed trades only, each credited to the strategy that opened it "
                  "(stop losses and take profits filled at the broker included).", className="empty"),
@@ -401,9 +406,8 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
             notes.append(html.Div("NO BACKTEST OF THIS DAY YET: PRESS RUN BACKTEST", className="empty"))
             return html.Div(notes), not backtesting
         return html.Div(notes + [
-            dbc.Row([dbc.Col(panel(1, "Summary", table(views.comparison_table(result))), lg=5),
-                     dbc.Col(panel(2, "P&L since the open: live vs backtest", chart(views.comparison_figure(result))), lg=7)],
-                    className="g-2"),
+            side_by_side(panel(1, "P&L since the open: live vs backtest", chart(views.comparison_figure(result))),
+                         panel(2, "Summary", table(views.comparison_table(result)))),
             panel(3, "Fills, side by side", table(views.fills_table(result))),
         ]), not backtesting
 
@@ -574,10 +578,8 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         log = records.log_tail(project.live_records, LOG_LINES) or "No output yet"
         latency = metrics.latency_by_day(records.trades(project.live_records))
         return html.Div([
-            dbc.Row([dbc.Col(panel(1, f"Portfolio  {picks.next_portfolio(project)}", table(views.portfolio_table(project))),
-                             lg=6),
-                     dbc.Col(panel(2, "Order latency by day (medians)", table(views.latency_table(latency))), lg=6)],
-                    className="g-2"),
+            side_by_side(panel(1, f"Portfolio  {picks.next_portfolio(project)}", table(views.portfolio_table(project))),
+                         panel(2, "Order latency by day (medians)", table(views.latency_table(latency)))),
             panel(3, "Trader log", html.Pre(log, className="log")),
         ])
 
