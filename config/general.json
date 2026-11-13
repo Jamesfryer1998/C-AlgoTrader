@@ -4,6 +4,8 @@
     "starting_capital": 100000.0,
     "data_limit_gb": 5.0,
     "_regulatory_fees_comment": "Fees Alpaca passes on when selling (it charges no commission on stocks): the SEC fee in $ per $1 million sold ($20.60 since 4 April 2026) and FINRA's TAF in $ per share sold, at most finra_taf_max a trade (2025 rates). Charged on every simulated sell.",
+    "_backtest_slippage_comment": "The live app's backtests (Backtest vs Live, the picks, the end-of-day runs). Against us on every simulated fill: half the bid/ask spread plus the move in the second or so before a live order reaches Alpaca. 0.03% (3 basis points, about 2 cents on a $70 stock) is a cautious figure for the S&P 100. It matters most to strategies that trade a lot, like SCALP.",
+    "backtest_slippage_percent": 0.03,
     "regulatory_fees": {"sec_fee_per_million": 20.60, "finra_taf_per_share": 0.000166, "finra_taf_max": 8.30},
     "alpaca": {
         "data_feed": "iex",
