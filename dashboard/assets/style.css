@@ -119,9 +119,7 @@ html, body { background: var(--black); color: var(--text); font-family: var(--mo
 
 /* ----- Picks: each week's "Trade these" ----- */
 .panel-actions { display: flex; align-items: center; gap: 6px; background: var(--black); }
-.panel-actions .key, .previous-heading .key { font-size: 10px; padding: 0 6px; line-height: 16px; }
-.previous-run + .previous-run { margin-top: 10px; }
-.previous-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.panel-actions .key { font-size: 10px; padding: 0 6px; line-height: 16px; }
+.picks-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .portfolio-line { color: var(--text); font-size: 11px; }
 .loaded { font-size: 10px; letter-spacing: 1px; }
-.loaded-run { border-bottom: 1px dashed var(--frame-dim); padding-bottom: 8px; }

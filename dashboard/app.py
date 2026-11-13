@@ -133,7 +133,6 @@ def confirm(id_: str, title: str, body: str, button: str, tone: str) -> dbc.Moda
 # ---------- Layout ----------
 
 REPORT_CHARTS = ["growth", "drawdown", "monthly", "daily", "distribution", "qq", "rolling"]
-PREVIOUS_PICKS_SHOWN = 8
 LOADED = "LOADED"
 ALL_STRATEGIES = "ALL STRATEGIES"
 TRADE_PICKS = "trade-picks"   # each saved week's "Trade these" button: {"type": TRADE_PICKS, "run": its date}
@@ -156,19 +155,10 @@ def picks_heading(project: Project, run: str, loaded: str | None) -> list:
     return [html.Span(f"SCREENED {run}{screened_note(project, run)}", className="panel-note"), action]
 
 
-def loaded_portfolio(project: Project) -> html.Div:
+def current_picks(project: Project) -> html.Div:
     """The stocks and strategies the trader's next Start trades: config/strategy.json's, or a chosen week's."""
-    heading = html.Span(f"{LOADED} NOW  {picks.next_portfolio(project)}", className=f"loaded {views.POSITIVE}")
-    return html.Div([html.Div(heading, className="previous-heading"), table(views.portfolio_table(project))],
-                    className="previous-run loaded-run")
-
-
-def previous_picks(project: Project, runs: list[str], loaded: str | None) -> list:
-    """What's loaded now, then each earlier week's picks, newest first, with a button to trade them."""
-    earlier = [html.Div([html.Div(picks_heading(project, run, loaded), className="previous-heading"),
-                         table(views.weekly_picks_table(picks.picks_table(project, run)))], className="previous-run")
-               for run in runs[:PREVIOUS_PICKS_SHOWN]]
-    return [loaded_portfolio(project), *(earlier or [html.Div("NO EARLIER SCREENS YET", className="empty")])]
+    source = html.Span(f"{LOADED}  {picks.next_portfolio(project)}", className=f"loaded {views.POSITIVE}")
+    return html.Div([html.Div(source, className="picks-heading"), table(views.portfolio_table(project))])
 
 
 def picks_tab() -> html.Div:
@@ -186,7 +176,7 @@ def picks_tab() -> html.Div:
         dbc.Row([dbc.Col(panel(1, "P&L added up: live vs picks", graph("picks-pnl")), lg=7),
                  dbc.Col([panel(2, "This week's picks", html.Div(id="picks-table"),
                                 extra=html.Div(id="picks-run", className="panel-actions")),
-                          panel(3, "Previous picks", html.Div(id="previous-picks"))], lg=5)], className="g-2"),
+                          panel(3, "Current picks", html.Div(id="current-picks"))], lg=5)], className="g-2"),
         panel(4, "Day by day", html.Div(id="picks-days")),
         html.Div("Each weekend the screen tunes every strategy on every stock on about three years of 1-minute bars and keeps the "
                  "five that held up best on the final month it never saw. After each traded day's close, those "
@@ -484,7 +474,7 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         return [{"label": choice, "value": choice} for choice in choices], chosen or ALL_STRATEGIES
 
     @app.callback(Output("picks-stats", "children"), Output("picks-pnl", "figure"), Output("picks-table", "children"),
-                  Output("picks-run", "children"), Output("previous-picks", "children"),
+                  Output("picks-run", "children"), Output("current-picks", "children"),
                   Output("picks-days", "children"), Output("picks-sent", "data"),
                   Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("portfolio-loaded", "data"),
                   State("picks-sent", "data"))
@@ -502,7 +492,7 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
                 sent.update("table", views.weekly_picks_table(chosen), table),
                 sent.update("run", (latest, loaded[0], picks.screened_with(project, latest) if latest else []),
                             lambda _: picks_heading(project, latest, loaded[0]) if latest else ""),
-                sent.update("previous", (runs[1:], loaded), lambda _: previous_picks(project, runs[1:], loaded[0])),
+                sent.update("current", loaded, lambda _: current_picks(project)),
                 sent.update("days", views.picks_days_table(days), table),
                 sent.fingerprints)
 
