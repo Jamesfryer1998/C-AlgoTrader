@@ -21,6 +21,7 @@ class OrderValidator
 
         // Validation methods
         bool isValidQuantity(const Order& order);
+        static bool onlyCloses(const Order& order, float totalHeldQuantity);
         bool isValidOrderType(const Order& order);
         bool isValidPrice(const Order& order, const MarketData& marketData);
         bool checkStopLoss(const Order& order, const MarketData& marketData);

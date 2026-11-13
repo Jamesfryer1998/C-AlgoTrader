@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
@@ -19,6 +20,8 @@
 #include "../oms/OrderManagement.hpp"
 #include "../oms/PerformanceTracker.hpp"
 #include "../oms/TradeStore.hpp"
+#include "../risk/DayEnd.hpp"
+#include "../util/MarketTime.hpp"
 #include "../risk/RiskEngine.hpp"
 #include "../strategy_engine/Portfolio.hpp"
 
@@ -114,6 +117,12 @@ class LiveTrader
 
         // Kill switch: send an order closing each position, on the main thread
         void flattenAll();
+
+        // Flat by the close (DayEnd): the order closing a stock's position, once a day (caller holds tradingLock);
+        // and, live, the clock closing any stock whose bars stopped before the close
+        std::optional<Order> closeForTheDay(const std::string& ticker, float held, float price, const std::string& day);
+        void closeQuietStocks();
+        void noteTodaysClose(const json& marketClock);
         RiskEngine::SizingContext sizingContext(const std::string& ticker, float held);
         void collectResult();
 
@@ -166,6 +175,12 @@ class LiveTrader
 
         // One decision at a time: a bar on the feed's thread, or flattening on the main one
         std::mutex tradingLock;
+
+        // Nothing held overnight (config "end_of_day"): today's close (minutes since midnight, New York; earlier
+        // on half days, from Alpaca's clock) and the day each stock's closing order was sent
+        DayEnd dayEnd{json::object()};
+        std::atomic<int> todaysCloseMinute{MarketTime::CLOSE_MINUTE};
+        std::map<std::string, std::string> closedOnDay;
 
         static std::atomic<bool> stopRequested;
         static std::atomic<bool> flattenRequested;

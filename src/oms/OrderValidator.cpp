@@ -53,7 +53,7 @@ bool OrderValidator::validateOrder(const Order& order, const MarketData& marketD
         return fail("order type " + order.getTypeAsString() + " not allowed");
     if(!isValidPrice(order, marketData))
         return fail("price " + price + " too far from last close " + close);
-    if(!isValidQuantity(order))
+    if(!isValidQuantity(order) && !onlyCloses(order, totalHeldPositions))
         return fail("quantity " + num(order.getQuantity()) + " not between 0 and max_position_size " + num(maxPositionSize));
     if(!checkMaxPositionSize(order, totalHeldPositions))
         return fail("holding " + num(totalHeldPositions) + ", " + (order.isBuy() ? "buying " : "selling ") + num(order.getQuantity())
@@ -104,6 +104,15 @@ OrderValidator::isValidQuantity(const Order& order)
 {
         return (order.getQuantity() > 0 &&
                 order.getQuantity() <= maxPositionSize);
+}
+
+// An order that closes all or part of what's held, without going beyond it: never too big, whatever the limit
+// (e.g. the end of day closing a position bought before max_position_size was lowered)
+bool
+OrderValidator::onlyCloses(const Order& order, float totalHeldQuantity)
+{
+    bool against = order.isBuy() ? totalHeldQuantity < 0 : totalHeldQuantity > 0;
+    return against && order.getQuantity() > 0 && order.getQuantity() <= std::fabs(totalHeldQuantity);
 }
 
 bool

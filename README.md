@@ -94,6 +94,13 @@ starts each day's backtest as the live account did: its equity at that day's fir
 carried in. At the end it
 prints the simulated equity, P&L, fills per stock and the most capital in use.
 
+#### Flat by the close (`"end_of_day"`)
+Nothing is held overnight, live and in every backtest (the screen's and the optimiser's too): from 15:45 New York
+time no order opens or adds to a position, and from 15:55 every position is closed (`"end_of_day"` in
+config/risk.json; half days close earlier, and live trading follows Alpaca's clock for them). Live, a stock whose
+bars go quiet before 15:55 is closed by the clock instead. The closing orders show as the `end_of_day` strategy;
+their P&L still counts for the strategy that opened the position.
+
 #### Stocks and strategies (`"portfolio"`)
 The `"portfolio"` list in `config/strategy.json` is what the app trades: every stock in it at once, each with
 its own strategy and settings, from a single Alpaca stream. There are no default strategies; each stock sets

@@ -70,7 +70,8 @@ LiveTrader::LiveTrader(const json& config, const LiveOptions& options, const std
     : config(withOptions(config, options)),
       options(options),
       dataRoot(dataRoot),
-      tracker(this->config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL))
+      tracker(this->config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL)),
+      dayEnd(this->config)
 {
 }
 
@@ -340,7 +341,9 @@ LiveTrader::describeRunForStatus()
                    {"records", describeRecords()}, {"backtest", options.backtest}, {"portfolio", portfolioSource},
                    {"starting_capital", config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL)},
                    {"started_utc", MarketTime::formatUtc(std::time(nullptr))}, {"stocks", stocks}});
-    status.setMarketClock(session->marketClock());
+    json clock = session->marketClock();
+    status.setMarketClock(clock);
+    noteTodaysClose(clock);
     lastClockCheck = std::chrono::steady_clock::now();
 }
 
@@ -438,6 +441,7 @@ LiveTrader::waitUntilFinished()
                 report->print(screen());
         }
         keepStatusFresh();
+        closeQuietStocks();
         session->keepConnectionWarm();
     }
 }
@@ -470,6 +474,58 @@ LiveTrader::stopFeed()
     report->print(screen());
 }
 
+// ---------- Flat by the close ----------
+
+std::optional<Order>
+LiveTrader::closeForTheDay(const std::string& ticker, float held, float price, const std::string& day)
+{
+    if (held == 0 || closedOnDay[ticker] == day)
+        return std::nullopt;   // flat, or already sent today (the fill may not have reached us yet)
+    closedOnDay[ticker] = day;
+    return DayEnd::closingOrder(ticker, held, price);
+}
+
+// Live, from the main thread: a stock with no bar since the close time came (the IEX feed has quiet minutes)
+// is closed by the clock instead, at its last price
+void
+LiveTrader::closeQuietStocks()
+{
+    if (options.backtest || !dayEnd.isOn())
+        return;
+    std::string now = MarketTime::toNewYorkTime(std::time(nullptr));
+    if (!MarketTime::isRegularSession(now)
+        || dayEnd.phaseAt(MarketTime::minuteOfDay(now), todaysCloseMinute) != DayEnd::Phase::Close)
+        return;
+    std::lock_guard<std::mutex> guard(tradingLock);
+    for (auto& lane : lanes)
+    {
+        const std::string& ticker = lane->getTicker();
+        if (lane->getMarketData().getData().empty())
+            continue;
+        float price = lane->getMarketData().getLastClosePrice();
+        std::optional<Order> close = closeForTheDay(ticker, oms.heldQuantity(ticker), price, MarketTime::datePart(now));
+        if (!close)
+            continue;
+        OutputCapture notes;
+        sendOrder(*lane, *close);
+        screen() << notes.release();
+        status.addEvent(now, ticker, "End of day: " + std::string(close->isBuy() ? "buy " : "sell ")
+                        + Format::number(close->getQuantity(), 0) + " at ~" + Format::number(price));
+    }
+    saveStatus(true);
+}
+
+// Alpaca's clock knows half days (13:00 closes): while the market is open, its next close is today's
+void
+LiveTrader::noteTodaysClose(const json& marketClock)
+{
+    if (!marketClock.value("known", false) || !marketClock.value("is_open", false))
+        return;
+    std::time_t close = MarketTime::parseUtc(marketClock.value("next_close_utc", std::string()));
+    if (close > 0)
+        todaysCloseMinute = MarketTime::minuteOfDay(MarketTime::toNewYorkTime(close));
+}
+
 // ---------- Each bar ----------
 
 void
@@ -488,8 +544,15 @@ LiveTrader::onBar(const MarketCondition& bar)
     lane.addBar(bar);                                                         // 1. the new price
     float held = oms.heldQuantity(bar.Ticker);
     std::optional<Order> order = lane.decide(held);                           // 2. the strategies vote
-    if (order)
+    DayEnd::Phase phase = dayEnd.phaseOfBar(bar.DateTime, todaysCloseMinute);
+    if (phase == DayEnd::Phase::Close)                                        //    (near the close: flat)
+        order = closeForTheDay(bar.Ticker, held, bar.Close, MarketTime::datePart(bar.DateTime));
+    else if (order)
+    {
         order = lane.size(*order, sizingContext(bar.Ticker, held));           // 3. the risk engine sizes it
+        if (order && phase == DayEnd::Phase::NoNewEntries && DayEnd::opensOrAdds(*order, held))
+            order.reset();                                                    //    (no new positions near the close)
+    }
     if (order)
         sendOrder(lane, *order);                                              // 4. risk checks, then the broker
     double decisionMs = millisecondsSince(started);

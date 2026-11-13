@@ -4,6 +4,8 @@
     "slippage_tolerance": 2.0,
     "_risk_comment": "How many shares each order is for, the same engine for every stock (see src/risk/RiskEngine.hpp). FIXED_SIZE = every order is \"quantity\" shares, capped by max_position_size (how it traded before). The others size in $ and are capped by max_stock_percent / max_portfolio_percent of equity instead. Compare them with: ./build/app/risk_app --backtest 2025-11-03 --days 120. Tune them (grids in risk_tuning) and save the best here with: ./build/app/risk_app --tune --backtest 2025-11-03 --days 120 --test-days 60 --save",
     "_risk_previous": "Before KELLY: {\"name\": \"VOLATILITY_TARGET\", \"daily_volatility_percent\": 1.0, \"max_stock_percent\": 40, \"volatility_bars\": 60}, chosen by risk_app --tune on 2026-11-07: training +41.0% (drawdown 4.4%), test +5.7% (drawdown 7.1%); one share per order made +0.9% and +0.2%",
+    "_end_of_day_comment": "Nothing held overnight (see src/risk/DayEnd.hpp), live and in every backtest: from no_entries_minutes_before_close minutes before the close (15:45 New York time) no order opens or adds to a position, and from close_minutes_before_close (15:55) every position is closed. Half days close earlier; live trading follows Alpaca's clock. flat_at_close false carries positions over to the next day.",
+    "end_of_day": {"flat_at_close": true, "no_entries_minutes_before_close": 15, "close_minutes_before_close": 5},
     "risk": {"name": "KELLY", "kelly_fraction": 0.5, "lookback_trades": 50, "min_trades": 20, "starting_percent": 5, "max_stock_percent": 20},
     "risk_comparison": [
         {"name": "FIXED_SIZE", "quantity": 1},

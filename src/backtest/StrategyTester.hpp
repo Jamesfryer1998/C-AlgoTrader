@@ -13,6 +13,7 @@
 #include <map>
 #include "../data_access/MarketData.hpp"
 #include "../oms/OrderManagement.hpp"
+#include "../risk/DayEnd.hpp"
 #include "../risk/RiskEngine.hpp"
 #include "../strategy_engine/StrategyEngine.hpp"
 #include "../strategy_engine/StrategyFactory.hpp"
@@ -108,6 +109,7 @@ private:
     StrategyEngine stratEngine;               // The strategies and the vote between them
     OrderManagement oms;                      // Risk checks, then the simulated broker
     std::unique_ptr<RiskEngine> risk;         // How many shares each order is for (config "risk")
+    DayEnd dayEnd;                            // Flat by the close (config "end_of_day")
     
     // Bars kept in memory for strategies (they only look back a fixed amount)
     static constexpr size_t WINDOW_BARS = 1000;

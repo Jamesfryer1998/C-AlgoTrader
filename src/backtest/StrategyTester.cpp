@@ -17,6 +17,7 @@ StrategyTester::StrategyTester(const json& algoConfig)
           broker(marketData),
           stratFactory(algoConfig), 
           stratEngine(),
+          dayEnd(algoConfig),
           algoConfig(algoConfig),
           detailedLogging(false),
           periodsPerYear(algoConfig.value("bars_per_year", PerformanceTracker::MINUTE_BARS_PER_YEAR))
@@ -160,9 +161,13 @@ StrategyTester::executeTimeStep(const MarketCondition& bar)
 
     // 2. Strategies vote; the risk engine sizes an agreed order, which goes through the risk checks to the
     //    simulated broker
+    //    Near the close (DayEnd): no new positions, then every position closed, so nothing is held overnight
     float held = oms.heldQuantity(bar.Ticker);
     std::optional<Order> order = stratEngine.decide(held);
-    if (order)
+    DayEnd::Phase phase = dayEnd.phaseOfBar(bar.DateTime);
+    if (phase == DayEnd::Phase::Close)
+        order = held != 0 ? std::optional<Order>(DayEnd::closingOrder(bar.Ticker, held, bar.Close)) : std::nullopt;
+    else if (order)
     {
         RiskEngine::SizingContext context;
         context.equity = broker.getCurrentEquity();
@@ -170,6 +175,8 @@ StrategyTester::executeTimeStep(const MarketCondition& bar)
         context.bars = &marketData;
         context.closedTradeReturns = &tracker.closedTradeReturns(bar.Ticker);
         order = risk->size(*order, context);
+        if (order && phase == DayEnd::Phase::NoNewEntries && DayEnd::opensOrAdds(*order, held))
+            order.reset();
     }
     if (order)
         oms.sendOrder(*order);

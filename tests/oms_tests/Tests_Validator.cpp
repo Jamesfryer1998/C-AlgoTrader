@@ -212,3 +212,12 @@ TEST_F(OrderValidatorTests, GivenWeHaveAnInvalidOrder_WeValidateCorrectly)
     
     EXPECT_EQ(cut.validateOrder(order, marketData, positions), false);
 }
+TEST(OrderValidatorCloseTests, AnOrderThatOnlyClosesIsNeverTooBig)
+{
+    Order sellAll(OrderType::SELL, "PEP", 20, 100), sellMore(OrderType::SELL, "PEP", 25, 100),
+          buyMore(OrderType::BUY, "PEP", 20, 100);
+    EXPECT_TRUE(OrderValidator::onlyCloses(sellAll, 20));
+    EXPECT_FALSE(OrderValidator::onlyCloses(sellMore, 20));   // would go short
+    EXPECT_FALSE(OrderValidator::onlyCloses(buyMore, 20));    // adds
+    EXPECT_TRUE(OrderValidator::onlyCloses(buyMore, -20));    // covers a short
+}

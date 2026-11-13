@@ -397,3 +397,26 @@ TEST_F(LiveTraderBacktestTests, FlattenClosesEveryPositionThenStops)
     EXPECT_EQ(status["state"], "stopped");
     EXPECT_LT(status["last_bar_time"].get<std::string>(), FIRST_DAY + " 15:59:00");
 }
+
+TEST_F(LiveTraderBacktestTests, IsFlatByTheCloseWhenTheRuleIsOn)
+{
+    json flatAtClose = config();
+    flatAtClose["end_of_day"] = {{"flat_at_close", true}, {"no_entries_minutes_before_close", 15},
+                                 {"close_minutes_before_close", 5}};
+    LiveOptions options = backtest(FIRST_DAY);
+    options.backtestPositions = {{"PEP", 20, 90.0}};   // held from the day before
+    LiveTrader trader(flatAtClose, options, dataRoot);
+    ASSERT_EQ(trader.run(), 0);
+
+    std::vector<TradeRecord> closes;
+    for (const auto& record : trades(FIRST_DAY))
+        if (record.strategy == DayEnd::STRATEGY)
+            closes.push_back(record);
+    ASSERT_EQ(closes.size(), 1u);   // once, though PEP still has bars to 15:59
+    EXPECT_EQ(closes[0].ticker, "PEP");
+    EXPECT_EQ(closes[0].side, "sell");
+    EXPECT_DOUBLE_EQ(closes[0].quantity, 20);
+    EXPECT_EQ(closes[0].time, FIRST_DAY + " 15:54:00");   // the bar ending 15:55
+    for (const auto& position : TradeStore(dataRoot + "backtest/" + FIRST_DAY).loadPositions())
+        EXPECT_FLOAT_EQ(position.getQuantity(), 0) << position.getTicker();
+}
