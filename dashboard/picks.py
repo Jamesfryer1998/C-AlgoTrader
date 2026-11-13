@@ -48,7 +48,7 @@ STALE_AFTER = timedelta(minutes=30)      # a screen that hasn't moved for this l
 SCREEN_TIMEOUT_SECONDS = 6 * 3600
 CHOSEN_PORTFOLIO = "portfolio.json"     # under data/: traded instead of config/strategy.json's portfolio
 CONFIG_PORTFOLIO = "config/strategy.json"
-SOURCE, PORTFOLIO, CHOSEN_AT = "source", "portfolio", "chosen_utc"
+SOURCE, PORTFOLIO, CHOSEN_AT, RUN = "source", "portfolio", "chosen_utc", "run"
 WEEKEND_FROM = (5, 6)                    # the weekly screen runs from Saturday 06:00 UTC (Saturday = weekday 5)
 SCREEN_NICENESS = 10                     # a lower CPU priority, so a screen run in trading hours never slows the trader
 
@@ -118,6 +118,16 @@ def next_portfolio(project: Project) -> str:
         return CONFIG_PORTFOLIO
 
 
+def loaded_run(project: Project) -> str | None:
+    """The week whose picks the trader's next Start will trade, or None for config/strategy.json's portfolio."""
+    try:
+        chosen = json.loads(chosen_portfolio_file(project).read_text())
+    except (OSError, ValueError):
+        return None
+    source = chosen.get(SOURCE, "")   # chosen before RUN was saved: "picks from <run>"
+    return chosen.get(RUN) or (source.removeprefix(picks_source("")) if source.startswith(picks_source("")) else None)
+
+
 def portfolio_list(project: Project) -> list[dict]:
     """The stocks and strategies the trader's next Start will trade."""
     try:
@@ -151,7 +161,7 @@ def trade_picks(project: Project, run: str) -> str:
     if not portfolio:
         return f"Can't read the picks from {run}"
     saved = {SOURCE: picks_source(run), CHOSEN_AT: datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-             PORTFOLIO: portfolio}
+             RUN: run, PORTFOLIO: portfolio}
     path = chosen_portfolio_file(project)
     partial = path.with_suffix(".partial")
     partial.write_text(json.dumps(saved, indent=2))

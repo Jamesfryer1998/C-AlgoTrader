@@ -125,3 +125,12 @@ def test_picks_that_cant_be_read_are_not_traded(project):
     save_picks(project, "2026-11-07", [])
     assert "Can't read" in picks.trade_picks(project, "2026-11-07")   # nothing to trade
     assert not picks.chosen_portfolio_file(project).exists()
+
+
+def test_which_week_is_loaded(project):
+    save_picks(project, "2026-11-07", [{"ticker": "KO", "strategy": {"name": "RSI"}}])
+    assert picks.loaded_run(project) is None
+    picks.trade_picks(project, "2026-11-07")
+    assert picks.loaded_run(project) == "2026-11-07"
+    picks.trade_config(project)
+    assert picks.loaded_run(project) is None
