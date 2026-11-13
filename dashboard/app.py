@@ -565,17 +565,20 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
                 *[sent.update(chart, data, lambda _, build=figures[chart]: build()) for chart in REPORT_CHARTS],
                 sent.fingerprints)
 
-    # ----- System: order latency and the trader's output -----
+    # ----- System: the portfolio, order latency and the trader's output -----
 
     @app.callback(Output("system-tab", "children"), Input("tabs", "active_tab"), Input("slow", "n_intervals"))
     def refresh_system(active, _):
         if active != SYSTEM:
             return no_update
         log = records.log_tail(project.live_records, LOG_LINES) or "No output yet"
+        latency = metrics.latency_by_day(records.trades(project.live_records))
         return html.Div([
-            panel(1, "Order latency by day (medians)",
-                  table(views.latency_table(metrics.latency_by_day(records.trades(project.live_records))))),
-            panel(2, "Trader log", html.Pre(log, className="log")),
+            dbc.Row([dbc.Col(panel(1, f"Portfolio  {picks.next_portfolio(project)}", table(views.portfolio_table(project))),
+                             lg=6),
+                     dbc.Col(panel(2, "Order latency by day (medians)", table(views.latency_table(latency))), lg=6)],
+                    className="g-2"),
+            panel(3, "Trader log", html.Pre(log, className="log")),
         ])
 
     return app
