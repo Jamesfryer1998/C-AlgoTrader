@@ -195,6 +195,22 @@ keeps the five that held up on the final month it never saw. After each traded d
 on it from the live account's money, next to live. `config/strategy.json` is never changed: use the picks
 (`data/picks/<date>/top_picks_config.json`) when they've earned it.
 
+#### Research: the morning screen (`morning_app`)
+Does trading each day's *stocks in play* make money? Each day it picks the 20 liquid US stocks with the most
+unusual volume in their first 5 minutes (against their own last 14 days), trades an opening range breakout and
+the other rules in `config/morning.json` on them, and does the same on 20 random stocks and SPY for comparison.
+The research plan behind it is the doc "Finding an Edge".
+
+```sh
+./build/app/morning_app              # development and validation years
+./build/app/morning_app --holdout    # the final year too: once, at the end (recorded)
+./build/app/morning_app --offline    # only what's already downloaded
+```
+It downloads only what it needs into `data/morning/` (daily bars for every listed stock, each morning's first
+5 minutes for the liquid ones, full minute bars only for the day's picks): a few thousand requests and about a
+gigabyte the first time, nothing after. Results go to `data/morning/report.json` and `trades.csv`, with a pass or
+fail for each step of the plan. The dashboard's Research tab runs it (RUN RESEARCH) and shows the report.
+
 ### CI and the home server
 GitHub Actions builds and tests everything on every push (`.github/workflows/ci.yml`). Once CI passes on
 `main`, `.github/workflows/deploy.yml` deploys to the home server's container through a self-hosted runner:

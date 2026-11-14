@@ -1,0 +1,34 @@
+{
+    "_comment": "morning_app: does picking each day's stocks by their first 5 minutes of volume give an edge? See the research doc 'Finding an Edge'. Rules are fixed here BEFORE a run; nothing is tuned. The data splits into development (start to development_end), validation (to validation_end) and a holdout (to end, empty = yesterday) that is only backtested with --holdout, once.",
+    "start": "2023-11-01",
+    "development_end": "2024-10-31",
+    "validation_end": "2025-10-31",
+    "end": "",
+
+    "_universe_comment": "Which stocks can be picked on a day, from the 14 trading days before it: price above min_price, average volume at least min_average_volume shares, 14-day ATR at least min_atr dollars. A stock needs min_history_days of first-5-minute volumes to have a relative volume.",
+    "universe": {"min_price": 5.0, "min_average_volume": 1000000, "min_atr": 0.5, "lookback_days": 14, "min_history_days": 10},
+
+    "_selection_comment": "Stocks in play: each day, the `stocks` with the highest relative volume (first opening_minutes' volume against its 14-day average for the same minutes), at least min_relative_volume, and an opening bar that moved. The control is the same number of random stocks from the same universe, the same day (random_seed makes it repeatable).",
+    "selection": {"stocks": 20, "min_relative_volume": 1.0, "opening_minutes": 5, "random_seed": 7},
+
+    "_orb_comment": "Opening range breakout as published (Zarattini, Barbon, Aziz 2024): opening bar up -> buy if the price goes above its high; down -> short below its low. Stop stop_atr_fraction x the 14-day ATR from the entry, sized so a stop loses risk_percent of equity, each stock at most max_leverage x equity / stocks. entry_fill next_open: a breakout is filled at the next minute's open (or the level, if worse), not at the level itself.",
+    "orb": {"stop_atr_fraction": 0.1, "risk_percent": 1.0, "max_leverage": 4.0, "entry_fill": "next_open"},
+
+    "_costs_comment": "Against us on every fill, as in every other backtest (config/screen.json). Regulatory fees on sells come from config/general.json.",
+    "starting_capital": 100000,
+    "slippage_percent": 0.03,
+
+    "_variants_comment": "Every rule tried, all counted when the deflated Sharpe discounts for trying several. ORB holds to the close (15:55, config/risk.json's end_of_day). hold_minutes > 0 closes that many minutes after entry; target_r > 0 takes profit at that many times the risk. SCALP runs the live SCALP strategy with these settings (the META ones in config/strategy.json) on the in-play stocks.",
+    "variants": [
+        {"name": "ORB"},
+        {"name": "ORB, fills at the level", "entry_fill": "touch"},
+        {"name": "ORB, 30-minute hold", "hold_minutes": 30},
+        {"name": "ORB, 10-minute hold", "hold_minutes": 10},
+        {"name": "ORB, 2R target", "target_r": 2.0},
+        {"name": "SCALP", "strategy": {"active": 1, "name": "SCALP", "entry_threshold": 2.5, "exit_threshold": 0.0,
+                                       "max_hold_bars": 30, "warmup_minutes": 15, "stop_loss": 1.0, "take_profit": 1.0}}
+    ],
+
+    "_gates_comment": "Pass marks from the research plan. Step 1: in-play stocks' typical 10-minute move at least min_move_to_cost x the round-trip cost. Steps 3-5: Sharpe above min_sharpe, at least min_lead_over_random ahead of the same rule on random stocks, at least min_trades trades, deflated Sharpe (the probability the true Sharpe is above zero, after counting every variant) at least min_deflated_sharpe.",
+    "gates": {"min_move_to_cost": 3.0, "min_sharpe": 1.0, "min_lead_over_random": 0.5, "min_trades": 300, "min_deflated_sharpe": 0.95}
+}

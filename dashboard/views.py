@@ -10,7 +10,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from . import comparison, metrics, picks, records, report
+from . import comparison, metrics, picks, records, report, research
 from .project import Project
 
 # Tones the stylesheet colours (assets/style.css)
@@ -664,3 +664,128 @@ def portfolio_status(running: str | None, upcoming: str) -> str:
     return f"{now}  ◆  NEXT START {upcoming}"
 
 
+
+
+# ---------- Research: the morning screen ----------
+
+RESEARCH_ZOOM_KEY = "research"
+IN_PLAY, RANDOM, BENCHMARK = "in play", "random", "SPY buy and hold"   # morning_app's line names
+RANDOM_COLOUR = REFERENCE_COLOUR   # the random control is a reference line, grey, never a hue
+BENCHMARK_COLOUR = BACKTEST_COLOUR
+PERIODS = ["development", "validation", "holdout"]
+PASS, FAIL = "PASS", "FAIL"
+HUNDRED = 100   # morning_app saves returns as fractions; percent() shows percentages
+
+
+def research_status(progress: research.ResearchProgress, report_json: dict | None, now: float) -> tuple[str, float]:
+    """The line beside the research buttons and how full its bar is (0 to 1)."""
+    if progress.state == research.RUNNING:
+        left = progress.seconds_left(now)
+        eta = f", about {metrics.describe_duration(left)} left" if left is not None else ""
+        count = f" {progress.done} of {progress.total}" if progress.total else ""
+        return f"{progress.stage or 'Starting'}:{count}{eta}", progress.fraction
+    last = f"Last run {report_json['generated_utc'][:16].replace('T', ' ')} UTC" if report_json else "Not run yet"
+    if progress.state == research.FAILED:
+        return f"The last run failed (see data/morning/morning.log). {last}", 0.0
+    return f"{last}. The first run downloads about three years of data and takes a while", 0.0
+
+
+def research_kpis(report_json: dict) -> list[Kpi]:
+    dates = report_json["dates"]
+    opened = report_json.get("holdout_opened")
+    holdout = f"opened {opened[:10]}" if opened else "still sealed"
+    return [Kpi("Data", f"{dates['start']} to {dates['end']}"),
+            Kpi("Stocks listed", number(report_json["universe_symbols"], 0)),
+            Kpi("Days traded", number(report_json["days_traded"], 0)),
+            Kpi("Stocks a day", number(report_json["stocks_a_day"], 0)),
+            Kpi("Round-trip cost", percent(report_json["round_trip_cost_percent"], 2)),
+            Kpi("Holdout", holdout, f"after {dates['validation_end']}", WARNING if opened else PLAIN)]
+
+
+def gates_table(report_json: dict) -> Table:
+    """Each pass mark from the plan, with what the run measured."""
+    table = Table(["Step", "Rule", "Period", "Verdict", "Checks"], empty="NO RESULTS YET")
+    for gate in report_json.get("gates", []):
+        failed = [check for check in gate["checks"] if not check["pass"]]
+        checks = "; ".join(f"{'ok' if check['pass'] else 'no'}: {check['name']} ({check['detail']})"
+                           for check in (failed or gate["checks"]))
+        table.add(gate["step"].split(":")[0], gate["variant"] or NOTHING, gate["period"],
+                  (PASS if gate["pass"] else FAIL, POSITIVE if gate["pass"] else NEGATIVE), checks)
+    return table
+
+
+def moves_table(report_json: dict) -> Table:
+    """Step 1: how far each selection's stocks typically move, against what a round trip costs."""
+    cost = report_json["round_trip_cost_percent"]
+    table = Table(["Stocks", "Stock-days", "10-min move", "30-min move", "ATR", "Relative volume", "Move / cost"],
+                  empty="NO MEASUREMENTS YET")
+    for selection, moves in report_json["step1"]["moves"].items():
+        ratio = moves["move_10_minutes_percent"] / cost if cost else 0
+        table.add(selection, number(moves["stock_days"], 0), f"{moves['move_10_minutes_percent']:.3f}%",
+                  f"{moves['move_30_minutes_percent']:.3f}%", f"{moves['atr_percent']:.2f}%",
+                  f"{moves['relative_volume']:.1f}x" if moves["relative_volume"] else NOTHING, f"{ratio:.1f}x")
+    return table
+
+
+def research_results_table(report_json: dict) -> Table:
+    """Every rule on every selection in every period, the in-play lines first."""
+    order = {IN_PLAY: 0, RANDOM: 1}
+    rows = sorted(report_json.get("results", []),
+                  key=lambda row: (PERIODS.index(row["period"]) if row["period"] in PERIODS else len(PERIODS),
+                                   row["variant"] == BENCHMARK, row["variant"], order.get(row["selection"], 2)))
+    table = Table(["Period", "Rule", "Stocks", "Return", "Sharpe", "Drawdown", "Trades", "Won", "$ a trade",
+                   "Cost a trade", "Gross / costs", "Deflated"], empty="NO RESULTS YET")
+    for row in rows:
+        deflated = row.get("deflated_sharpe")
+        table.add(row["period"], row["variant"], row["selection"],
+                  (percent(row["total_return"] * HUNDRED, 1, signed=True), tone_of(row["total_return"])),
+                  (number(row["sharpe"]), tone_of(row["sharpe"])), percent(row["max_drawdown"] * HUNDRED, 1),
+                  number(row["trades"], 0), percent(row["win_rate"] * HUNDRED, 0) if row["trades"] else NOTHING,
+                  (signed_money(row["avg_net_per_trade"]), tone_of(row["avg_net_per_trade"])) if row["trades"] else NOTHING,
+                  money(row["avg_cost_per_trade"]) if row["trades"] else NOTHING,
+                  number(row["gross_to_cost"]) if row["trades"] else NOTHING,
+                  number(deflated) if deflated is not None else NOTHING)
+    return table
+
+
+def research_variants(report_json: dict | None) -> list[str]:
+    if not report_json:
+        return []
+    names = []
+    for curve in report_json.get("curves", []):
+        if curve["variant"] != BENCHMARK and curve["variant"] not in names:
+            names.append(curve["variant"])
+    return names
+
+
+def research_figure(report_json: dict | None, variant: str | None) -> dict:
+    """One rule's account on the stocks in play, on random stocks, and SPY bought and held, as the return since
+    the start, with the development / validation / holdout boundaries marked."""
+    if not report_json or not report_json.get("curves"):
+        return _note_figure("Run the research to see results", RESEARCH_ZOOM_KEY)
+    lines = []
+    for curve in report_json["curves"]:
+        if curve["variant"] == variant and curve["selection"] == IN_PLAY:
+            name, colour = f"{variant}, stocks in play", LIVE_COLOUR
+        elif curve["variant"] == variant and curve["selection"] == RANDOM:
+            name, colour = f"{variant}, random stocks", RANDOM_COLOUR
+        elif curve["variant"] == BENCHMARK:
+            name, colour = BENCHMARK, BENCHMARK_COLOUR
+        else:
+            continue
+        points = curve["points"]
+        line = _line(name, [day for day, _ in points], [value - 1 for _, value in points], colour)
+        line["y"] = [round(value - 1, 4) for _, value in points]
+        line["line"] = {**line["line"], "shape": "linear"}
+        line["hovertemplate"] = "%{x}  " + SIGNED_PERCENT_HOVER + "<extra>%{fullData.name}</extra>"
+        lines.append(line)
+    layout = _percent_layout(f"{RESEARCH_ZOOM_KEY}-{variant}")
+    dates = report_json["dates"]
+    layout["shapes"] = [{"type": "line", "xref": "x", "yref": "paper", "x0": day, "x1": day, "y0": 0, "y1": 1,
+                         "line": {"color": REFERENCE_COLOUR, "width": 1, "dash": "dot"}}
+                        for day in (dates["development_end"], dates["validation_end"])]
+    layout["annotations"] = [{"text": label, "xref": "x", "yref": "paper", "x": day, "y": 1, "showarrow": False,
+                              "xanchor": "left", "font": {"color": REFERENCE_COLOUR, "size": 9}}
+                             for label, day in (("VALIDATION", dates["development_end"]),
+                                                ("HOLDOUT", dates["validation_end"]))]
+    return {"data": lines, "layout": {**layout, "showlegend": True}}
