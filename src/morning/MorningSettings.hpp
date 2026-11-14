@@ -30,8 +30,12 @@ struct MorningSettings
         int holdMinutes = 0;      // 0: hold to the end of the day
         double targetR = 0;       // 0: no profit target
         json strategy;            // a live strategy's settings (e.g. SCALP) instead of the breakout
+        int holdDays = 0;         // > 0: drift, held for days from the in-play day's close (no breakout)
+        bool fade = false;        // drift against the move instead of with it
+        bool dayMove = false;     // drift in the direction of the whole day (open to close), not the opening bar
 
         bool isStrategy() const { return strategy.is_object() && !strategy.empty(); }
+        bool isDrift() const { return holdDays > 0; }
     };
 
     // Dates (YYYY-MM-DD)
@@ -54,6 +58,9 @@ struct MorningSettings
     double stopAtrFraction = 0.1;
     double riskPercent = 1.0;
     double maxLeverage = 4.0;
+
+    // Drift: held overnight, so at most driftLeverage x equity, shared between the stocks and the days held
+    double driftLeverage = 1.0;
 
     // Costs
     double startingCapital = 100000;

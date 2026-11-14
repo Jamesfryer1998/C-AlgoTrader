@@ -20,6 +20,7 @@ namespace
     const std::string STEP_3 = "Step 3: the breakout as published";
     const std::string STEP_4 = "Step 4: short holds";
     const std::string STEP_5 = "Step 5: the holdout";
+    const std::string STEP_DRIFT = "Drift: held for days";
     const std::string STEP_1_PERIODS = "development + validation";
     const int TABLE_NAME_WIDTH = 28;
     const int TABLE_COLUMN_WIDTH = 10;
@@ -37,7 +38,13 @@ namespace
 
     bool isAsPublished(const MorningSettings::Variant& variant)
     {
-        return !variant.isStrategy() && variant.holdMinutes == 0 && variant.targetR == 0;
+        return !variant.isStrategy() && !variant.isDrift() && variant.holdMinutes == 0 && variant.targetR == 0;
+    }
+
+    // Which step of the plan judges this variant on the validation year
+    const std::string& stepOf(const MorningSettings::Variant& variant)
+    {
+        return variant.isDrift() ? STEP_DRIFT : isAsPublished(variant) ? STEP_3 : STEP_4;
     }
 
     // The line's returns on the days in `period`
@@ -179,7 +186,7 @@ MorningReport::addGates()
         verdicts.push_back(gate);
     };
     for (const auto& variant : settings.variants)
-        judge(isAsPublished(variant) ? STEP_3 : STEP_4, variant, MorningSettings::VALIDATION, false);
+        judge(stepOf(variant), variant, MorningSettings::VALIDATION, false);
     if (results.holdoutTraded)
         for (const auto& variant : settings.variants)
             judge(STEP_5, variant, MorningSettings::HOLDOUT, true);

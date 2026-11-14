@@ -4,6 +4,7 @@ namespace
 {
     const std::string NEXT_OPEN = "next_open";
     const std::string TOUCH = "touch";
+    const std::string DAY_MOVE = "day";   // a drift variant's "direction": the day's open to close
 
     MorningSettings::EntryFill entryFillFrom(const json& settings, MorningSettings::EntryFill otherwise)
     {
@@ -46,6 +47,8 @@ MorningSettings::fromConfig(const json& config, const std::string& yesterday)
     settings.maxLeverage = orb.value("max_leverage", settings.maxLeverage);
     EntryFill defaultFill = entryFillFrom(orb, EntryFill::NextOpen);
 
+    settings.driftLeverage = config.value("drift", json::object()).value("leverage", settings.driftLeverage);
+
     settings.startingCapital = config.value("starting_capital", settings.startingCapital);
     settings.slippagePercent = config.value("slippage_percent", settings.slippagePercent);
 
@@ -57,6 +60,9 @@ MorningSettings::fromConfig(const json& config, const std::string& yesterday)
         variant.holdMinutes = entry.value("hold_minutes", 0);
         variant.targetR = entry.value("target_r", 0.0);
         variant.strategy = entry.value("strategy", json::object());
+        variant.holdDays = entry.value("hold_days", 0);
+        variant.fade = entry.value("fade", false);
+        variant.dayMove = entry.value("direction", std::string()) == DAY_MOVE;
         settings.variants.push_back(variant);
     }
 

@@ -18,7 +18,7 @@
     "starting_capital": 100000,
     "slippage_percent": 0.03,
 
-    "_variants_comment": "Every rule tried, all counted when the deflated Sharpe discounts for trying several. ORB holds to the close (15:55, config/risk.json's end_of_day). hold_minutes > 0 closes that many minutes after entry; target_r > 0 takes profit at that many times the risk. SCALP runs the live SCALP strategy with these settings (the META ones in config/strategy.json) on the in-play stocks.",
+    "_variants_comment": "Every rule tried, all counted when the deflated Sharpe discounts for trying several. ORB holds to the close (15:55, config/risk.json's end_of_day); drift variants are explained below. hold_minutes > 0 closes that many minutes after entry; target_r > 0 takes profit at that many times the risk. SCALP runs the live SCALP strategy with these settings (the META ones in config/strategy.json) on the in-play stocks.",
     "variants": [
         {"name": "ORB"},
         {"name": "ORB, fills at the level", "entry_fill": "touch"},
@@ -26,8 +26,17 @@
         {"name": "ORB, 10-minute hold", "hold_minutes": 10},
         {"name": "ORB, 2R target", "target_r": 2.0},
         {"name": "SCALP", "strategy": {"active": 1, "name": "SCALP", "entry_threshold": 2.5, "exit_threshold": 0.0,
-                                       "max_hold_bars": 30, "warmup_minutes": 15, "stop_loss": 1.0, "take_profit": 1.0}}
+                                       "max_hold_bars": 30, "warmup_minutes": 15, "stop_loss": 1.0, "take_profit": 1.0}},
+        {"name": "Drift, 1 day", "hold_days": 1},
+        {"name": "Drift, 3 days", "hold_days": 3},
+        {"name": "Drift, 5 days", "hold_days": 5},
+        {"name": "Drift, 5 days, the day's move", "hold_days": 5, "direction": "day"},
+        {"name": "Fade, 1 day", "hold_days": 1, "fade": true},
+        {"name": "Fade, 5 days", "hold_days": 5, "fade": true}
     ],
+
+    "_drift_comment": "Drift variants (hold_days > 0): do stocks in play keep going for days? Bought or shorted at the in-play day's close in the direction of the opening bar (\"direction\": \"day\": of the whole day, open to close; \"fade\": against it), sold hold_days trading days later at the close. Held overnight, so at most leverage x equity in all, shared by the stocks and the overlapping days. Added 2026-11-14 after the breakout failed validation, as a new hypothesis fixed before its first run.",
+    "drift": {"leverage": 1.0},
 
     "_gates_comment": "Pass marks from the research plan. Step 1: in-play stocks' typical 10-minute move at least min_move_to_cost x the round-trip cost. Steps 3-5: Sharpe above min_sharpe, at least min_lead_over_random ahead of the same rule on random stocks, at least min_trades trades, deflated Sharpe (the probability the true Sharpe is above zero, after counting every variant) at least min_deflated_sharpe.",
     "gates": {"min_move_to_cost": 3.0, "min_sharpe": 1.0, "min_lead_over_random": 0.5, "min_trades": 300, "min_deflated_sharpe": 0.95}

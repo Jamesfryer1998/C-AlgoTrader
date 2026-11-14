@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <set>
+#include "DriftBacktest.hpp"
 #include "OpeningRangeBreakout.hpp"
 #include "ScalpDay.hpp"
 #include "../risk/DayEnd.hpp"
@@ -180,10 +181,10 @@ MorningBacktest::run(MorningData& data, bool includeHoldout, const Progress& pro
     std::vector<Rule> rules;
     for (const auto& variant : settings.variants)
     {
-        Rule rule;
+        Rule rule;   // a drift variant has neither: it's traded after the walk through the days, on daily bars
         if (variant.isStrategy())
             rule.strategy = std::make_unique<ScalpDay>(config, variant.strategy, settings, costs);
-        else
+        else if (!variant.isDrift())
             rule.breakout = std::make_unique<OpeningRangeBreakout>(settings, variant, costs, dayEnd);
         rules.push_back(std::move(rule));
         for (const auto& selection : {IN_PLAY, RANDOM})
@@ -203,6 +204,8 @@ MorningBacktest::run(MorningData& data, bool includeHoldout, const Progress& pro
             calendar.push_back(bar.date);
     StockSelection::OpeningVolumes volumes(settings);
     std::map<std::string, MoveSamples> samples;
+    DriftBacktest::PicksByDay inPlayByDay, randomByDay;
+    std::vector<std::string> tradedDays;
     for (size_t index = 0; index < calendar.size(); index++)
     {
         const std::string& day = calendar[index];
@@ -229,9 +232,14 @@ MorningBacktest::run(MorningData& data, bool includeHoldout, const Progress& pro
             {
                 for (size_t r = 0; r < rules.size(); r++)
                 {
+                    if (!rules[r].breakout && !rules[r].strategy)
+                        continue;
                     tradeDay(rules[r], inPlay, bars, day, results.lines[2 * r]);
                     tradeDay(rules[r], random, bars, day, results.lines[2 * r + 1]);
                 }
+                inPlayByDay[day] = inPlay;
+                randomByDay[day] = random;
+                tradedDays.push_back(day);
                 results.daysTraded++;
                 results.holdoutTraded = results.holdoutTraded || holdout;
             }
@@ -251,7 +259,23 @@ MorningBacktest::run(MorningData& data, bool includeHoldout, const Progress& pro
     if (progress)
         progress(STAGE_DAYS, calendar.size(), calendar.size());
 
-    // 5. The benchmark, on the days the lines traded
+    // 5. Drift: the same picks held for days, on their daily bars
+    DriftBacktest::DailyBySymbol daily;
+    for (const auto* byDay : {&inPlayByDay, &randomByDay})
+        for (const auto& [day, picks] : *byDay)
+            for (const auto& pick : picks)
+                if (!daily.count(pick.symbol))
+                    for (const auto& bar : data.dailyBars(pick.symbol))
+                        daily[pick.symbol][bar.date] = bar;
+    DriftBacktest drift(settings, costs);
+    for (size_t r = 0; r < settings.variants.size(); r++)
+        if (settings.variants[r].isDrift())
+        {
+            drift.run(settings.variants[r], inPlayByDay, daily, tradedDays, results.lines[2 * r]);
+            drift.run(settings.variants[r], randomByDay, daily, tradedDays, results.lines[2 * r + 1]);
+        }
+
+    // 6. The benchmark, on the days the lines traded
     Line spy;
     spy.variant = BENCHMARK;
     spy.selection = BENCHMARK_SYMBOL;

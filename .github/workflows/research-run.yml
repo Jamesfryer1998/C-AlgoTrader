@@ -1,0 +1,25 @@
+name: Research run
+
+# Runs the deployed morning_app on the home server from the data it has already downloaded (--offline: no
+# requests to Alpaca, no keys needed), then prints the report. The same as the Research tab's RUN RESEARCH,
+# without the holdout. Start it from the Actions tab, or by pushing to the ops/research-run branch.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ops/research-run]
+
+jobs:
+  research:
+    runs-on: [self-hosted, algo-trader]
+    timeout-minutes: 120
+    env:
+      APP_DIR: /opt/algo-trader/app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run morning_app --offline
+        run: |
+          cd "$APP_DIR"
+          if pgrep -x morning_app > /dev/null; then echo "morning_app is already running"; exit 1; fi
+          nice -n 10 ./build/app/morning_app --offline > data/morning/morning.log 2>&1 || { tail -30 data/morning/morning.log; exit 1; }
+      - name: Report
+        run: python3 deploy/research_summary.py "$APP_DIR/data/morning/report.json"

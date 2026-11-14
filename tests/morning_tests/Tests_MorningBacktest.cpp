@@ -27,7 +27,8 @@ namespace
                 {"selection", {{"stocks", 2}, {"min_relative_volume", 1.0}, {"opening_minutes", 5}, {"random_seed", 7}}},
                 {"orb", {{"stop_atr_fraction", 0.1}, {"risk_percent", 1.0}, {"max_leverage", 4.0}, {"entry_fill", "next_open"}}},
                 {"starting_capital", 100000}, {"slippage_percent", 0.0},
-                {"variants", {{{"name", "ORB"}}, {{"name", "ORB, 10-minute hold"}, {"hold_minutes", 10}}}}};
+                {"variants", {{{"name", "ORB"}}, {{"name", "ORB, 10-minute hold"}, {"hold_minutes", 10}},
+                              {{"name", "Drift, 1 day"}, {"hold_days", 1}}}}};
     }
 
     // UP rises through its opening range and keeps going; DOWN does the reverse; SPY and FLAT don't move
@@ -91,7 +92,7 @@ TEST_F(MorningBacktestTests, TradesTheStocksInPlayEachDayAndLeavesTheHoldoutAlon
 {
     MorningBacktest::Results results = run(false);
     EXPECT_EQ(results.symbols, 4);
-    ASSERT_EQ(results.lines.size(), 5u);   // 2 variants x {in play, random} + SPY
+    ASSERT_EQ(results.lines.size(), 7u);   // 3 variants x {in play, random} + SPY
     EXPECT_FALSE(results.holdoutTraded);
     EXPECT_EQ(results.daysTraded, 6) << "03-04 to 03-11";
 
@@ -109,6 +110,12 @@ TEST_F(MorningBacktestTests, TradesTheStocksInPlayEachDayAndLeavesTheHoldoutAlon
     EXPECT_EQ(longs, 6);
     EXPECT_GT(orb.equity, 100000);
     EXPECT_EQ(orb.trades.front().day, "2026-03-04");
+
+    // Drift held each day's two picks to the next close (daily closes don't move here: no profit, only trades)
+    const auto& drift = line(results, "Drift, 1 day", MorningBacktest::IN_PLAY);
+    EXPECT_EQ(drift.days.size(), 6u);
+    EXPECT_EQ(drift.stockDays.size(), 10u) << "the last day's picks are still held";
+    EXPECT_DOUBLE_EQ(drift.stockDays.front().grossPnl, 0);
 
     // Step 1 measured both selections, over development and validation
     ASSERT_TRUE(results.moves.count(MorningBacktest::IN_PLAY));
@@ -160,7 +167,7 @@ TEST_F(MorningBacktestTests, TheReportJudgesEachVariantAndSavesItsCurves)
     json saved = report.toJson("", 42);
     EXPECT_TRUE(saved["holdout_opened"].is_null());
     EXPECT_EQ(saved["downloads"], 42);
-    EXPECT_EQ(saved["curves"].size(), 5u);
+    EXPECT_EQ(saved["curves"].size(), 7u);
     EXPECT_EQ(saved["curves"][0]["points"].size(), 6u);
     std::ostringstream printed;
     report.print(printed);
