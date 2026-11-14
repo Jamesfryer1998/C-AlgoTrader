@@ -45,6 +45,11 @@ rsync -a --delete \
   --exclude '__pycache__' --exclude '.pytest_cache' \
   "$SRC"/ "$APP_DIR"/
 [[ -L "$APP_DIR/data" ]] || ln -s "$DATA_DIR" "$APP_DIR/data"
+# What's deployed, for the dashboard's System tab
+printf '{"commit": "%s", "branch": "%s", "subject": %s, "deployed_utc": "%s"}\n' \
+  "$(git -C "$SRC" rev-parse --short HEAD)" "${DEPLOY_BRANCH:-}" \
+  "$(git -C "$SRC" log -1 --format=%s | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().strip()))')" \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$APP_DIR/DEPLOYED.json"
 
 # ── the C++ apps ──
 echo "==> Building the trader"

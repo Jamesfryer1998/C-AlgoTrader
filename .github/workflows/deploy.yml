@@ -30,6 +30,8 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Build, deploy and restart the dashboard
+        env:
+          DEPLOY_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
         run: bash deploy/deploy.sh "$GITHUB_WORKSPACE"
 
       - name: Health check

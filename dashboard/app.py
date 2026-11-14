@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import logging
+import os
 import time
 from datetime import datetime, timezone
 
@@ -19,7 +20,7 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 from dash import ALL, ClientsideFunction, Dash, Input, Output, State, ctx, dcc, html, no_update
 
-from . import comparison, metrics, picks, records, report, research, views
+from . import comparison, metrics, picks, records, report, research, server, views
 from .end_of_day import EndOfDayBacktests
 from .project import Project
 from .trader import TraderControl
@@ -654,7 +655,7 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
                 *[sent.update(chart, data, lambda _, build=figures[chart]: build()) for chart in REPORT_CHARTS],
                 sent.fingerprints)
 
-    # ----- System: the portfolio, order latency and the trader's output -----
+    # ----- System: the portfolio, order latency, the data and the server, the trader's output -----
 
     @app.callback(Output("system-tab", "children"), Input("tabs", "active_tab"), Input("slow", "n_intervals"))
     def refresh_system(active, _):
@@ -662,10 +663,15 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
             return no_update
         log = records.log_tail(project.live_records, LOG_LINES) or "No output yet"
         latency = metrics.latency_by_day(records.trades(project.live_records))
+        sizes = server.folder_sizes(project.data_root)
+        machine = views.server_table(server.disk(project.data_root), server.memory(), server.load(),
+                                     server.uptime_seconds(), server.deployed(project), os.cpu_count() or 1)
         return html.Div([
             side_by_side(panel(1, f"Portfolio  {picks.next_portfolio(project)}", table(views.portfolio_table(project))),
                          panel(2, "Order latency by day (medians)", table(views.latency_table(latency)))),
-            panel(3, "Trader log", html.Pre(log, className="log")),
+            side_by_side(panel(3, "Data", table(views.data_table(sizes, server.data_limit_bytes(project)))),
+                         panel(4, "Server", table(machine))),
+            panel(5, "Trader log", html.Pre(log, className="log")),
         ])
 
     return app

@@ -10,7 +10,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from . import comparison, metrics, picks, records, report, research
+from . import comparison, metrics, picks, records, report, research, server
 from .project import Project
 
 # Tones the stylesheet colours (assets/style.css)
@@ -789,3 +789,55 @@ def research_figure(report_json: dict | None, variant: str | None) -> dict:
                              for label, day in (("VALIDATION", dates["development_end"]),
                                                 ("HOLDOUT", dates["validation_end"]))]
     return {"data": lines, "layout": {**layout, "showlegend": True}}
+
+
+# ---------- System: the server ----------
+
+LIMIT_WARNING_SHARE = 0.8   # past this much of the data limit, the oldest files are about to be deleted
+
+
+def size(value: float) -> str:
+    """Bytes as "812 MB", "3.4 GB"."""
+    for unit, scale in (("GB", server.GIGABYTE), ("MB", 1024 ** 2), ("KB", server.KILOBYTE)):
+        if value >= scale:
+            return f"{value / scale:.1f} {unit}" if unit == "GB" else f"{value / scale:.0f} {unit}"
+    return f"{value:.0f} B"
+
+
+def data_table(sizes: list[server.FolderSize], limit: int) -> Table:
+    """data/ folder by folder, against the limit beyond which the oldest files are deleted."""
+    total = sum(folder.bytes for folder in sizes)
+    table = Table(["Folder", "Size", "Files", "Of the limit"], empty="NO DATA YET")
+    for folder in sizes:
+        table.add(folder.name, size(folder.bytes), f"{folder.files:,}", percent(folder.bytes / limit * 100, 1))
+    if sizes:
+        share = total / limit
+        tone = NEGATIVE if share >= 1 else WARNING if share >= LIMIT_WARNING_SHARE else PLAIN
+        table.add(("All of data/", tone), (size(total), tone), f"{sum(f.files for f in sizes):,}",
+                  (f"{percent(share * 100, 1)} of {size(limit)}", tone))
+    return table
+
+
+def server_table(disk: server.Disk | None, memory: server.Memory | None, load: tuple | None,
+                 uptime: float | None, deployed: dict | None, cores: int) -> Table:
+    """The machine under the dashboard, one fact a row."""
+    table = Table(["", ""], empty="")
+    if disk:
+        share = disk.used / disk.total if disk.total else 0
+        table.add("Disk", (f"{size(disk.free)} free of {size(disk.total)} ({percent(share * 100, 0)} used)",
+                           WARNING if share >= LIMIT_WARNING_SHARE else PLAIN))
+    if memory:
+        table.add("Memory", f"{size(memory.available)} free of {size(memory.total)}")
+    if load:
+        busy = load[0] >= cores
+        table.add("Load", (f"{load[0]:.2f} / {load[1]:.2f} / {load[2]:.2f} (1 / 5 / 15 min, {cores} cores)",
+                           WARNING if busy else PLAIN))
+    if uptime is not None:
+        table.add("Up", metrics.describe_duration(uptime))
+    if deployed:
+        branch = f" on {deployed['branch']}" if deployed.get("branch") else ""
+        table.add("Deployed", f"{deployed['commit']}{branch}, {deployed['deployed_utc'][:16].replace('T', ' ')} UTC")
+        table.add("", deployed.get("subject", ""))
+    else:
+        table.add("Deployed", "not by deploy.sh (no DEPLOYED.json)")
+    return table
