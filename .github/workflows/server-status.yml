@@ -1,0 +1,30 @@
+name: Server status
+
+# Reads, never changes: how much data the server holds, the disk, and the research run's progress and report.
+# Runs ON the home server (self-hosted runner `algo-trader`). Start it from the Actions tab, or by pushing to
+# the ops/server-status branch. Prints nothing from /etc/algo-trader.env (the keys).
+on:
+  workflow_dispatch:
+  push:
+    branches: [ops/server-status]
+
+jobs:
+  status:
+    runs-on: [self-hosted, algo-trader]
+    timeout-minutes: 10
+    env:
+      DATA: /var/lib/algo-trader/data
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disk and data
+        run: |
+          df -h "$DATA"
+          du -sh "$DATA"
+          du -sh "$DATA"/* 2>/dev/null | sort -h | tail -15
+      - name: Research run
+        run: |
+          cat "$DATA/morning/progress.json" 2>/dev/null || echo "no progress.json"; echo
+          tail -40 "$DATA/morning/morning.log" 2>/dev/null || echo "no morning.log"
+          ps -ww -o pid,etime,ni,%cpu,%mem,args -C morning_app || true
+      - name: Research report
+        run: python3 deploy/research_summary.py "$DATA/morning/report.json"
