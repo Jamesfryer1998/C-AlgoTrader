@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <deque>
 #include <map>
 #include <string>
@@ -38,6 +39,10 @@ namespace StockSelection
     };
 
     using CandidatesByDay = std::map<std::string, std::vector<Candidate>>;
+
+    // FNV-1a: the same number for the same text on every machine (std::hash makes no such promise), for
+    // random draws that come out the same every run
+    uint64_t stableHash(const std::string& text);
 
     // The average true range of the `days` days before index `before` (oldest first). 0 if too few.
     double averageTrueRange(const std::vector<quant::DailyBar>& bars, size_t before, int days);

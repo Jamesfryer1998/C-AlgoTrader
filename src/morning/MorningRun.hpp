@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -13,10 +12,7 @@ using json = nlohmann::json;
  *
  * morning_app from start to finish: read config/morning.json, download what's missing, backtest, then save
  * data/morning/report.json and trades.csv and print the verdicts. While it runs, data/morning/progress.json
- * says how far it has got, for the dashboard's progress bar:
- *
- *   {"state": "running", "stage": "Picking and trading each day", "done": 120, "total": 790,
- *    "started": 1794600000, "updated": 1794600360}
+ * says how far it has got (ResearchProgress).
  *
  *   morning_app              development and validation only
  *   morning_app --holdout    the holdout too: do this once, at the end (it's recorded)
@@ -42,11 +38,7 @@ class MorningRun
         int run(const Options& options);
 
     private:
-        void saveProgress(const std::string& state, const std::string& stage, size_t done, size_t total, bool force);
-
         json algoConfig;
         json morningConfig;
         std::string folder;
-        std::time_t started = 0;
-        std::chrono::steady_clock::time_point lastSaved;
 };

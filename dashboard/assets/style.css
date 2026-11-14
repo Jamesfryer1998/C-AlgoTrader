@@ -127,3 +127,8 @@ html, body { background: var(--black); color: var(--text); font-family: var(--mo
 /* ----- Boxes side by side reach the same bottom edge: the last box in each column takes up the slack ----- */
 .row > [class*="col-"] { display: flex; flex-direction: column; }
 .row > [class*="col-"] > .panel:last-child { flex: 1 1 auto; }
+
+/* ----- Research: the study picker and its buttons on one line ----- */
+#research-tab .controls { flex-wrap: wrap; }
+#research-tab .controls .key { white-space: nowrap; }
+#research-study { width: auto; min-width: 260px; flex: 0 0 auto; }

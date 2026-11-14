@@ -8,20 +8,9 @@
 
 namespace
 {
-    // FNV-1a: the same number for the same day on every machine (std::hash makes no such promise)
+    // FNV-1a's constants
     const uint64_t FNV_OFFSET = 1469598103934665603ULL;
     const uint64_t FNV_PRIME = 1099511628211ULL;
-
-    uint64_t stableHash(const std::string& text)
-    {
-        uint64_t hash = FNV_OFFSET;
-        for (unsigned char c : text)
-        {
-            hash ^= c;
-            hash *= FNV_PRIME;
-        }
-        return hash;
-    }
 
     // In the universe, priced above min_price at the open, and an opening bar that moved
     bool tradeableToday(const StockSelection::Candidate& candidate, const std::map<std::string, IntradayBar>& openings,
@@ -41,6 +30,17 @@ namespace
 
 namespace StockSelection
 {
+    uint64_t stableHash(const std::string& text)
+    {
+        uint64_t hash = FNV_OFFSET;
+        for (unsigned char c : text)
+        {
+            hash ^= c;
+            hash *= FNV_PRIME;
+        }
+        return hash;
+    }
+
     double averageTrueRange(const std::vector<quant::DailyBar>& bars, size_t before, int days)
     {
         if (days <= 0 || before < static_cast<size_t>(days) + 1 || before > bars.size())

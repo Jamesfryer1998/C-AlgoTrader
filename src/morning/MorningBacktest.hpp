@@ -59,6 +59,11 @@ class MorningBacktest
             int symbols = 0;                        // in the universe before filters
             int daysTraded = 0;
             bool holdoutTraded = false;
+
+            // How the report names things, so other studies (pairs_app) can use it too
+            std::string title = "MORNING SCREEN";
+            std::string chosen = IN_PLAY;           // the selection being tested; the other is RANDOM
+            std::string countLabel = "Stocks a day";
         };
 
         // progress(stage, done, total)

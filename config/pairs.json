@@ -1,0 +1,33 @@
+{
+    "_comment": "pairs_app: do stocks that move together pay to trade against each other? Two ideas, on daily bars only, with the same development / validation / holdout years as config/morning.json and the same pass marks. Rules are fixed here BEFORE the first run (2026-11-14); nothing is tuned by it.",
+    "start": "2023-11-01",
+    "development_end": "2024-10-31",
+    "validation_end": "2025-10-31",
+    "end": "",
+    "data_start": "2022-09-01",
+
+    "_universe_comment": "Each month, from the formation_days trading days before it: the universe_size stocks with the most dollar volume, priced above min_price, with a bar every day. Only stocks averaging at least prefilter_dollar_volume a day over the morning screen's daily bars (data/morning/daily) are downloaded, when those exist.",
+    "universe": {"universe_size": 500, "min_price": 5.0, "min_dollar_volume": 10000000, "prefilter_dollar_volume": 5000000},
+
+    "_pairs_comment": "Pairs trading, the distance method (Gatev, Goetzmann, Rouwenhorst 2006). Each month: the `pairs` pairs whose prices (each divided by its first price) tracked closest over the last formation_days (smallest sum of squared differences; no stock in two pairs). Then for trading_days: when the gap between them is more than open_sigma times its formation standard deviation, short the one above and buy the one below, equal dollars; close when the gap closes (the prices cross) or the window ends. delay_days 1 opens and closes a day after the signal, as published. The control: random pairs from the same universe.",
+    "formation_days": 252,
+    "pairs": {"pairs": 20, "trading_days": 126, "open_sigma": 2.0},
+
+    "_lead_lag_comment": "Lead-lag: each month, each stock's leader is the bigger stock (more dollar volume) whose daily returns moved most with its own over formation_days, if the correlation is at least min_correlation. Each day, buy the stocks_each_side stocks whose leader beat them most today and short those it trailed most, at the close, held hold_days. The control: a random bigger stock as leader.",
+    "lead_lag": {"stocks_each_side": 20, "min_correlation": 0.5},
+
+    "_money_comment": "Positions held overnight: at most leverage x equity in all, shared equally between everything that can be open at once. Costs as everywhere else: slippage_percent against us on each fill, regulatory fees on sells. A short's borrowing cost isn't counted.",
+    "starting_capital": 100000,
+    "slippage_percent": 0.03,
+    "leverage": 1.0,
+    "random_seed": 7,
+
+    "variants": [
+        {"name": "Pairs, a day later", "kind": "pairs", "delay_days": 1},
+        {"name": "Pairs, same day", "kind": "pairs", "delay_days": 0},
+        {"name": "Lead-lag, 1 day", "kind": "lead_lag", "hold_days": 1},
+        {"name": "Lead-lag, 5 days", "kind": "lead_lag", "hold_days": 5}
+    ],
+
+    "gates": {"min_sharpe": 1.0, "min_lead_over_random": 0.5, "min_trades": 300, "min_deflated_sharpe": 0.95}
+}

@@ -7,6 +7,7 @@
 #include "MorningData.hpp"
 #include "MorningReport.hpp"
 #include "MorningSettings.hpp"
+#include "ResearchProgress.hpp"
 #include "../util/MarketTime.hpp"
 #include "../util/SaveData.hpp"
 
@@ -15,7 +16,6 @@ namespace fs = std::filesystem;
 namespace
 {
     const std::string MORNING_FOLDER = "morning";
-    const std::string PROGRESS_FILE = "progress.json";
     const std::string REPORT_FILE = "report.json";
     const std::string TRADES_FILE = "trades.csv";
 
@@ -23,18 +23,10 @@ namespace
     const std::string OFFLINE = "--offline";
     const std::string HELP = "--help";
 
-    const std::string RUNNING = "running", FINISHED = "finished", FAILED = "failed";
     const std::string STAGE_REPORT = "Writing the report";
 
-    // progress.json at most this often, so a fast stage doesn't spend its time writing it
-    const std::chrono::seconds PROGRESS_EVERY{2};
     const int REPORT_INDENT = 1;
 
-    std::string yesterday()
-    {
-        std::string today = MarketTime::datePart(MarketTime::toNewYorkTime(std::time(nullptr)));
-        return MarketTime::datePart(MarketTime::formatUtc(MarketTime::parseDate(today) - MarketTime::SECONDS_PER_DAY));
-    }
 }
 
 MorningRun::Options
@@ -70,25 +62,12 @@ MorningRun::MorningRun(const json& algoConfig, const json& morningConfig, const 
 {
 }
 
-void
-MorningRun::saveProgress(const std::string& state, const std::string& stage, size_t done, size_t total, bool force)
-{
-    auto now = std::chrono::steady_clock::now();
-    if (!force && now - lastSaved < PROGRESS_EVERY)
-        return;
-    lastSaved = now;
-    json progress = {{"state", state}, {"stage", stage}, {"done", done}, {"total", total},
-                     {"started", started}, {"updated", std::time(nullptr)}};
-    fs::create_directories(folder);
-    SaveData::write((fs::path(folder) / PROGRESS_FILE).string(), progress.dump());
-}
-
 int
 MorningRun::run(const Options& options)
 {
-    started = std::time(nullptr);
-    MorningSettings settings = MorningSettings::fromConfig(morningConfig, yesterday());
-    saveProgress(RUNNING, "", 0, 0, true);
+    MorningSettings settings = MorningSettings::fromConfig(morningConfig, ResearchProgress::yesterday());
+    ResearchProgress progress(folder);
+    progress.save(ResearchProgress::RUNNING, "", 0, 0, true);
 
     std::string holdoutOpened = MorningHoldout::openedAt(folder);
     if (options.holdout)
@@ -106,21 +85,16 @@ MorningRun::run(const Options& options)
     MorningData data(algoConfig, folder, options.offline);
     MorningBacktest backtest(algoConfig, settings);
     MorningBacktest::Results results;
-    std::string lastStage;
     bool ok = backtest.run(data, options.holdout, [&](const std::string& stage, size_t done, size_t total) {
-        bool newStage = stage != lastStage;
-        if (newStage)
-            std::cout << stage << "..." << std::endl;
-        lastStage = stage;
-        saveProgress(RUNNING, stage, done, total, newStage);
+        progress.stage(stage, done, total);
     }, results);
     if (!ok)
     {
-        saveProgress(FAILED, lastStage, 0, 0, true);
+        progress.save(ResearchProgress::FAILED, "", 0, 0, true);
         return 1;
     }
 
-    saveProgress(RUNNING, STAGE_REPORT, 0, 1, true);
+    progress.save(ResearchProgress::RUNNING, STAGE_REPORT, 0, 1, true);
     MorningReport report(settings, results);
     report.print(std::cout);
     SaveData::write((fs::path(folder) / REPORT_FILE).string(),
@@ -128,6 +102,6 @@ MorningRun::run(const Options& options)
     report.writeTrades((fs::path(folder) / TRADES_FILE).string());
     std::cout << "Saved " << (fs::path(folder) / REPORT_FILE).string() << " (" << data.downloads()
               << " requests to Alpaca)" << std::endl;
-    saveProgress(FINISHED, STAGE_REPORT, 1, 1, true);
+    progress.save(ResearchProgress::FINISHED, STAGE_REPORT, 1, 1, true);
     return 0;
 }

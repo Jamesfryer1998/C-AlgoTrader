@@ -4,6 +4,7 @@ add_executable(quant_app quant.cpp)
 add_executable(screen_app screen.cpp)
 add_executable(risk_app risk.cpp)
 add_executable(morning_app morning.cpp)
+add_executable(pairs_app pairs.cpp)
 
 target_link_libraries(algo_trader_app
     live_lib
@@ -36,5 +37,10 @@ target_link_libraries(risk_app
 
 target_link_libraries(morning_app
     morning_lib
+    util_lib
+    nlohmann_json)
+
+target_link_libraries(pairs_app
+    pairs_lib
     util_lib
     nlohmann_json)

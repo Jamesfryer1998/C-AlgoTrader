@@ -33,6 +33,7 @@ struct MorningSettings
         int holdDays = 0;         // > 0: drift, held for days from the in-play day's close (no breakout)
         bool fade = false;        // drift against the move instead of with it
         bool dayMove = false;     // drift in the direction of the whole day (open to close), not the opening bar
+        std::string step;         // the report's step name for it, when not one of the morning screen's
 
         bool isStrategy() const { return strategy.is_object() && !strategy.empty(); }
         bool isDrift() const { return holdDays > 0; }

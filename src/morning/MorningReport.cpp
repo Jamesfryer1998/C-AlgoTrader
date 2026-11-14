@@ -44,6 +44,8 @@ namespace
     // Which step of the plan judges this variant on the validation year
     const std::string& stepOf(const MorningSettings::Variant& variant)
     {
+        if (!variant.step.empty())
+            return variant.step;
         return variant.isDrift() ? STEP_DRIFT : isAsPublished(variant) ? STEP_3 : STEP_4;
     }
 
@@ -129,10 +131,10 @@ MorningReport::addDeflatedSharpes(const std::string& period)
 {
     quant::Vector trials;
     for (const auto& line : results.lines)
-        if (line.selection == MorningBacktest::IN_PLAY)
+        if (line.selection == results.chosen)
             trials.push_back(quant::dailySharpe(returnsIn(line, settings, period)));
     for (const auto& line : results.lines)
-        if (line.selection == MorningBacktest::IN_PLAY)
+        if (line.selection == results.chosen)
             for (auto& row : table)
                 if (row.variant == line.variant && row.selection == line.selection && row.period == period)
                     row.deflatedSharpe = quant::deflatedSharpe(returnsIn(line, settings, period), trials);
@@ -155,15 +157,19 @@ MorningReport::Gate::pass() const
 void
 MorningReport::addGates()
 {
-    Gate step1{STEP_1, "", STEP_1_PERIODS, {}};
-    double ratio = moveToCost();
-    step1.checks.push_back({"In-play stocks' 10-minute move at least " + fixed(settings.minMoveToCost, 0) + "x the round-trip cost",
-                            ratio >= settings.minMoveToCost, fixed(ratio, RATIO_DECIMALS) + "x"});
-    verdicts.push_back(step1);
+    if (!results.moves.empty())   // the morning screen's step 1
+    {
+        Gate step1{STEP_1, "", STEP_1_PERIODS, {}};
+        double ratio = moveToCost();
+        step1.checks.push_back({"In-play stocks' 10-minute move at least " + fixed(settings.minMoveToCost, 0)
+                                + "x the round-trip cost", ratio >= settings.minMoveToCost,
+                                fixed(ratio, RATIO_DECIMALS) + "x"});
+        verdicts.push_back(step1);
+    }
 
     auto judge = [&](const std::string& step, const MorningSettings::Variant& variant, const std::string& period,
                      bool holdout) {
-        const Row* inPlay = find(variant.name, MorningBacktest::IN_PLAY, period);
+        const Row* inPlay = find(variant.name, results.chosen, period);
         const Row* random = find(variant.name, MorningBacktest::RANDOM, period);
         if (!inPlay || !random)
             return;
@@ -205,6 +211,9 @@ MorningReport::toJson(const std::string& holdoutOpened, size_t downloads) const
     report["days_traded"] = results.daysTraded;
     report["downloads"] = downloads;
     report["stocks_a_day"] = settings.stocks;
+    report["title"] = results.title;
+    report["chosen"] = results.chosen;
+    report["count_label"] = results.countLabel;
     report["round_trip_cost_percent"] = FILLS_PER_ROUND_TRIP * settings.slippagePercent;
 
     json moves = json::object();
@@ -270,8 +279,8 @@ MorningReport::writeTrades(const std::string& path) const
 void
 MorningReport::print(std::ostream& out) const
 {
-    out << "\nMORNING SCREEN  " << settings.start << " to " << settings.end << "  (" << results.daysTraded
-        << " days traded, " << settings.stocks << " stocks a day)\n";
+    out << "\n" << results.title << "  " << settings.start << " to " << settings.end << "  (" << results.daysTraded
+        << " days traded, " << settings.stocks << " " << results.countLabel << ")\n";
     for (const auto& [selection, moves] : results.moves)
         out << "  " << std::left << std::setw(TABLE_COLUMN_WIDTH) << selection << " typical 10-minute move "
             << fixed(moves.move10Percent, MOVE_DECIMALS) << "%, 30-minute " << fixed(moves.move30Percent, MOVE_DECIMALS) << "%, ATR "

@@ -677,7 +677,13 @@ PASS, FAIL = "PASS", "FAIL"
 HUNDRED = 100   # morning_app saves returns as fractions; percent() shows percentages
 
 
-def research_status(progress: research.ResearchProgress, report_json: dict | None, now: float) -> tuple[str, float]:
+def chosen_selection(report_json: dict) -> str:
+    """The selection a report tests ("in play", "matched"); the other is RANDOM."""
+    return report_json.get("chosen", IN_PLAY)
+
+
+def research_status(progress: research.ResearchProgress, report_json: dict | None, now: float,
+                    study: research.Study = research.MORNING) -> tuple[str, float]:
     """The line beside the research buttons and how full its bar is (0 to 1)."""
     if progress.state == research.RUNNING:
         left = progress.seconds_left(now)
@@ -686,8 +692,8 @@ def research_status(progress: research.ResearchProgress, report_json: dict | Non
         return f"{progress.stage or 'Starting'}:{count}{eta}", progress.fraction
     last = f"Last run {report_json['generated_utc'][:16].replace('T', ' ')} UTC" if report_json else "Not run yet"
     if progress.state == research.FAILED:
-        return f"The last run failed (see data/morning/morning.log). {last}", 0.0
-    return f"{last}. The first run downloads about three years of data and takes a while", 0.0
+        return f"The last run failed (see data/{study.folder}/{study.log}). {last}", 0.0
+    return f"{last}. A first run downloads what it needs and takes a while", 0.0
 
 
 def research_kpis(report_json: dict) -> list[Kpi]:
@@ -697,7 +703,7 @@ def research_kpis(report_json: dict) -> list[Kpi]:
     return [Kpi("Data", f"{dates['start']} to {dates['end']}"),
             Kpi("Stocks listed", number(report_json["universe_symbols"], 0)),
             Kpi("Days traded", number(report_json["days_traded"], 0)),
-            Kpi("Stocks a day", number(report_json["stocks_a_day"], 0)),
+            Kpi(report_json.get("count_label", "Stocks a day").capitalize(), number(report_json["stocks_a_day"], 0)),
             Kpi("Round-trip cost", percent(report_json["round_trip_cost_percent"], 2)),
             Kpi("Holdout", holdout, f"after {dates['validation_end']}", WARNING if opened else PLAIN)]
 
@@ -718,7 +724,7 @@ def moves_table(report_json: dict) -> Table:
     """Step 1: how far each selection's stocks typically move, against what a round trip costs."""
     cost = report_json["round_trip_cost_percent"]
     table = Table(["Stocks", "Stock-days", "10-min move", "30-min move", "ATR", "Relative volume", "Move / cost"],
-                  empty="NO MEASUREMENTS YET")
+                  empty="NOT MEASURED FOR THIS STUDY")
     for selection, moves in report_json["step1"]["moves"].items():
         ratio = moves["move_10_minutes_percent"] / cost if cost else 0
         table.add(selection, number(moves["stock_days"], 0), f"{moves['move_10_minutes_percent']:.3f}%",
@@ -728,8 +734,8 @@ def moves_table(report_json: dict) -> Table:
 
 
 def research_results_table(report_json: dict) -> Table:
-    """Every rule on every selection in every period, the in-play lines first."""
-    order = {IN_PLAY: 0, RANDOM: 1}
+    """Every rule on every selection in every period, the tested selection first."""
+    order = {chosen_selection(report_json): 0, RANDOM: 1}
     rows = sorted(report_json.get("results", []),
                   key=lambda row: (PERIODS.index(row["period"]) if row["period"] in PERIODS else len(PERIODS),
                                    row["variant"] == BENCHMARK, row["variant"], order.get(row["selection"], 2)))
@@ -763,12 +769,12 @@ def research_figure(report_json: dict | None, variant: str | None) -> dict:
     the start, with the development / validation / holdout boundaries marked."""
     if not report_json or not report_json.get("curves"):
         return _note_figure("Run the research to see results", RESEARCH_ZOOM_KEY)
-    lines = []
+    lines, chosen = [], chosen_selection(report_json)
     for curve in report_json["curves"]:
-        if curve["variant"] == variant and curve["selection"] == IN_PLAY:
-            name, colour = f"{variant}, stocks in play", LIVE_COLOUR
+        if curve["variant"] == variant and curve["selection"] == chosen:
+            name, colour = f"{variant}, {chosen}", LIVE_COLOUR
         elif curve["variant"] == variant and curve["selection"] == RANDOM:
-            name, colour = f"{variant}, random stocks", RANDOM_COLOUR
+            name, colour = f"{variant}, random", RANDOM_COLOUR
         elif curve["variant"] == BENCHMARK:
             name, colour = BENCHMARK, BENCHMARK_COLOUR
         else:

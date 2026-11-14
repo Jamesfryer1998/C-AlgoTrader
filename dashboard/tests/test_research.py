@@ -111,6 +111,41 @@ def test_the_chart_compares_in_play_random_and_spy(project):
     assert views.research_variants(report_json) == ["ORB", "ORB, 10-minute hold"]
     figure = views.research_figure(report_json, "ORB")
     names = [line["name"] for line in figure["data"]]
-    assert names == ["ORB, stocks in play", "ORB, random stocks", "SPY buy and hold"]
+    assert names == ["ORB, in play", "ORB, random", "SPY buy and hold"]
     assert figure["data"][0]["y"] == [0.0, 0.01, 0.03]
     assert [shape["x0"] for shape in figure["layout"]["shapes"]] == ["2024-10-31", "2025-10-31"]
+
+
+def test_each_study_has_its_own_folder_and_clearing_keeps_the_data(project):
+    pairs = research.STUDIES["pairs"]
+    assert research.study_of("pairs") is pairs and research.study_of(None) is research.MORNING
+    save(project, research.REPORT_FILE, sample_report())
+    pairs_folder = research.folder(project, pairs)
+    pairs_folder.mkdir(parents=True)
+    (pairs_folder / research.REPORT_FILE).write_text(json.dumps({**sample_report(), "chosen": "matched"}))
+    (pairs_folder / pairs.log).write_text("log")
+    (pairs_folder / "holdout_opened.json").write_text("{}")
+    (pairs_folder / "daily").mkdir()
+    (pairs_folder / "daily" / "AAPL.csv").write_text("bars")
+    assert research.load_report(project, pairs)["chosen"] == "matched"
+
+    controls = {key: research.ResearchControl(project, study) for key, study in research.STUDIES.items()}
+    assert research.clear_results(project, controls) == "Cleared 3 result files"
+    assert research.load_report(project) is None and research.load_report(project, pairs) is None
+    assert (pairs_folder / "holdout_opened.json").exists() and (pairs_folder / "daily" / "AAPL.csv").exists()
+    assert research.clear_results(project, controls) == "Nothing to clear"
+
+    save(project, research.PROGRESS_FILE, {"state": "running", "stage": "x", "done": 1, "total": 2,
+                                           "updated": time.time()})
+    assert research.clear_results(project, controls) == "Not while research is running"
+
+
+def test_another_studys_report_names_its_own_selection():
+    report_json = {**sample_report(), "chosen": "matched", "count_label": "pairs a month"}
+    report_json["curves"] = [{**curve, "selection": "matched" if curve["selection"] == "in play" else curve["selection"]}
+                             for curve in report_json["curves"]]
+    names = [line["name"] for line in views.research_figure(report_json, "ORB")["data"]]
+    assert names == ["ORB, matched", "ORB, random", "SPY buy and hold"]
+    kpis = {kpi.title: kpi.value for kpi in views.research_kpis(report_json)}
+    assert kpis["Pairs a month"] == "20"
+    assert views.moves_table({**report_json, "step1": {"moves": {}, "move_to_cost": 0}}).rows == []

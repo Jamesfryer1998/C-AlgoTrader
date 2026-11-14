@@ -19,7 +19,7 @@ ENV_NAME="${ENV_NAME:-algotrader}"
 PYTHON_VERSION="3.13"
 CONDA_BASE="${CONDA_BASE:-$HOME/miniforge3}"
 SERVICE="algo-trader-dashboard.service"
-TRADER_APPS=(algo_trader_app optimise_app quant_app screen_app risk_app morning_app)   # the tests are CI's job
+TRADER_APPS=(algo_trader_app optimise_app quant_app screen_app risk_app morning_app pairs_app)   # the tests are CI's job
 REQUIREMENTS="$APP_DIR/dashboard/requirements.txt"
 
 SETUP_GUIDE="deploy/README.md"
@@ -57,6 +57,7 @@ cmake -S "$APP_DIR" -B "$APP_DIR/build" > /dev/null
 cmake --build "$APP_DIR/build" --target "${TRADER_APPS[@]}" -j "$(nproc)"
 "$APP_DIR/build/app/algo_trader_app" --help > /dev/null
 "$APP_DIR/build/app/morning_app" --help > /dev/null   # built, and starts
+"$APP_DIR/build/app/pairs_app" --help > /dev/null
 
 # ── conda env: create on first deploy, update only when the dashboard's requirements change ──
 # shellcheck disable=SC1091

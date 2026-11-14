@@ -186,9 +186,11 @@ def picks_tab() -> html.Div:
                             extra=html.Div(id="picks-run", className="panel-actions")),
                       panel(3, "Current picks", html.Div(id="current-picks"))]),
         panel(4, "Day by day", html.Div(id="picks-days")),
-        html.Div("Each weekend the screen tunes every strategy on every stock on about three years of 1-minute bars and keeps the "
-                 "five that held up best on the final month it never saw. After each traded day's close, those "
-                 "picks are backtested on the day from the live account's money, starting flat. TRADE THESE makes "
+        html.Div("Each weekend the screen tunes every strategy on every stock on about three years of 1-minute "
+                 "bars and keeps up to five that held up in both the training years and the final month it never "
+                 "saw, and beat buying and holding that stock (fewer when fewer pass). After each traded day's "
+                 "close, those picks are backtested on the day from the live account's money, starting flat. "
+                 "TRADE THESE makes "
                  "a week's picks the trader's portfolio from its next Start (saved as data/portfolio.json, so "
                  "deploys don't undo it); config/strategy.json itself is never changed.", className="empty"),
     ], id="picks-tab", style={"display": "none"})
@@ -213,9 +215,14 @@ def report_tab() -> html.Div:
 
 
 def research_tab() -> html.Div:
-    """The morning screen: each day's stocks in play against random stocks (research.py, config/morning.json)."""
-    controls = html.Div([key("RUN RESEARCH", "run-research", views.WARNING),
+    """Each study's backtest against random picks, with its pass marks (research.py, config/morning.json and
+    config/pairs.json)."""
+    studies = [{"label": study.title.upper(), "value": study.key} for study in research.STUDIES.values()]
+    controls = html.Div([dbc.Select(id="research-study", options=studies, value=research.MORNING.key,
+                                    className="day-picker source-picker"),
+                         key("RUN RESEARCH", "run-research", views.WARNING),
                          key("OPEN THE HOLDOUT", "research-holdout", views.NEGATIVE),
+                         key("CLEAR RESULTS", "research-clear", views.MUTED),
                          html.Div(html.Div(id="research-bar", className="progress-fill"), className="progress-track"),
                          html.Span(id="research-status", className="muted")], className="controls")
     return html.Div([
@@ -226,10 +233,11 @@ def research_tab() -> html.Div:
                      [panel(2, "Step 1: moves against costs", html.Div(id="research-moves")),
                       panel(3, "Gates", html.Div(id="research-gates"))]),
         panel(4, "Every rule, every period", html.Div(id="research-results")),
-        html.Div("Each day the 20 stocks with the most unusual volume in their first 5 minutes are traded with the "
-                 "rules in config/morning.json, next to the same rules on 20 random stocks and SPY bought and held. "
-                 "Development and validation are looked at as often as you like; the holdout only once, at the end, "
-                 "with OPEN THE HOLDOUT. Nothing here trades: it's research.", className="empty"),
+        html.Div("Each study trades its idea with fixed rules (config/morning.json: each day's stocks in play; "
+                 "config/pairs.json: pairs and lead-lag) next to the same rules on random picks and SPY bought and "
+                 "held. Development and validation are looked at as often as you like; the holdout only once, at "
+                 "the end, with OPEN THE HOLDOUT. CLEAR RESULTS deletes the reports, not the downloaded data or the "
+                 "holdout records. Nothing here trades: it's research.", className="empty"),
     ], id="research-tab", style={"display": "none"})
 
 
@@ -292,6 +300,9 @@ def layout() -> html.Div:
         confirm("trade-picks", "Trade these picks", "", "Trade them", views.POSITIVE),
         dcc.Store(id="trade-picks-choice"),
         dcc.Store(id="portfolio-loaded"),   # changes when TRADE THESE or BACK TO CONFIG changes what's loaded
+        confirm("research-clear", "Clear research results",
+                "Delete every study's report, trades and log? The downloaded bars stay, so a rerun doesn't download "
+                "again, and so do the holdout records.", "Clear them", views.NEGATIVE),
         confirm("research-holdout", "Open the holdout",
                 "Backtest the final year too? It's meant to be looked at once, when the rules are settled: the first "
                 "time is recorded, and after that its result no longer counts as an unseen test.", "Open it",
@@ -317,7 +328,7 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
     """end_of_day_backtests: backtest each day live traded once it's over (end_of_day.py), as the server does."""
     control = TraderControl(project)
     screen = picks.ScreenControl(project)
-    morning = research.ResearchControl(project)
+    studies = {key: research.ResearchControl(project, study) for key, study in research.STUDIES.items()}
     if end_of_day_backtests:
         EndOfDayBacktests(project, control, screen).start()
     app = Dash(__name__, title=TITLE, update_title=None, external_stylesheets=[dbc.themes.BOOTSTRAP, FONTS],
@@ -490,30 +501,45 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
     def ask_before_the_holdout(_, __, ___):
         return ctx.triggered_id == "research-holdout"
 
+    @app.callback(Output("research-clear-modal", "is_open"),
+                  Input("research-clear", "n_clicks"), Input("research-clear-cancel", "n_clicks"),
+                  Input("research-clear-confirm", "n_clicks"), prevent_initial_call=True)
+    def ask_before_clearing(_, __, ___):
+        return ctx.triggered_id == "research-clear"
+
     @app.callback(Output("research-status", "children"), Output("research-bar", "style"),
                   Output("run-research", "disabled"), Output("research-holdout", "disabled"),
+                  Output("research-clear", "disabled"),
                   Input("fast", "n_intervals"), Input("run-research", "n_clicks"),
-                  Input("research-holdout-confirm", "n_clicks"), State("tabs", "active_tab"))
-    def research_progress(_, __, ___, active):
-        """The research's progress bar and time left, every couple of seconds while the tab is open."""
+                  Input("research-holdout-confirm", "n_clicks"), Input("research-clear-confirm", "n_clicks"),
+                  Input("research-study", "value"), State("tabs", "active_tab"))
+    def research_progress(_, __, ___, ____, key, active):
+        """The chosen study's progress bar and time left, every couple of seconds while the tab is open."""
+        study = research.study_of(key)
+        control = studies[study.key]
         pressed = bool(ctx.triggered and ctx.triggered[0]["value"])
-        started = ""
+        done = ""
         if ctx.triggered_id == "run-research" and pressed:
-            started = morning.run() + ". "
+            done = control.run() + ". "
         elif ctx.triggered_id == "research-holdout-confirm" and pressed:
-            started = morning.run(holdout=True) + ". "
+            done = control.run(holdout=True) + ". "
+        elif ctx.triggered_id == "research-clear-confirm" and pressed:
+            done = research.clear_results(project, studies) + ". "
         elif active != RESEARCH:
-            return no_update, no_update, no_update, no_update
-        text, fraction = views.research_status(morning.progress(), research.load_report(project), time.time())
-        busy = morning.running()
-        return started + text, {"width": f"{fraction * 100:.1f}%"}, busy, busy
+            return no_update, no_update, no_update, no_update, no_update
+        text, fraction = views.research_status(control.progress(), research.load_report(project, study),
+                                               time.time(), study)
+        busy = control.running()
+        anything_busy = any(other.running() for other in studies.values())
+        return done + text, {"width": f"{fraction * 100:.1f}%"}, busy, busy, anything_busy
 
     @app.callback(Output("research-variant", "options"), Output("research-variant", "value"),
-                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), State("research-variant", "value"))
-    def research_variant_choices(active, _, chosen):
+                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("research-study", "value"),
+                  State("research-variant", "value"))
+    def research_variant_choices(active, _, key, chosen):
         if active != RESEARCH:
             return no_update, no_update
-        variants = views.research_variants(research.load_report(project))
+        variants = views.research_variants(research.load_report(project, research.study_of(key)))
         return ([{"label": name.upper(), "value": name} for name in variants],
                 chosen if chosen in variants else (variants[0] if variants else None))
 
@@ -521,16 +547,17 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
                   Output("research-moves", "children"), Output("research-gates", "children"),
                   Output("research-results", "children"), Output("research-sent", "data"),
                   Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("research-variant", "value"),
+                  Input("research-study", "value"), Input("research-clear-confirm", "n_clicks"),
                   State("research-sent", "data"))
-    def refresh_research(active, _, variant, sent_before):
+    def refresh_research(active, _, variant, key, __, sent_before):
         if active != RESEARCH:
             return (*[no_update] * 5, sent_before)
-        report_json = research.load_report(project)
+        report_json = research.load_report(project, research.study_of(key))
         sent = SentParts(sent_before)
-        generated = report_json.get("generated_utc") if report_json else None
+        generated = (key, report_json.get("generated_utc")) if report_json else None
         if not report_json:
             empty = html.Div("NO RESULTS YET: RUN RESEARCH", className="empty")
-            return ("", views.research_figure(None, None), empty, empty, empty, sent.fingerprints)
+            return ("", views.research_figure(None, None), empty, empty, empty, SentParts(None).fingerprints)
         return (sent.update("stats", generated, lambda _: segments([kpi_segment(kpi)
                                                                     for kpi in views.research_kpis(report_json)])),
                 sent.update("chart", (generated, variant), lambda _: views.research_figure(report_json, variant)),
