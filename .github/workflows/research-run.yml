@@ -1,8 +1,9 @@
 name: Research run
 
-# Runs the deployed morning_app on the home server from the data it has already downloaded (--offline: no
-# requests to Alpaca, no keys needed), then prints the report. The same as the Research tab's RUN RESEARCH,
-# without the holdout. Start it from the Actions tab, or by pushing to the ops/research-run branch.
+# Reruns the deployed research apps on the home server from the data they've already downloaded (--offline: no
+# requests to Alpaca, no keys needed), then prints their reports. The same as the Research tab's RUN RESEARCH,
+# without the holdout; a study whose first run (with downloads) hasn't happened yet is skipped. Start it from
+# the Actions tab, or by pushing to the ops/research-run branch.
 on:
   workflow_dispatch:
   push:
@@ -16,10 +17,18 @@ jobs:
       APP_DIR: /opt/algo-trader/app
     steps:
       - uses: actions/checkout@v4
-      - name: Run morning_app --offline
+      - name: Run each study --offline
         run: |
           cd "$APP_DIR"
-          if pgrep -x morning_app > /dev/null; then echo "morning_app is already running"; exit 1; fi
-          nice -n 10 ./build/app/morning_app --offline > data/morning/morning.log 2>&1 || { tail -30 data/morning/morning.log; exit 1; }
-      - name: Report
-        run: python3 deploy/research_summary.py "$APP_DIR/data/morning/report.json"
+          for study in morning pairs; do
+            app="${study}_app"
+            if [[ ! -d "data/$study/daily" ]]; then echo "$study: no downloads yet, run it from the Research tab first"; continue; fi
+            if pgrep -x "$app" > /dev/null; then echo "$app is already running"; continue; fi
+            nice -n 10 "./build/app/$app" --offline > "data/$study/$study.log" 2>&1 || { tail -30 "data/$study/$study.log"; exit 1; }
+          done
+      - name: Reports
+        run: |
+          for study in morning pairs; do
+            echo "===== $study"
+            python3 deploy/research_summary.py "$APP_DIR/data/$study/report.json"
+          done
