@@ -29,6 +29,6 @@ jobs:
       - name: Research reports
         run: |
           for study in morning pairs; do
-            echo "===== $study"; cat "$DATA/$study/progress.json" 2>/dev/null; echo
+            echo "===== $study"; cat "$DATA/$study/progress.json" 2>/dev/null || echo "no progress.json"; echo
             python3 deploy/research_summary.py "$DATA/$study/report.json"
           done
