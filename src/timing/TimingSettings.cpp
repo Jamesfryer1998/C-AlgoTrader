@@ -29,6 +29,13 @@ TimingSettings::fromConfig(const json& config, const std::string& yesterday)
     settings.leaderboardSize = finalists.value("leaderboard", settings.leaderboardSize);
     settings.randomSeed = config.value("random_seed", settings.randomSeed);
 
+    json universe = config.value("universe", json::object());
+    settings.universeStocks = universe.value("stocks", settings.universeStocks);
+    settings.alwaysSymbols = universe.value("always", std::vector<std::string>());
+    settings.notStocks = universe.value("not_stocks", std::vector<std::string>());
+    settings.loadDollarVolume = universe.value("load_dollar_volume", settings.loadDollarVolume);
+    settings.rankingFrom = universe.value("ranking_from", settings.rankingFrom);
+
     settings.families = config.value("families", json::object());
     settings.gates = config.value("gates", json::object());
     return settings;

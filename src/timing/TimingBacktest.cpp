@@ -26,6 +26,7 @@ TimingBacktest::Traded
 TimingBacktest::trade(const std::vector<double>& targets, size_t first, size_t last) const
 {
     Traded traded;
+    traded.firstIndex = std::max<size_t>(first, 1);
     double slippage = settings.slippagePercent / PERCENT;
     int legs = settings.cashSymbol.empty() ? 1 : 2;
     double held = ALL_OUT;   // flat before the first day
@@ -81,8 +82,7 @@ TimingBacktest::measure(const Traded& traded, const std::string& period) const
         returns.push_back(traded.returns[i]);
         exposure += traded.exposure[i];
         measures.trades += traded.changes[i];
-        size_t day = static_cast<size_t>(std::lower_bound(series.days.begin(), series.days.end(), traded.days[i])
-                                         - series.days.begin());
+        size_t day = traded.firstIndex + i;
         own.push_back(series.close[day] / series.close[day - 1] - 1);
         cash.push_back(series.cashReturn[day]);
     }
@@ -112,7 +112,8 @@ TimingBacktest::Traded
 TimingBacktest::buyAndHold(size_t first, size_t last) const
 {
     Traded traded;
-    for (size_t day = std::max<size_t>(first, 1); day <= last && day < series.size(); day++)
+    traded.firstIndex = std::max<size_t>(first, 1);
+    for (size_t day = traded.firstIndex; day <= last && day < series.size(); day++)
     {
         traded.days.push_back(series.days[day]);
         traded.returns.push_back(series.close[day] / series.close[day - 1] - 1);

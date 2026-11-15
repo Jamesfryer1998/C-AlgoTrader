@@ -20,7 +20,7 @@ jobs:
       - name: Run each study --offline
         run: |
           cd "$APP_DIR"
-          for study in morning pairs swing intraday timing momentum rebalance grid; do
+          for study in morning pairs swing intraday timing momentum rebalance grid timing_stocks; do
             app="${study}_app"
             case "$study" in   # where each keeps the bars its first run downloads
               swing|grid) bars="data/pairs/daily" ;;   # share pairs_app's daily bars
@@ -34,7 +34,7 @@ jobs:
           done
       - name: Reports
         run: |
-          for study in morning pairs swing intraday timing momentum rebalance grid; do
+          for study in morning pairs swing intraday timing momentum rebalance grid timing_stocks; do
             echo "===== $study"
             python3 deploy/research_summary.py "$APP_DIR/data/$study/report.json"
           done

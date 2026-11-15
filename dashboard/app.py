@@ -61,6 +61,11 @@ def leaderboard(report_json: dict) -> html.Div:
     summary = views.leaderboard_summary(report_json)
     if not summary:
         return html.Div("NOT USED BY THIS STUDY", className="empty")
+    picks = views.stock_picks_summary(report_json)
+    if picks:   # the many-stocks search: rules that travel, then each stock's own pick
+        return html.Div([html.Div(summary, className="muted"), table(views.families_table(report_json)),
+                         table(views.travelling_rules_table(report_json)), html.Div(picks, className="muted"),
+                         table(views.stock_picks_table(report_json))])
     return html.Div([html.Div(summary, className="muted"), table(views.families_table(report_json)),
                      table(views.leaderboard_table(report_json))])
 

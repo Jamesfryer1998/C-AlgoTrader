@@ -26,6 +26,7 @@ class TimingBacktest
     public:
         struct Traded
         {
+            size_t firstIndex = 0;           // the series' index of days[0]
             std::vector<std::string> days;
             std::vector<double> returns;     // after costs
             std::vector<double> exposure;    // held through each day

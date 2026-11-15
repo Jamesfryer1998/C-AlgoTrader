@@ -169,3 +169,26 @@ def test_the_timing_search_shows_its_leaderboard():
     assert rows[0][0][0] == "1 *" and rows[0][7][0] == "-3.9%" and rows[0][9][0] == "46%"
     assert rows[1][6][0] == views.NOTHING   # not a finalist: no validation shown
     assert views.leaderboard_summary(sample_report()) == ""
+
+
+def test_the_many_stocks_search_shows_rules_that_travel_and_each_stocks_pick():
+    measures = {"cagr": 0.08, "edge": 0.01, "capture": 0.7, "exposure": 0.6, "sharpe": 0.9}
+    pick_period = {"cagr": 0.12, "edge": 0.02, "exposure": 0.5, "sharpe": 1.0, "held_cagr": 0.15, "held_sharpe": 0.8,
+                   "random_percentile": 0.7}
+    summary = {"ahead_of_mix": 0.52, "random_pick_ahead_of_mix": 0.5, "beat_hold": 0.2, "beat_hold_sharpe": 0.4,
+               "beat_95_percent_of_random": 0.06, "median_edge": 0.001}
+    report_json = {**sample_report(), "leaderboard": {
+        "rules_tried": 1271400, "eligible": 400000, "symbol": "300 stocks", "cash": "BIL",
+        "ahead_of_mix": {"development": 0.3, "validation": 0.4}, "edge_rank_correlation": 0.05, "families": [],
+        "top": [{"rank": 1, "rule": "trend: days 200", "family": "trend", "finalist": True, "eligible_on": 280,
+                 "development": measures, "validation": measures,
+                 "stocks_ahead": {"development": 0.7, "validation": 0.45}}],
+        "stock_picks": {"summary": {"development": summary, "validation": summary},
+                        "rows": [{"symbol": "AAPL", "rule": "dip: rsi_days 2", "family": "dip",
+                                  "development": pick_period, "validation": pick_period}]}}}
+    assert "52%" in views.stock_picks_summary(report_json) and "random: 50%" in views.stock_picks_summary(report_json)
+    rules = views.travelling_rules_table(report_json).rows
+    assert rules[0][0][0] == "1 *" and rules[0][9][0] == "45%"
+    picks = views.stock_picks_table(report_json).rows
+    assert picks[0][0][0] == "AAPL" and picks[0][4][1] == views.NEGATIVE   # behind holding it
+    assert views.stock_picks_summary(sample_report()) == ""

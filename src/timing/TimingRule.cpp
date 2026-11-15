@@ -195,20 +195,27 @@ TimingRule::targets(const TimingSeries& series) const
     }
     if (family == DRAWDOWN_STOP)
     {
-        size_t highDays = static_cast<size_t>(whole(p, "high_days"));
+        int highDays = whole(p, "high_days");
+        const auto& windowHigh = series.priorHigh(highDays);   // the highest of the high_days before today
         double drop = fraction(p, "drop_percent");
         const auto& reenter = series.sma(whole(p, "reenter_days"));
         size_t entered = 0;
+        double sinceEntry = 0;   // the highest close since it last got in
         return holding(days,
                        [&](size_t d) {
                            bool back = above(reenter, d, 0);
                            if (back)
+                           {
                                entered = d;
+                               sinceEntry = close[d];
+                           }
                            return back;
                        },
                        [&](size_t d) {
-                           size_t from = std::max(entered, d >= highDays ? d - highDays : 0);
-                           double highest = *std::max_element(close.begin() + from, close.begin() + d + 1);
+                           sinceEntry = std::max(sinceEntry, close[d]);
+                           // The highest over the high_days, or since getting back in if that's more recent
+                           bool recentEntry = d - entered <= static_cast<size_t>(highDays) || !series.known(windowHigh, d);
+                           double highest = recentEntry ? sinceEntry : std::max(windowHigh[d], close[d]);
                            return close[d] < highest * (1 - drop);
                        });
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
 #include "../morning/MorningSettings.hpp"
 
@@ -34,6 +35,14 @@ struct TimingSettings
     int randomDraws = 200;            // random timings of each finalist, for its percentile
     unsigned randomSeed = 7;
     size_t leaderboardSize = 100;
+
+    // Many symbols (timing_stocks_app): the `universeStocks` most traded over the shared daily bars (data/pairs),
+    // plus `alwaysSymbols`, none of `notStocks`, each with bars from data_start
+    size_t universeStocks = 0;
+    std::vector<std::string> alwaysSymbols;
+    std::vector<std::string> notStocks;
+    double loadDollarVolume = 100e6;
+    std::string rankingFrom = "2022-09-01";
 
     json families = json::object();
     json gates = json::object();

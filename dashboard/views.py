@@ -838,6 +838,48 @@ def leaderboard_table(report_json: dict) -> Table:
     return table
 
 
+def stock_picks_summary(report_json: dict) -> str:
+    """timing_stocks_app: how each stock's best rule (picked on development) did in validation, in a line."""
+    picks = ((report_json.get("leaderboard") or {}).get("stock_picks") or {}).get("summary", {})
+    validation = picks.get("validation")
+    if not validation:
+        return ""
+    return (f"Each stock's best rule in validation: ahead of holding as much without timing on "
+            f"{percent(validation['ahead_of_mix'] * HUNDRED, 0)} of stocks (a rule picked at random: "
+            f"{percent(validation['random_pick_ahead_of_mix'] * HUNDRED, 0)}); beat holding the stock on "
+            f"{percent(validation['beat_hold'] * HUNDRED, 0)} (by Sharpe {percent(validation['beat_hold_sharpe'] * HUNDRED, 0)}); "
+            f"beat 95% of its random timings on {percent(validation['beat_95_percent_of_random'] * HUNDRED, 0)}")
+
+
+def travelling_rules_table(report_json: dict) -> Table:
+    """timing_stocks_app: rules ranked by their median edge across the stocks, validation for finalists (*) only."""
+    table = Table(["#", "Rule", "Stocks", "Exposure", "CAGR, dev", "Edge, dev", "Ahead, dev", "CAGR, validation",
+                   "Edge, validation", "Ahead, validation"], empty="NOT USED BY THIS STUDY")
+    for row in (report_json.get("leaderboard") or {}).get("top", []):
+        development, validation, ahead = row["development"], row.get("validation"), row.get("stocks_ahead", {})
+        later = ([(percent(validation["cagr"] * HUNDRED, 1, signed=True), tone_of(validation["cagr"])),
+                  _edge(validation["edge"]), percent(ahead["validation"] * HUNDRED, 0)] if validation else [NOTHING] * 3)
+        table.add(f"{row['rank']}{' *' if row['finalist'] else ''}", row["rule"].replace("_", " "),
+                  number(row.get("eligible_on", 0), 0), percent(development["exposure"] * HUNDRED, 0),
+                  (percent(development["cagr"] * HUNDRED, 1, signed=True), tone_of(development["cagr"])),
+                  _edge(development["edge"]), percent(ahead.get("development", 0) * HUNDRED, 0), *later)
+    return table
+
+
+def stock_picks_table(report_json: dict) -> Table:
+    """timing_stocks_app: each stock's best rule on development, then in validation next to holding the stock."""
+    table = Table(["Stock", "Its best rule, dev", "Exposure", "Edge, dev", "CAGR, validation", "Held, validation",
+                   "Edge, validation", "Beat random timings"], empty="NOT USED BY THIS STUDY")
+    for row in (((report_json.get("leaderboard") or {}).get("stock_picks") or {}).get("rows", [])):
+        development, validation = row["development"], row["validation"]
+        table.add(row["symbol"], row["rule"].replace("_", " "), percent(development["exposure"] * HUNDRED, 0),
+                  _edge(development["edge"]),
+                  (percent(validation["cagr"] * HUNDRED, 1, signed=True), tone_of(validation["cagr"] - validation["held_cagr"])),
+                  percent(validation["held_cagr"] * HUNDRED, 1, signed=True), _edge(validation["edge"]),
+                  percent(validation["random_percentile"] * HUNDRED, 0))
+    return table
+
+
 def _edge(value: float) -> tuple[str, str]:
     """What timing added a year over the same exposure held without it."""
     return percent(value * HUNDRED, 1, signed=True), tone_of(value)
