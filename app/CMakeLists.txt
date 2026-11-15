@@ -9,6 +9,7 @@ add_executable(swing_app swing.cpp)
 add_executable(intraday_app intraday.cpp)
 add_executable(timing_app timing.cpp)
 add_executable(momentum_app momentum.cpp)
+add_executable(rebalance_app rebalance.cpp)
 
 target_link_libraries(algo_trader_app
     live_lib
@@ -66,5 +67,10 @@ target_link_libraries(timing_app
 
 target_link_libraries(momentum_app
     momentum_lib
+    util_lib
+    nlohmann_json)
+
+target_link_libraries(rebalance_app
+    rebalance_lib
     util_lib
     nlohmann_json)

@@ -1,0 +1,33 @@
+{
+    "_comment": "rebalance_app: Harvey, Mazzoleni and Melone, 'The Unintended Consequences of Rebalancing' (NBER w33554, February 2025). Pension and target-date funds hold about 60% stocks / 40% bonds and rebalance at month ends, so when stocks have run ahead of bonds that month, stocks fall against bonds in the month's last days (about 17bp a day per standard deviation of the drift), and bounce on the first day of the next. The paper: Sharpe about 1.1 front-running it, 1997 to 2023, stronger since 2006 and 'even stronger' through 2025. Development and validation overlap its sample (a replication, on ETFs instead of futures); the holdout starts when it came out. Fixed 2026-11-15.",
+    "start": "2016-02-01",
+    "development_end": "2020-12-31",
+    "validation_end": "2025-01-31",
+    "end": "",
+    "data_start": "2016-01-04",
+
+    "_signal_comment": "At each close, the stock weight of a portfolio that was target_stock_weight stocks (SPY) and the rest bonds at the last month end, less the target: the drift. Through the month's last window_days trading days, hold the other way to it (positive drift: short stocks against bonds); on the next month's first day (reversal_day), the same way as the drift that set the window. Scaled: a drift of full_at_drift is a whole position (capped there); all in: the direction only. Set at the close, held to the next close (market-on-close orders). Prices include dividends and coupons (adjustment all).",
+    "stocks": "SPY",
+    "adjustment": "all",
+    "target_stock_weight": 0.6,
+    "window_days": 5,
+    "reversal_day": true,
+    "full_at_drift": 0.01,
+    "starting_capital": 100000,
+
+    "_control_comment": "Each variant against random_draws versions of itself with each month's direction decided by a coin (same days, same sizes): the share of them it beat is printed at the end, by period.",
+    "random_draws": 200,
+    "random_seed": 7,
+
+    "_variants_comment": "bond: the Treasury fund (IEF 7-10 years, nearest the paper's 10-year note futures; TLT 20+ years). legs: spread (stocks against the bond fund, a whole position being one of each), stocks (SPY alone, long or short), stocks_long_only (SPY only when it's expected to rise). slippage_percent: each fill of each leg.",
+    "variants": [
+        {"name": "SPY vs IEF, scaled", "bond": "IEF", "legs": "spread", "sizing": "scaled"},
+        {"name": "SPY vs IEF, all in", "bond": "IEF", "legs": "spread", "sizing": "sign"},
+        {"name": "SPY vs TLT, scaled", "bond": "TLT", "legs": "spread", "sizing": "scaled"},
+        {"name": "SPY alone, scaled", "bond": "IEF", "legs": "stocks", "sizing": "scaled"},
+        {"name": "SPY alone, long only", "bond": "IEF", "legs": "stocks_long_only", "sizing": "scaled"},
+        {"name": "SPY vs IEF, our usual 0.03% costs", "bond": "IEF", "legs": "spread", "sizing": "scaled", "slippage_percent": 0.03}
+    ],
+
+    "gates": {"min_sharpe": 1.0, "min_lead_over_random": 0.5, "min_trades": 30, "min_deflated_sharpe": 0.95}
+}

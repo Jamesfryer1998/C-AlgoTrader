@@ -28,10 +28,10 @@ jobs:
           ps -ww -o pid,etime,ni,%cpu,%mem,args -C morning_app || true
       - name: Research reports
         run: |
-          for study in morning pairs swing intraday timing momentum; do
+          for study in morning pairs swing intraday timing momentum rebalance; do
             echo "===== $study"; cat "$DATA/$study/progress.json" 2>/dev/null || echo "no progress.json"; echo
             python3 deploy/research_summary.py "$DATA/$study/report.json"
             ls -la --time-style=+%H:%M "$DATA/$study" 2>/dev/null | grep -v "^d" || true
-            echo "--- $study.log"; tail -15 "$DATA/$study/$study.log" 2>/dev/null || echo "no log"
+            echo "--- $study.log"; tail -25 "$DATA/$study/$study.log" 2>/dev/null || echo "no log"
           done
-          ps -ww -o pid,etime,ni,%cpu,args -C timing_app,momentum_app,swing_app,intraday_app,pairs_app || true
+          ps -ww -o pid,etime,ni,%cpu,args -C timing_app,momentum_app,rebalance_app,swing_app,intraday_app,pairs_app || true
