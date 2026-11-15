@@ -130,9 +130,13 @@ void
 MorningReport::addDeflatedSharpes(const std::string& period)
 {
     quant::Vector trials;
-    for (const auto& line : results.lines)
-        if (line.selection == results.chosen)
-            trials.push_back(quant::dailySharpe(returnsIn(line, settings, period)));
+    auto searched = results.trialSharpes.find(period);
+    if (searched != results.trialSharpes.end())
+        trials = searched->second;
+    else
+        for (const auto& line : results.lines)
+            if (line.selection == results.chosen)
+                trials.push_back(quant::dailySharpe(returnsIn(line, settings, period)));
     for (const auto& line : results.lines)
         if (line.selection == results.chosen)
             for (auto& row : table)

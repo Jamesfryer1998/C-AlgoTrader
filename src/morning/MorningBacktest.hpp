@@ -64,6 +64,10 @@ class MorningBacktest
             std::string title = "MORNING SCREEN";
             std::string chosen = IN_PLAY;           // the selection being tested; the other is RANDOM
             std::string countLabel = "Stocks a day";
+
+            // By period: the Sharpe of every rule tried, when more were tried than are reported (timing_app
+            // searches thousands and reports its finalists), so the deflated Sharpe counts them all
+            std::map<std::string, std::vector<double>> trialSharpes;
         };
 
         // progress(stage, done, total)

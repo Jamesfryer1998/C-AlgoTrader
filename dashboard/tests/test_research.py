@@ -149,3 +149,23 @@ def test_another_studys_report_names_its_own_selection():
     kpis = {kpi.title: kpi.value for kpi in views.research_kpis(report_json)}
     assert kpis["Pairs a month"] == "20"
     assert views.moves_table({**report_json, "step1": {"moves": {}, "move_to_cost": 0}}).rows == []
+
+
+def test_the_timing_search_shows_its_leaderboard():
+    measures = {"cagr": 0.08, "sharpe": 1.1, "max_drawdown": 0.1, "exposure": 0.6, "trades": 30, "mix_cagr": 0.06,
+                "edge": 0.02, "capture": 0.7, "days": 1000}
+    report_json = {**sample_report(), "leaderboard": {
+        "rules_tried": 4238, "eligible": 1061, "symbol": "SPY", "cash": "BIL",
+        "ahead_of_mix": {"development": 0.34, "validation": 0.33}, "edge_rank_correlation": -0.42,
+        "families": [{"family": "turn_of_month", "tried": 49, "eligible": 42, "best_development_edge": 0.07,
+                      "median_development_edge": 0.017, "median_validation_edge": -0.04, "validation_ahead": 0.24}],
+        "top": [{"rank": 1, "rule": "momentum: days 10", "family": "momentum", "finalist": True,
+                 "development": measures, "validation": {**measures, "edge": -0.039},
+                 "random_percentile": {"development": 0.99, "validation": 0.46}},
+                {"rank": 2, "rule": "trend: days 200", "family": "trend", "finalist": False, "development": measures}]}}
+    assert "4,238 rules tried" in views.leaderboard_summary(report_json)
+    assert views.families_table(report_json).rows[0][0][0] == "turn of month"
+    rows = views.leaderboard_table(report_json).rows
+    assert rows[0][0][0] == "1 *" and rows[0][7][0] == "-3.9%" and rows[0][9][0] == "46%"
+    assert rows[1][6][0] == views.NOTHING   # not a finalist: no validation shown
+    assert views.leaderboard_summary(sample_report()) == ""

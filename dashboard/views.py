@@ -797,6 +797,52 @@ def research_figure(report_json: dict | None, variant: str | None) -> dict:
     return {"data": lines, "layout": {**layout, "showlegend": True}}
 
 
+def leaderboard_summary(report_json: dict) -> str:
+    """timing_app's search in a line: how many rules, and whether development's ranking held up."""
+    board = report_json.get("leaderboard")
+    if not board:
+        return ""
+    ahead = board["ahead_of_mix"]
+    return (f"{number(board['rules_tried'], 0)} rules tried, {number(board['eligible'], 0)} eligible. Ahead of holding "
+            f"{board['symbol']} at the same exposure without timing: {percent(ahead['development'] * HUNDRED, 0)} in "
+            f"development, {percent(ahead['validation'] * HUNDRED, 0)} in validation. How well development's ranking "
+            f"predicted validation's (rank correlation, 1 is perfectly): {number(board['edge_rank_correlation'])}")
+
+
+def families_table(report_json: dict) -> Table:
+    """Each family of rules: how its eligible rules did, as medians, so no single lucky rule speaks for it."""
+    table = Table(["Family", "Tried", "Eligible", "Best edge, dev", "Median edge, dev", "Median edge, validation",
+                   "Ahead in validation"], empty="NOT USED BY THIS STUDY")
+    for family in (report_json.get("leaderboard") or {}).get("families", []):
+        table.add(family["family"].replace("_", " "), number(family["tried"], 0), number(family["eligible"], 0),
+                  _edge(family["best_development_edge"]), _edge(family["median_development_edge"]),
+                  _edge(family["median_validation_edge"]),
+                  percent(family["validation_ahead"] * HUNDRED, 0) if family["eligible"] else NOTHING)
+    return table
+
+
+def leaderboard_table(report_json: dict) -> Table:
+    """The best rules on development, with validation for the finalists (*) only."""
+    table = Table(["#", "Rule", "Exposure", "CAGR, dev", "Edge, dev", "Of SPY's, dev", "CAGR, validation",
+                   "Edge, validation", "Of SPY's, validation", "Beat random timings"], empty="NOT USED BY THIS STUDY")
+    for row in (report_json.get("leaderboard") or {}).get("top", []):
+        development, validation = row["development"], row.get("validation")
+        later = ([(percent(validation["cagr"] * HUNDRED, 1, signed=True), tone_of(validation["cagr"])),
+                  _edge(validation["edge"]), percent(validation["capture"] * HUNDRED, 0),
+                  percent(row["random_percentile"]["validation"] * HUNDRED, 0)]
+                 if validation else [NOTHING] * 4)
+        table.add(f"{row['rank']}{' *' if row['finalist'] else ''}", row["rule"].replace("_", " "),
+                  percent(development["exposure"] * HUNDRED, 0),
+                  (percent(development["cagr"] * HUNDRED, 1, signed=True), tone_of(development["cagr"])),
+                  _edge(development["edge"]), percent(development["capture"] * HUNDRED, 0), *later)
+    return table
+
+
+def _edge(value: float) -> tuple[str, str]:
+    """What timing added a year over the same exposure held without it."""
+    return percent(value * HUNDRED, 1, signed=True), tone_of(value)
+
+
 # ---------- System: the server ----------
 
 LIMIT_WARNING_SHARE = 0.8   # past this much of the data limit, the oldest files are about to be deleted

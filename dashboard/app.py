@@ -56,6 +56,15 @@ def table(view: views.Table) -> html.Div:
     return html.Div(html.Table([head, body], className="data-table"), className="table-wrap")
 
 
+def leaderboard(report_json: dict) -> html.Div:
+    """The timing search: a line on how it went, each family's medians, then the best rules on development."""
+    summary = views.leaderboard_summary(report_json)
+    if not summary:
+        return html.Div("NOT USED BY THIS STUDY", className="empty")
+    return html.Div([html.Div(summary, className="muted"), table(views.families_table(report_json)),
+                     table(views.leaderboard_table(report_json))])
+
+
 def panel(number: int, title: str, body, extra=None, tall: bool = False) -> html.Div:
     """A cyan-framed box with its numbered title tab on the top edge, like '2 CHART'."""
     # `is None`, not `or`: a Dash component with no children is falsy, and `extra or ""` would drop it
@@ -233,11 +242,14 @@ def research_tab() -> html.Div:
                      [panel(2, "Step 1: moves against costs", html.Div(id="research-moves")),
                       panel(3, "Gates", html.Div(id="research-gates"))]),
         panel(4, "Every rule, every period", html.Div(id="research-results")),
-        html.Div("Each study trades its idea with fixed rules (config/morning.json: each day's stocks in play; "
-                 "config/pairs.json: pairs and lead-lag) next to the same rules on random picks and SPY bought and "
-                 "held. Development and validation are looked at as often as you like; the holdout only once, at "
-                 "the end, with OPEN THE HOLDOUT. CLEAR RESULTS deletes the reports, not the downloaded data or the "
-                 "holdout records. Nothing here trades: it's research.", className="empty"),
+        panel(5, "The search: every rule ranked on development", html.Div(id="research-leaderboard")),
+        html.Div("Each study trades its idea with fixed rules (config/<study>.json) next to the same rules on random "
+                 "picks and SPY bought and held. The timing search tries thousands of rules, ranks them on development "
+                 "alone by what their timing added over holding SPY as much of the time without it (edge), and only "
+                 "its finalists (*) are shown in validation, against random timings of themselves. Development and "
+                 "validation are looked at as often as you like; the holdout only once, at the end, with OPEN THE "
+                 "HOLDOUT. CLEAR RESULTS deletes the reports, not the downloaded data or the holdout records. Nothing "
+                 "here trades: it's research.", className="empty"),
     ], id="research-tab", style={"display": "none"})
 
 
@@ -545,25 +557,27 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
 
     @app.callback(Output("research-stats", "children"), Output("research-chart", "figure"),
                   Output("research-moves", "children"), Output("research-gates", "children"),
-                  Output("research-results", "children"), Output("research-sent", "data"),
+                  Output("research-results", "children"), Output("research-leaderboard", "children"),
+                  Output("research-sent", "data"),
                   Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("research-variant", "value"),
                   Input("research-study", "value"), Input("research-clear-confirm", "n_clicks"),
                   State("research-sent", "data"))
     def refresh_research(active, _, variant, key, __, sent_before):
         if active != RESEARCH:
-            return (*[no_update] * 5, sent_before)
+            return (*[no_update] * 6, sent_before)
         report_json = research.load_report(project, research.study_of(key))
         sent = SentParts(sent_before)
         generated = (key, report_json.get("generated_utc")) if report_json else None
         if not report_json:
             empty = html.Div("NO RESULTS YET: RUN RESEARCH", className="empty")
-            return ("", views.research_figure(None, None), empty, empty, empty, SentParts(None).fingerprints)
+            return ("", views.research_figure(None, None), empty, empty, empty, empty, SentParts(None).fingerprints)
         return (sent.update("stats", generated, lambda _: segments([kpi_segment(kpi)
                                                                     for kpi in views.research_kpis(report_json)])),
                 sent.update("chart", (generated, variant), lambda _: views.research_figure(report_json, variant)),
                 sent.update("moves", generated, lambda _: table(views.moves_table(report_json))),
                 sent.update("gates", generated, lambda _: table(views.gates_table(report_json))),
                 sent.update("results", generated, lambda _: table(views.research_results_table(report_json))),
+                sent.update("leaderboard", generated, lambda _: leaderboard(report_json)),
                 sent.fingerprints)
 
     # ----- Picks -----

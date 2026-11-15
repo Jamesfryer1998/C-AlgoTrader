@@ -7,6 +7,7 @@ add_executable(morning_app morning.cpp)
 add_executable(pairs_app pairs.cpp)
 add_executable(swing_app swing.cpp)
 add_executable(intraday_app intraday.cpp)
+add_executable(timing_app timing.cpp)
 
 target_link_libraries(algo_trader_app
     live_lib
@@ -54,5 +55,10 @@ target_link_libraries(swing_app
 
 target_link_libraries(intraday_app
     intraday_lib
+    util_lib
+    nlohmann_json)
+
+target_link_libraries(timing_app
+    timing_lib
     util_lib
     nlohmann_json)

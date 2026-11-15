@@ -28,7 +28,7 @@ jobs:
           ps -ww -o pid,etime,ni,%cpu,%mem,args -C morning_app || true
       - name: Research reports
         run: |
-          for study in morning pairs swing intraday; do
+          for study in morning pairs swing intraday timing; do
             echo "===== $study"; cat "$DATA/$study/progress.json" 2>/dev/null || echo "no progress.json"; echo
             python3 deploy/research_summary.py "$DATA/$study/report.json"
           done
