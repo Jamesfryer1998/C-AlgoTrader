@@ -1,0 +1,29 @@
+{
+    "_comment": "momentum_app: published intraday momentum rules, tested as published (nothing tuned here). The headline is the noise-area breakout of Zarattini, Aziz and Barbon, 'Beat the Market: An Effective Intraday Momentum Strategy for S&P500 ETF (SPY)', May 2024: 19.6% a year net, Sharpe 1.33, 2007 to 2024, on SPY. Development and validation overlap the paper's own years, so for SPY they are a replication; QQQ and IWM weren't in it. The holdout starts the month it was published: its rules hadn't seen any of it. Fixed 2026-11-15.",
+    "start": "2016-03-01",
+    "development_end": "2020-12-31",
+    "validation_end": "2024-04-30",
+    "end": "",
+    "data_start": "2016-01-04",
+
+    "symbols": ["SPY", "QQQ", "IWM"],
+    "benchmark": "SPY",
+    "starting_capital": 100000,
+    "random_seed": 7,
+
+    "_noise_area_comment": "The paper's rules, the defaults for every variant: each minute's usual move from the open is its average over lookback_days days; the band is max(open, yesterday's close) x (1 + band_multiplier x it) above and min(...) x (1 - ...) below. Checked every check_minutes from 10:00 to 15:30: above the band long, below short; out when back through the band or (vwap_stop) the day's VWAP; all sold at the close. Sized at min(max_leverage, target_daily_volatility / the last lookback_days' daily volatility) of the account. Fills at the open of the minute after a check. Costs per fill: cost_per_share (Alpaca charges no commission; half SPY's one-cent spread) plus slippage_percent; regulatory fees on sales. The paper assumed $0.0045 a share.",
+    "noise_area": {"band_multiplier": 1.0, "lookback_days": 14, "check_minutes": 30, "vwap_stop": true,
+                   "target_daily_volatility": 0.02, "max_leverage": 4.0, "cost_per_share": 0.005, "slippage_percent": 0.0},
+
+    "_variants_comment": "Each on each symbol. The control for each: its own trades, same times, sizes and prices, in random directions. last_half_hour (Gao, Han, Li and Zhou 2018): at 15:30 the way it moved from yesterday's close to 10:00, to the close. overnight: bought at the close, sold at the open.",
+    "variants": [
+        {"name": "noise area, as published"},
+        {"name": "noise area, no leverage", "max_leverage": 1.0},
+        {"name": "noise area, our usual 0.03% costs", "cost_per_share": 0.0, "slippage_percent": 0.03},
+        {"name": "noise area, no VWAP stop", "vwap_stop": false},
+        {"name": "last half hour", "kind": "last_half_hour", "target_daily_volatility": 0, "max_leverage": 1.0},
+        {"name": "overnight", "kind": "overnight", "target_daily_volatility": 0, "max_leverage": 1.0}
+    ],
+
+    "gates": {"min_sharpe": 1.0, "min_lead_over_random": 0.5, "min_trades": 300, "min_deflated_sharpe": 0.95}
+}
