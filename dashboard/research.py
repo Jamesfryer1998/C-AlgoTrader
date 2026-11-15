@@ -7,6 +7,7 @@
     timing    timing_app    of thousands of rules for when to hold SPY, does any time it well?   config/timing.json
     momentum  momentum_app  do published intraday momentum rules make money, before and since?   config/momentum.json
     rebalance rebalance_app does trading ahead of 60/40 funds' month-end rebalancing pay?   config/rebalance.json
+    grid      grid_app      does buying after big down days and selling after big up days beat holding?   config/grid.json
 
     RUN RESEARCH      the app: downloads what it hasn't got, backtests the development and validation years and
                       saves data/<study>/report.json
@@ -59,7 +60,8 @@ INTRADAY = Study("intraday", "Intraday: stocks against their sector", "build/app
 TIMING = Study("timing", "Market timing search: SPY", "build/app/timing_app", "timing", "timing.log")
 MOMENTUM = Study("momentum", "Intraday momentum, as published", "build/app/momentum_app", "momentum", "momentum.log")
 REBALANCE = Study("rebalance", "Month-end rebalancing", "build/app/rebalance_app", "rebalance", "rebalance.log")
-STUDIES = {study.key: study for study in (MORNING, PAIRS, SWING, INTRADAY, TIMING, MOMENTUM, REBALANCE)}
+GRID = Study("grid", "Buying drops, selling pops", "build/app/grid_app", "grid", "grid.log")
+STUDIES = {study.key: study for study in (MORNING, PAIRS, SWING, INTRADAY, TIMING, MOMENTUM, REBALANCE, GRID)}
 
 
 @dataclass
