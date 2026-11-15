@@ -26,5 +26,9 @@ jobs:
           cat "$DATA/morning/progress.json" 2>/dev/null || echo "no progress.json"; echo
           tail -40 "$DATA/morning/morning.log" 2>/dev/null || echo "no morning.log"
           ps -ww -o pid,etime,ni,%cpu,%mem,args -C morning_app || true
-      - name: Research report
-        run: python3 deploy/research_summary.py "$DATA/morning/report.json"
+      - name: Research reports
+        run: |
+          for study in morning pairs; do
+            echo "===== $study"; cat "$DATA/$study/progress.json" 2>/dev/null; echo
+            python3 deploy/research_summary.py "$DATA/$study/report.json"
+          done
