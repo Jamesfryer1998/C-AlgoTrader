@@ -1,6 +1,8 @@
 #include "DailyPrices.hpp"
 
+#include <algorithm>
 #include <filesystem>
+#include <set>
 #include <iostream>
 #include "../morning/MorningData.hpp"
 
@@ -60,6 +62,11 @@ namespace DailyPrices
             return false;
         }
         std::vector<std::string> symbols = worthDownloading(dataRoot, listed, request.downloadAbove);
+        std::set<std::string> always(request.alwaysInclude.begin(), request.alwaysInclude.end());
+        always.insert(BENCHMARK);
+        for (const auto& symbol : always)
+            if (std::find(symbols.begin(), symbols.end(), symbol) == symbols.end())
+                symbols.push_back(symbol);
         std::cout << symbols.size() << " of " << listed.size() << " stocks trade enough to consider" << std::endl;
         if (!data.ensureDailyBars(symbols, request.from, request.to, [&](size_t done, size_t total) {
                 progress.stage(STAGE_DAILY, done, total);
@@ -80,7 +87,7 @@ namespace DailyPrices
         {
             progress.stage(STAGE_PRICES, i, symbols.size());
             std::vector<quant::DailyBar> bars = data.dailyBars(symbols[i]);
-            if (symbols[i] == BENCHMARK || averageDollarVolume(bars) >= request.loadAbove)
+            if (always.count(symbols[i]) || averageDollarVolume(bars) >= request.loadAbove)
                 prices.add(symbols[i], bars);
         }
         return true;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
 #include "PriceMatrix.hpp"
 #include "../morning/MorningBacktest.hpp"
@@ -24,6 +25,7 @@ namespace DailyPrices
         double downloadAbove = 5e6;        // average daily dollar volume to download a stock at all
         double loadAbove = 0;              // ... and to load it for this study (over all its bars)
         bool offline = false;
+        std::vector<std::string> alwaysInclude;   // downloaded and loaded whatever they trade (SPY always is)
     };
 
     // False (with a message on stderr) if there's no list of stocks or no SPY. `downloads`: requests made.

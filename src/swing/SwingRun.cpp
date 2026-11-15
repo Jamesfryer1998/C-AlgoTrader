@@ -60,7 +60,7 @@ SwingRun::run(const MorningRun::Options& options)
 
     // 1. Daily bars for the liquid stocks, on SPY's trading days
     DailyPrices::Request request{settings.dataStart, settings.end, settings.prefilterDollarVolume,
-                                 settings.loadDollarVolume, options.offline};
+                                 settings.loadDollarVolume, options.offline, {}};
     PriceMatrix prices;
     size_t downloads = 0;
     if (!DailyPrices::load(algoConfig, dataRoot, request, progress, prices, downloads))

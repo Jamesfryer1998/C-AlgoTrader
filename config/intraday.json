@@ -1,0 +1,43 @@
+{
+    "_comment": "intraday_app: many hedged trades a day. Do stocks that stray from their sector fund within the day come back (fade) or keep going (ride), better than random stocks, after costs? On 1-minute bars, with the same development / validation / holdout years and pass marks as config/morning.json. Rules are fixed here BEFORE the first run (2026-11-15); nothing is tuned by it.",
+    "start": "2023-11-01",
+    "development_end": "2024-10-31",
+    "validation_end": "2025-10-31",
+    "end": "",
+    "data_start": "2022-09-01",
+
+    "_universe_comment": "Each month, from the formation_days of daily bars before it: the `stocks` with the most dollar volume, priced above min_price, with a bar every day, that move less closely than max_correlation with SPY, every fund and every stock already picked (so no index, sector or leveraged funds, and one share class per company), and aren't in not_stocks. Each is hedged in the fund it moved with most, at its beta to it. Daily bars are shared with pairs_app (data/pairs/daily); only stocks averaging load_dollar_volume over all their bars are loaded.",
+    "universe": {"stocks": 100, "formation_days": 252, "min_price": 5.0, "max_correlation": 0.9,
+                 "prefilter_dollar_volume": 5000000, "load_dollar_volume": 100000000},
+    "funds": ["XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"],
+    "not_stocks": ["GLD", "IAU", "SLV", "GDX", "GDXJ", "USO", "UNG", "TLT", "IEF", "SHY", "BIL", "SGOV", "HYG", "LQD",
+                   "TBT", "TMF", "IBIT", "FBTC", "GBTC", "ETHA", "BITO", "BITX", "VXX", "UVXY", "SVXY", "EEM", "EFA",
+                   "FXI", "KWEB", "EWZ", "EWJ", "INDA", "VEA", "VWO", "QQQ", "IWM", "DIA", "VTI", "VOO", "IVV", "RSP",
+                   "SPLG", "SCHD", "JEPI", "TQQQ", "SQQQ", "SPXL", "SPXS", "UPRO", "SH", "SDS", "TNA", "TZA", "SOXL",
+                   "SOXS", "SMH", "ARKK", "XBI", "KRE", "XOP"],
+
+    "_day_comment": "Minutes after the 09:30 open: looks every step_minutes from first_minute, enters until last_entry_minute (15:30), and sells whatever's left at 15:59's close.",
+    "day": {"first_minute": 30, "last_entry_minute": 360, "step_minutes": 5},
+
+    "_signal_comment": "The gap: the stock's move over lookback_minutes less beta x its fund's, divided by its usual size for that long (the daily standard deviation of that difference over the formation year x sqrt(lookback / 390)). Trade it at |z| >= entry_z, biggest first, up to stocks_each_side a side; out when it's back to exit_z (closed), after hold_minutes, or at the close.",
+    "stocks_each_side": 10,
+    "entry_z": 2.0,
+    "exit_z": 0.0,
+
+    "_money_comment": "Each stock is leverage x equity / (2 x stocks_each_side); hedged, the book holds -beta x that in its fund, trading only the funds' net change each step. Orders fill at the open of the minute delay_minutes after the signal. Costs as everywhere else: slippage_percent against us on each fill, regulatory fees on every sale (short sales too). Borrowing costs aren't counted.",
+    "starting_capital": 100000,
+    "slippage_percent": 0.03,
+    "leverage": 1.0,
+    "random_seed": 7,
+
+    "_variants_comment": "The control for each: on each step as many entries a side as its signals made, of random stocks from the month's list, each held as long as the trade it copies, hedged the same way.",
+    "variants": [
+        {"name": "Fade, 30-minute gap", "direction": "fade", "lookback_minutes": 30, "hold_minutes": 30},
+        {"name": "Fade, 5-minute gap", "direction": "fade", "lookback_minutes": 5, "hold_minutes": 15},
+        {"name": "Fade, unhedged", "direction": "fade", "lookback_minutes": 30, "hold_minutes": 30, "hedge": false},
+        {"name": "Fade, filled at the signal", "direction": "fade", "lookback_minutes": 30, "hold_minutes": 30, "delay_minutes": 0},
+        {"name": "Ride, 30-minute gap", "direction": "ride", "lookback_minutes": 30, "hold_minutes": 30}
+    ],
+
+    "gates": {"min_sharpe": 1.0, "min_lead_over_random": 0.5, "min_trades": 300, "min_deflated_sharpe": 0.95}
+}
