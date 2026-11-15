@@ -84,13 +84,13 @@ namespace
         return {{"cagr", cagr}, {"edge", edge}, {"capture", capture}, {"exposure", exposure}, {"sharpe", sharpe}};
     }
 
-    // An equal-weighted portfolio's returns, built a stock at a time on a master calendar
+    // An equal-weighted portfolio's returns, built a stock at a time on a master calendar, with its trades and costs
     struct Portfolio
     {
-        std::vector<double> sum;
-        std::vector<int> count;
+        std::vector<double> sum, costs;
+        std::vector<int> count, trades;
 
-        explicit Portfolio(size_t days) : sum(days, 0), count(days, 0) {}
+        explicit Portfolio(size_t days) : sum(days, 0), costs(days, 0), count(days, 0), trades(days, 0) {}
 
         void add(const TimingBacktest::Traded& traded, const std::map<std::string, size_t>& calendar)
         {
@@ -101,6 +101,11 @@ namespace
                     continue;
                 sum[found->second] += traded.returns[i];
                 count[found->second]++;
+                if (!traded.changes.empty())
+                {
+                    trades[found->second] += traded.changes[i];
+                    costs[found->second] += traded.costs[i];
+                }
             }
         }
 
@@ -112,13 +117,26 @@ namespace
             made.selection = selection;
             made.equity = capital;
             for (size_t day = 0; day < days.size(); day++)
-                if (count[day] > 0)
-                {
-                    double change = sum[day] / count[day];
-                    made.days.push_back(days[day]);
-                    made.returns.push_back(change);
-                    made.equity *= 1 + change;
-                }
+            {
+                if (count[day] == 0)
+                    continue;
+                double morning = made.equity;
+                double change = sum[day] / count[day];
+                made.days.push_back(days[day]);
+                made.returns.push_back(change);
+                made.equity *= 1 + change;
+                if (trades[day] == 0)
+                    continue;
+                StockDay summary;   // the day's changes of exposure across the stocks, as one row
+                summary.symbol = variant;
+                summary.day = days[day];
+                summary.trades = trades[day];
+                summary.costs = costs[day] / count[day] * morning;
+                summary.netPnl = made.equity - morning;
+                summary.grossPnl = summary.netPnl + summary.costs;
+                summary.wins = summary.netPnl > 0 ? 1 : 0;
+                made.stockDays.push_back(summary);
+            }
             return made;
         }
     };
