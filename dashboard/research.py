@@ -2,6 +2,7 @@
 
     morning   morning_app   does trading each day's stocks in play make money?      config/morning.json
     pairs     pairs_app     do stocks that move together pay to trade against each other?   config/pairs.json
+    swing     swing_app     do pullbacks, breakouts or the week's losers, held days to weeks, pay?   config/swing.json
 
     RUN RESEARCH      the app: downloads what it hasn't got, backtests the development and validation years and
                       saves data/<study>/report.json
@@ -48,7 +49,8 @@ class Study:
 
 MORNING = Study("morning", "Morning screen: stocks in play", "build/app/morning_app", "morning", "morning.log")
 PAIRS = Study("pairs", "Pairs and lead-lag", "build/app/pairs_app", "pairs", "pairs.log")
-STUDIES = {study.key: study for study in (MORNING, PAIRS)}
+SWING = Study("swing", "Swing trading", "build/app/swing_app", "swing", "swing.log")
+STUDIES = {study.key: study for study in (MORNING, PAIRS, SWING)}
 
 
 @dataclass

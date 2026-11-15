@@ -8,7 +8,7 @@
 /**
  * PriceMatrix
  *
- * Many stocks' daily closes and dollar volumes on one trading calendar, row per stock, column per day, so a
+ * Many stocks' daily bars and dollar volumes on one trading calendar, row per stock, column per day, so a
  * month's formation can compare hundreds of stocks quickly. 0 where a stock had no bar that day.
  */
 struct PriceMatrix
@@ -17,6 +17,9 @@ struct PriceMatrix
     std::vector<std::string> symbols;
     std::vector<std::vector<double>> close;
     std::vector<std::vector<double>> open;
+    std::vector<std::vector<double>> high;
+    std::vector<std::vector<double>> low;
+    std::vector<std::vector<double>> volume;      // shares
     std::vector<std::vector<double>> dollarVolume;
 
     // Add a stock from its daily bars (any not on the calendar are ignored)
@@ -38,4 +41,7 @@ struct PriceMatrix
 
     // close[stock][day] / close[stock][day - 1] - 1, or 0 if either is missing
     double dailyReturn(size_t stock, size_t day) const;
+
+    // The row of `symbol`, or stocks() if it isn't here
+    size_t row(const std::string& symbol) const;
 };

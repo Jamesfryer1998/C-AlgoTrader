@@ -31,10 +31,6 @@ class PairsRun
         static void printUsage(std::ostream& out);
 
     private:
-        // The symbols worth downloading: those averaging at least prefilter_dollar_volume a day in the morning
-        // screen's daily bars, if it has some; otherwise all of them
-        std::vector<std::string> worthDownloading(const std::vector<std::string>& symbols, double prefilter) const;
-
         json algoConfig;
         json pairsConfig;
         std::string dataRoot;

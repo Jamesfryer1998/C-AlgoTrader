@@ -14,7 +14,8 @@ PriceMatrix::add(const std::string& symbol, const std::vector<quant::DailyBar>& 
     std::map<std::string, const quant::DailyBar*> byDate;
     for (const auto& bar : bars)
         byDate[bar.date] = &bar;
-    std::vector<double> closes(days.size(), 0), opens(days.size(), 0), dollars(days.size(), 0);
+    std::vector<double> closes(days.size(), 0), opens(days.size(), 0), highs(days.size(), 0), lows(days.size(), 0),
+        shares(days.size(), 0), dollars(days.size(), 0);
     for (size_t day = 0; day < days.size(); day++)
     {
         auto found = byDate.find(days[day]);
@@ -22,11 +23,17 @@ PriceMatrix::add(const std::string& symbol, const std::vector<quant::DailyBar>& 
             continue;
         closes[day] = found->second->close;
         opens[day] = found->second->open;
+        highs[day] = found->second->high;
+        lows[day] = found->second->low;
+        shares[day] = found->second->volume;
         dollars[day] = found->second->close * found->second->volume;
     }
     symbols.push_back(symbol);
     close.push_back(std::move(closes));
     open.push_back(std::move(opens));
+    high.push_back(std::move(highs));
+    low.push_back(std::move(lows));
+    volume.push_back(std::move(shares));
     dollarVolume.push_back(std::move(dollars));
 }
 
@@ -82,4 +89,10 @@ PriceMatrix::dailyReturn(size_t stock, size_t day) const
     if (day == 0 || close[stock][day] <= 0 || close[stock][day - 1] <= 0)
         return 0;
     return close[stock][day] / close[stock][day - 1] - 1;
+}
+
+size_t
+PriceMatrix::row(const std::string& symbol) const
+{
+    return static_cast<size_t>(std::find(symbols.begin(), symbols.end(), symbol) - symbols.begin());
 }

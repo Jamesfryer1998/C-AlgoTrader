@@ -1,0 +1,38 @@
+{
+    "_comment": "swing_app: do positions held days to weeks pay, on daily bars? Three published signals, each against random buys on the same days, with the same development / validation / holdout years and pass marks as config/morning.json. Rules are fixed here BEFORE the first run (2026-11-15); nothing is tuned by it.",
+    "start": "2023-11-01",
+    "development_end": "2024-10-31",
+    "validation_end": "2025-10-31",
+    "end": "",
+    "data_start": "2022-09-01",
+
+    "_universe_comment": "A stock can be bought on a day when it closed above min_price and averaged at least min_dollar_volume a day over the dollar_volume_days to then. The daily bars are shared with pairs_app (data/pairs/daily): stocks averaging prefilter_dollar_volume in the morning screen's daily bars are downloaded, and those averaging load_dollar_volume over all their bars are loaded (to keep memory down; a stock needs twice that to be bought).",
+    "universe": {"min_price": 5.0, "min_dollar_volume": 20000000, "dollar_volume_days": 20, "prefilter_dollar_volume": 5000000, "load_dollar_volume": 10000000},
+
+    "_pullback_comment": "Pullback in an uptrend (Connors and Alvarez, RSI(2)): the close is above its trend_days average and the rsi_days RSI is under rsi_below. Most oversold first. Out at the next open after a close above its exit_above_days average, or at the close after max_hold_days.",
+    "pullback": {"trend_days": 200, "rsi_days": 2, "rsi_below": 10, "exit_above_days": 5, "max_hold_days": 10},
+
+    "_breakout_comment": "Breakout to a 52-week high (George and Hwang 2004; the momentum traders' version): the close at least the highest close of the high_days - 1 days before, on volume at least volume_ratio times its volume_days average. Most volume first. A stop stop_atr ATRs (atr_days) under the entry, filled at the stop or the open if it gapped under; otherwise out at the close after hold_days.",
+    "breakout": {"high_days": 252, "volume_days": 50, "volume_ratio": 1.5, "atr_days": 14, "stop_atr": 2.0, "hold_days": 20},
+
+    "_losers_comment": "The week's biggest losers (short-term reversal, Jegadeesh 1990, Lehmann 1990): at the week's last close, the `positions` stocks that fell most over return_days. Held hold_days, out at the close.",
+    "losers": {"return_days": 5, "hold_days": 5},
+
+    "_money_comment": "Long only. At most `positions` held at once, each leverage x equity / positions when picked; a signal with no free place is skipped. Bought at the next open unless the variant says at the signal's close. Costs as everywhere else: slippage_percent against us on each fill, regulatory fees on sells.",
+    "positions": 20,
+    "starting_capital": 100000,
+    "slippage_percent": 0.03,
+    "leverage": 1.0,
+    "random_seed": 7,
+
+    "_variants_comment": "The control for each is as many buys of random stocks that could have been bought, on the same days, with the same exits. For SPY and QQQ it's as many buys of each on random days, so SPY bought and held is the real bar there.",
+    "variants": [
+        {"name": "Pullback in an uptrend", "kind": "pullback"},
+        {"name": "Pullback, SPY and QQQ", "kind": "pullback", "symbols": ["SPY", "QQQ"], "positions": 2},
+        {"name": "Pullback, at the close", "kind": "pullback", "entry": "close"},
+        {"name": "52-week-high breakout", "kind": "breakout"},
+        {"name": "Weekly losers", "kind": "losers"}
+    ],
+
+    "gates": {"min_sharpe": 1.0, "min_lead_over_random": 0.5, "min_trades": 300, "min_deflated_sharpe": 0.95}
+}

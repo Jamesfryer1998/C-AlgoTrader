@@ -20,15 +20,18 @@ jobs:
       - name: Run each study --offline
         run: |
           cd "$APP_DIR"
-          for study in morning pairs; do
+          for study in morning pairs swing; do
             app="${study}_app"
-            if [[ ! -d "data/$study/daily" ]]; then echo "$study: no downloads yet, run it from the Research tab first"; continue; fi
+            bars="data/$study/daily"
+            [[ "$study" == swing ]] && bars="data/pairs/daily"   # swing_app shares pairs_app's daily bars
+            if [[ ! -d "$bars" ]]; then echo "$study: no downloads yet, run it from the Research tab first"; continue; fi
             if pgrep -x "$app" > /dev/null; then echo "$app is already running"; continue; fi
+            mkdir -p "data/$study"
             nice -n 10 "./build/app/$app" --offline > "data/$study/$study.log" 2>&1 || { tail -30 "data/$study/$study.log"; exit 1; }
           done
       - name: Reports
         run: |
-          for study in morning pairs; do
+          for study in morning pairs swing; do
             echo "===== $study"
             python3 deploy/research_summary.py "$APP_DIR/data/$study/report.json"
           done
