@@ -49,11 +49,12 @@ def print_leaderboard(board: dict, rows: int = 40) -> None:
         line = (f"  {row['rank']:3}{'*' if row['finalist'] else ' '} {row['rule'][:62]:62} exp {d['exposure']:.2f} "
                 f"cagr {d['cagr']:+.3f} edge {d['edge']:+.3f} capture {d['capture']:.2f} sharpe {d['sharpe']:+.2f} "
                 f"dd {d['max_drawdown']:.3f} trades {d['trades']}")
-        if "validation" in row:
-            v = row["validation"]
-            line += (f" | VAL exp {v['exposure']:.2f} cagr {v['cagr']:+.3f} edge {v['edge']:+.3f} capture "
-                     f"{v['capture']:.2f} sharpe {v['sharpe']:+.2f} dd {v['max_drawdown']:.3f} trades {v['trades']} "
-                     f"beat random {row['random_percentile']['validation']:.2f}")
+        for period, label in (("validation", "VAL"), ("holdout", "HOLDOUT")):
+            if period in row:
+                v = row[period]
+                line += (f" | {label} exp {v['exposure']:.2f} cagr {v['cagr']:+.3f} edge {v['edge']:+.3f} capture "
+                         f"{v['capture']:.2f} sharpe {v['sharpe']:+.2f} dd {v['max_drawdown']:.3f} trades "
+                         f"{v['trades']} beat random {row['random_percentile'][period]:.2f}")
         print(line)
 
 
