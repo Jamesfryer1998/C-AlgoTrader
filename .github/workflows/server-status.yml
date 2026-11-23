@@ -26,7 +26,19 @@ jobs:
           ps -ww -o pid,lstart,etime,args -C algo_trader_app || echo "trader not running"
           echo "--- data/portfolio.json (TRADE THESE)"; cat "$DATA/portfolio.json" 2>/dev/null || echo "none: config/strategy.json"
           echo; echo "--- the running trader's status"
-          python3 -c "import json,sys; s=json.load(open(sys.argv[1])); print('state', s.get('state'), 'updated', s.get('updated')); print('run', json.dumps(s.get('run', {}))); [print(x.get('ticker'), [l.get('label') for l in x.get('strategies', [])]) for x in s.get('stocks', [])]" "$DATA/live/status.json" 2>&1 || true; ls -la --time-style=+%F_%H:%M "$DATA/live" "$DATA/live_dry_run" 2>/dev/null | head -20
+          for sample in 1 2; do   # twice, 70 seconds apart: each stock's last bar and its strategies' levels
+            python3 - "$DATA/live/status.json" <<'PY' || true
+          import json, sys
+          s = json.load(open(sys.argv[1]))
+          print("state", s.get("state"), "updated", s.get("updated_utc"), "run", json.dumps(s.get("run", {})))
+          for stock in s.get("stocks", []):
+              levels = [(l.get("label"), l.get("lower"), l.get("current"), l.get("upper"), l.get("state"), l.get("ready"))
+                        for l in stock.get("strategies", [])]
+              print(" ", stock.get("ticker"), stock.get("bar_time") or stock.get("time"), stock.get("price"), levels)
+          PY
+            if [ "$sample" = 1 ]; then sleep 70; fi
+          done
+          ls -la --time-style=+%F_%H:%M "$DATA/live" 2>/dev/null | head -20
       - name: Research run
         run: |
           cat "$DATA/morning/progress.json" 2>/dev/null || echo "no progress.json"; echo
