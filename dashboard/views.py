@@ -207,14 +207,21 @@ def positions_table(status: dict, risk_config: dict) -> Table:
 
 
 def strategy_table(status: dict) -> Table:
-    """One line a strategy: where its indicator sits between the levels that would trade."""
-    table = Table(["Stock", "Strategy", "Low < now < high", "State"], empty="NO BARS YET")
+    """One line a strategy: where its indicator sits between the levels that would trade, as of its last bar.
+    RSI's levels are its fixed thresholds (only its RSI moves); MEANREV's band moves with its average."""
+    table = Table(["Stock", "Strategy", "Low < now < high", "State", "Bar"], empty="NO BARS YET")
     for stock in (status or {}).get("stocks", []):
         for i, levels in enumerate(stock.get("strategies", []) or [{}]):
             between = " < ".join(str(levels.get(key) or NOTHING) for key in ("lower", "current", "upper"))
+            ready = levels.get("ready")
+            state = levels.get("state") or (NO_SIGNAL if ready else WARMING_UP)
             table.add(stock["ticker"] if i == 0 else "", levels.get("label", NOTHING), between,
-                      (levels.get("state") or "warming up", PLAIN if levels.get("ready") else MUTED))
+                      (state, PLAIN if ready else MUTED), (str(stock.get("time") or "")[11:16] if i == 0 else "", MUTED))
     return table
+
+
+NO_SIGNAL = "no signal"     # ready, between its levels
+WARMING_UP = "warming up"   # not enough bars yet
 
 
 def trades_table(trades: pd.DataFrame, day: str, limit: int = RECENT_TRADES) -> Table:

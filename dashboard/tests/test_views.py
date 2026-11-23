@@ -89,9 +89,20 @@ def test_events_newest_first():
 
 
 def test_strategy_levels_on_one_line():
-    status = {"stocks": [{"ticker": "KO", "strategies": [{"label": "RSI", "lower": 30, "current": 45.2, "upper": 70,
-                                                          "state": "hold", "ready": True}]}]}
-    assert texts(views.strategy_table(status)) == [["KO", "RSI", "30 < 45.2 < 70", "hold"]]
+    status = {"stocks": [{"ticker": "KO", "time": "2026-11-23 11:22:00",
+                          "strategies": [{"label": "RSI", "lower": 30, "current": 45.2, "upper": 70,
+                                          "state": "hold", "ready": True}]}]}
+    assert texts(views.strategy_table(status)) == [["KO", "RSI", "30 < 45.2 < 70", "hold", "11:22"]]
+
+
+def test_a_ready_strategy_between_its_levels_isnt_warming_up():
+    status = {"stocks": [{"ticker": "ABT", "time": "2026-11-23 11:22:00",
+                          "strategies": [{"label": "RSI(30)", "lower": "35.00", "current": "57.72", "upper": "70.00",
+                                          "state": "", "ready": True},
+                                         {"label": "MACD", "ready": False}]}]}
+    rows = texts(views.strategy_table(status))
+    assert rows[0][3] == views.NO_SIGNAL and rows[1][3] == views.WARMING_UP
+    assert rows[1][0] == "" and rows[1][4] == ""   # the stock and its bar time once
 
 
 def test_charts_are_plotly_figures(backtest_folder):
