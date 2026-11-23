@@ -41,23 +41,31 @@ jobs:
           ls -la --time-style=+%F_%H:%M "$DATA/live" 2>/dev/null | head -20
       - name: Dashboard
         run: |
-          echo "--- the Live page's refresh, as the dashboard computes it"
-          cd /opt/algo-trader/app && /opt/algo-trader/env/bin/python - <<'PY' 2>&1 | tail -40 || true
-          import time, traceback
-          from dashboard import views, records
-          from dashboard.project import Project
-          project = Project.find()
+          echo "--- the Live page's refresh, asked of the running dashboard twice, a minute apart"
+          python3 - <<'PY' 2>&1 | tail -60 || true
+          import json, time, urllib.request
+          BASE = "http://localhost:8050"
+          callbacks = json.load(urllib.request.urlopen(BASE + "/_dash-dependencies"))
+          live = next(c for c in callbacks if "live-strategies.children" in c["output"])
           for sample in (1, 2):
+              body = {"output": live["output"],
+                      "outputs": [{"id": o.split(".")[0], "property": o.split(".")[1]} for o in live["output"].strip(".").split("...")],
+                      "inputs": [{"id": "fast", "property": "n_intervals", "value": sample},
+                                 {"id": "tabs", "property": "active_tab", "value": "live"}],
+                      "state": [{"id": "live-sent", "property": "data", "value": None}],
+                      "changedPropIds": ["fast.n_intervals"]}
+              request = urllib.request.Request(BASE + "/_dash-update-component", data=json.dumps(body).encode(),
+                                               headers={"Content-Type": "application/json"})
               try:
-                  folder = project.live_records
-                  status, trades, equity = records.status(folder), records.trades(folder), records.equity(folder)
-                  day = views.today(status, trades, equity)
-                  print("folder", folder, "day", day, "updated", status.get("updated_utc"))
-                  print("header", views.header(project, status, time.time()))
-                  for row in views.strategy_table(status).rows:
-                      print("  ", [cell[0] for cell in row])
-              except Exception:
-                  traceback.print_exc()
+                  reply = json.load(urllib.request.urlopen(request))
+                  strategies = json.dumps(reply["response"]["live-strategies"]["children"])
+                  print("sample", sample, "HTTP OK, strategies part:", len(strategies), "chars")
+                  import re
+                  print("  numbers:", re.findall(r'\d+\.\d+ < \d+\.\d+ < \d+\.\d+', strategies))
+              except urllib.error.HTTPError as error:
+                  print("sample", sample, "HTTP", error.code, error.read()[:2000].decode(errors="replace"))
+              except Exception as error:
+                  print("sample", sample, "failed:", repr(error))
               if sample == 1:
                   time.sleep(65)
           PY
