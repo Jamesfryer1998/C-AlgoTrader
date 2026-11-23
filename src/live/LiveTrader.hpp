@@ -57,8 +57,12 @@ class LiveTrader
     public:
         LiveTrader(const json& config, const LiveOptions& options, const std::string& dataRoot);
 
-        // Runs until Ctrl+C (or the end of a backtest). Returns the process exit code.
+        // Runs until Ctrl+C (or the end of a backtest). Returns the process exit code, or SWITCH_PORTFOLIO
         int run();
+
+        // run() returns this when the dashboard chose another portfolio (TRADE THESE, BACK TO CONFIG) and the
+        // trader stopped to trade it: run a new LiveTrader, which loads it
+        static const int SWITCH_PORTFOLIO = 3;
 
         // For the SIGINT / SIGTERM handler
         static void requestStop() { stopRequested = true; }
@@ -172,6 +176,18 @@ class LiveTrader
         // What the dashboard reads
         StatusWriter status;
         std::chrono::steady_clock::time_point lastClockCheck;
+        json lastMarketClock = json::object();
+
+        // A portfolio chosen on the dashboard while running: switched to once the market's closed and nothing's
+        // held. chosenAtStart: data/portfolio.json as it was when this run loaded its portfolio ("" for none).
+        std::string chosenAtStart;
+        std::chrono::steady_clock::time_point lastChoiceCheck;
+        bool switchNoted = false;
+        bool switching = false;
+        std::string chosenPortfolio() const;
+        bool readyToSwitchPortfolio();
+        bool marketOpen() const;
+        bool holdsAnything() const;
 
         // One decision at a time: a bar on the feed's thread, or flattening on the main one
         std::mutex tradingLock;

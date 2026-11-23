@@ -659,9 +659,12 @@ def portfolio_table(project: Project) -> Table:
 
 
 def portfolio_status(running: str | None, upcoming: str) -> str:
-    """"TRADING config/strategy.json  ◆  NEXT START picks from 2026-11-07" (running: None when stopped)."""
-    now = f"TRADING {running}" if running else "STOPPED"
-    return f"{now}  ◆  NEXT START {upcoming}"
+    """"TRADING config/strategy.json  ◆  SWITCHING TO picks from 2026-11-07 ..." (running: None when stopped)."""
+    if not running:
+        return f"STOPPED  ◆  NEXT START {upcoming}"
+    if running != upcoming:
+        return f"TRADING {running}  ◆  SWITCHING TO {upcoming} ONCE THE MARKET'S CLOSED AND NOTHING'S HELD"
+    return f"TRADING {running}"
 
 
 

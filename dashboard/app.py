@@ -204,9 +204,10 @@ def picks_tab() -> html.Div:
                  "bars and keeps up to five that held up in both the training years and the final month it never "
                  "saw, and beat buying and holding that stock (fewer when fewer pass). After each traded day's "
                  "close, those picks are backtested on the day from the live account's money, starting flat. "
-                 "TRADE THESE makes "
-                 "a week's picks the trader's portfolio from its next Start (saved as data/portfolio.json, so "
-                 "deploys don't undo it); config/strategy.json itself is never changed.", className="empty"),
+                 "TRADE THESE makes a week's picks the trader's portfolio (saved as data/portfolio.json, so "
+                 "deploys don't undo it): a running trader switches once the market's closed and it holds "
+                 "nothing, a stopped one from its next Start. config/strategy.json itself is never changed.",
+                 className="empty"),
     ], id="picks-tab", style={"display": "none"})
 
 
@@ -646,9 +647,10 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         if isinstance(clicked, dict) and pressed:
             run = clicked["run"]
             stocks = picks.describe_portfolio(picks.picks_portfolio(project, run) or [])
-            body = (f"Trade the picks from {run} ({stocks}) from the trader's next Start? Until then it keeps "
-                    f"what it trades now. config/strategy.json isn't changed: BACK TO CONFIG/STRATEGY.JSON undoes "
-                    f"this.")
+            body = (f"Trade the picks from {run} ({stocks})? A running trader switches to them as soon as the "
+                    f"market's closed and it holds nothing (straight away outside market hours, when it's flat); "
+                    f"a stopped one trades them from its next Start. config/strategy.json isn't changed: BACK TO "
+                    f"CONFIG/STRATEGY.JSON undoes this.")
             return True, body, run, no_update, no_update, no_update
         if clicked == "trade-picks-confirm" and pressed and choice:
             done = picks.trade_picks(project, choice) + ". "

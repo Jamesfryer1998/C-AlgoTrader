@@ -264,4 +264,5 @@ def test_latency_views():
 def test_portfolio_status_line():
     assert views.portfolio_status(None, "config/strategy.json") == "STOPPED  ◆  NEXT START config/strategy.json"
     assert views.portfolio_status("config/strategy.json", "picks from 2026-11-07") == \
-        "TRADING config/strategy.json  ◆  NEXT START picks from 2026-11-07"
+        "TRADING config/strategy.json  ◆  SWITCHING TO picks from 2026-11-07 ONCE THE MARKET'S CLOSED AND NOTHING'S HELD"
+    assert views.portfolio_status("picks from 2026-11-07", "picks from 2026-11-07") == "TRADING picks from 2026-11-07"

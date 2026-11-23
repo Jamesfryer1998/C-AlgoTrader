@@ -50,6 +50,9 @@ namespace
 
     // The dashboard's status: the market clock is asked for again this often (it's an Alpaca request)
     const std::chrono::minutes MARKET_CLOCK_REFRESH{5};
+
+    // How often a running trader looks for a portfolio chosen on the dashboard since it started
+    const std::chrono::seconds PORTFOLIO_CHOICE_CHECK{30};
     const std::string RUNNING = "running", STOPPING = "stopping", STOPPED = "stopped";
 
     // Flattening: the closing orders' stop loss and take profit (the risk checks want both; they close
@@ -124,7 +127,7 @@ LiveTrader::run()
     recap() << capital.describe(config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL)) << std::endl;
     recap() << "Records saved in " << recordsDir << std::endl;
     collectResult();
-    return 0;
+    return switching ? SWITCH_PORTFOLIO : 0;
 }
 
 // ---------- Setting up ----------
@@ -168,6 +171,8 @@ LiveTrader::recordsFolder() const
 bool
 LiveTrader::loadPortfolio()
 {
+    chosenAtStart = chosenPortfolio();
+    lastChoiceCheck = std::chrono::steady_clock::now();
     std::string other = otherPortfolioFile();
     try
     {
@@ -342,6 +347,7 @@ LiveTrader::describeRunForStatus()
                    {"starting_capital", config.value(STARTING_CAPITAL_KEY, Defaults::STARTING_CAPITAL)},
                    {"started_utc", MarketTime::formatUtc(std::time(nullptr))}, {"stocks", stocks}});
     json clock = session->marketClock();
+    lastMarketClock = clock;
     status.setMarketClock(clock);
     noteTodaysClose(clock);
     lastClockCheck = std::chrono::steady_clock::now();
@@ -366,7 +372,8 @@ LiveTrader::keepStatusFresh()
     if (now - lastClockCheck >= MARKET_CLOCK_REFRESH)
     {
         lastClockCheck = now;
-        status.setMarketClock(session->marketClock());
+        lastMarketClock = session->marketClock();
+        status.setMarketClock(lastMarketClock);
     }
     saveStatus(false);
 }
@@ -443,7 +450,70 @@ LiveTrader::waitUntilFinished()
         keepStatusFresh();
         closeQuietStocks();
         session->keepConnectionWarm();
+        if (readyToSwitchPortfolio())
+        {
+            switching = true;
+            stopRequested = true;
+        }
     }
+}
+
+// ---------- A portfolio chosen while running ----------
+
+// data/portfolio.json as it is now ("" if there isn't one: config/strategy.json's portfolio)
+std::string
+LiveTrader::chosenPortfolio() const
+{
+    std::ifstream file(dataRoot + ACTIVE_PORTFOLIO_FILE);
+    if (!file)
+        return "";
+    std::stringstream contents;
+    contents << file.rdbuf();
+    return contents.str();
+}
+
+// Every PORTFOLIO_CHOICE_CHECK, live: has the dashboard chosen another portfolio since this run loaded its own,
+// and can it switch now without leaving anything behind (the market's closed and nothing's held)? Says so once
+// when it has to wait.
+bool
+LiveTrader::readyToSwitchPortfolio()
+{
+    if (options.backtest || !options.backtestPortfolio.empty())
+        return false;
+    auto now = std::chrono::steady_clock::now();
+    if (now - lastChoiceCheck < PORTFOLIO_CHOICE_CHECK)
+        return false;
+    lastChoiceCheck = now;
+    if (chosenPortfolio() == chosenAtStart)
+        return false;
+    if (marketOpen() || holdsAnything())
+    {
+        if (!switchNoted)
+            screen() << "\nA new portfolio was chosen on the dashboard: switching to it once the market's closed "
+                     << "and nothing's held" << std::endl;
+        switchNoted = true;
+        return false;
+    }
+    screen() << "\nA new portfolio was chosen on the dashboard: switching to it now" << std::endl;
+    return true;
+}
+
+// From Alpaca's clock when it's known (it knows holidays), else the regular hours
+bool
+LiveTrader::marketOpen() const
+{
+    if (lastMarketClock.value("known", false))
+        return lastMarketClock.value("is_open", true);
+    return MarketTime::isRegularSession(MarketTime::toNewYorkTime(std::time(nullptr)));
+}
+
+bool
+LiveTrader::holdsAnything() const
+{
+    for (const auto& ticker : tickers)
+        if (oms.heldQuantity(ticker) != 0)
+            return true;
+    return false;
 }
 
 // e.g. "=== Backtest results: 2025-11-03 to 2026-01-14 (50 days) ==="

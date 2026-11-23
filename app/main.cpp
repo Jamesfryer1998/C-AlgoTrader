@@ -53,10 +53,14 @@ int main(int argc, char* argv[])
 
     Config config;
     DotEnv::load(config.getProjectRoot() + "/.env");
-    json algoConfig = config.loadConfig();
-    std::string dataRoot = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
-    SaveData::configure(dataRoot, algoConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
-
-    LiveTrader trader(algoConfig, options, dataRoot);
-    return trader.run();
+    int exitCode = LiveTrader::SWITCH_PORTFOLIO;
+    while (exitCode == LiveTrader::SWITCH_PORTFOLIO)   // a new portfolio chosen on the dashboard: start again with it
+    {
+        json algoConfig = config.loadConfig();
+        std::string dataRoot = config.getProjectRoot() + "/" + algoConfig.value("marketDataBasePath", Defaults::DATA_FOLDER);
+        SaveData::configure(dataRoot, algoConfig.value("data_limit_gb", SaveData::DEFAULT_LIMIT_GB));
+        LiveTrader trader(algoConfig, options, dataRoot);
+        exitCode = trader.run();
+    }
+    return exitCode;
 }

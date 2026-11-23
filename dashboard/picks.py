@@ -186,13 +186,13 @@ def trade_picks(project: Project, run: str) -> str:
     partial = path.with_suffix(".partial")
     partial.write_text(json.dumps(saved, indent=2))
     partial.replace(path)   # whole, or not at all: the trader may read it at any Start
-    return f"The trader will trade the {picks_source(run)} from its next Start"
+    return f"The trader will trade the {picks_source(run)} (a running one once the market's closed and it's flat)"
 
 
 def trade_config(project: Project) -> str:
     """Go back to config/strategy.json's portfolio from the trader's next Start."""
     chosen_portfolio_file(project).unlink(missing_ok=True)
-    return f"The trader will trade {CONFIG_PORTFOLIO}'s portfolio from its next Start"
+    return f"The trader will trade {CONFIG_PORTFOLIO}'s portfolio (a running one once the market's closed and it's flat)"
 
 
 # ---------- Running the screen ----------
