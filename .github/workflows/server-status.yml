@@ -39,6 +39,31 @@ jobs:
             if [ "$sample" = 1 ]; then sleep 70; fi
           done
           ls -la --time-style=+%F_%H:%M "$DATA/live" 2>/dev/null | head -20
+      - name: Dashboard
+        run: |
+          echo "--- the Live page's refresh, as the dashboard computes it"
+          cd /opt/algo-trader/app && /opt/algo-trader/env/bin/python - <<'PY' 2>&1 | tail -40 || true
+          import time, traceback
+          from dashboard import views, records
+          from dashboard.project import Project
+          project = Project.find()
+          for sample in (1, 2):
+              try:
+                  folder = project.live_records
+                  status, trades, equity = records.status(folder), records.trades(folder), records.equity(folder)
+                  day = views.today(status, trades, equity)
+                  print("folder", folder, "day", day, "updated", status.get("updated_utc"))
+                  print("header", views.header(project, status, time.time()))
+                  for row in views.strategy_table(status).rows:
+                      print("  ", [cell[0] for cell in row])
+              except Exception:
+                  traceback.print_exc()
+              if sample == 1:
+                  time.sleep(65)
+          PY
+          echo "--- the dashboard's log"
+          journalctl -u algo-trader-dashboard --since "-40 min" --no-pager 2>&1 | tail -40 || true
+          sudo -n journalctl -u algo-trader-dashboard --since "-40 min" --no-pager 2>&1 | grep -iE "error|traceback|exception" | tail -20 || true
       - name: Research run
         run: |
           cat "$DATA/morning/progress.json" 2>/dev/null || echo "no progress.json"; echo
