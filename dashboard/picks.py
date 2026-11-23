@@ -2,14 +2,16 @@
 
     every weekend (or the Picks tab's button)   screen_app --weekly: tune every strategy on every stock on the
                                                 last months, keep what held up on the final month it never saw.
-                                                Its top picks are saved as data/picks/<date>/
+                                                Its top picks are saved as data/picks/<date>-<id>/, each run with
+                                                an id (#1, #2, ...) and a name it can be given (run.json)
     after each traded day's close               that week's picks are backtested on the day, starting with the
                                                 live account's money (data/picks/backtest/<day>/), next to live
                                                 and live's own portfolio backtested (end_of_day.py)
 
-Nothing here changes config/strategy.json. To trade a week's picks, "Trade these" saves them as data/portfolio.json,
-which the trader uses instead of config/strategy.json's portfolio from its next Start (deploys replace config/
-from the repo, but never touch data/). "Back to config/strategy.json" removes it.
+Nothing here changes config/strategy.json. To trade a run's picks, "Trade these" saves them as data/portfolio.json,
+which the trader uses instead of config/strategy.json's portfolio (deploys replace config/ from the repo, but never
+touch data/): a running trader switches once the market's closed and it's flat, or straight away if it's restarted.
+"Back to config/strategy.json" removes it.
 """
 
 from __future__ import annotations
@@ -43,6 +45,10 @@ PICKS_CSV = "top_picks.csv"
 PICKS_PORTFOLIO = "top_picks_config.json"
 RESULTS_CSV = "screen_results.csv"
 SCREENED_WITH_FILE = "screened_with.json"  # in a run's folder: {"strategies": [...]}, absent if it tried them all
+RUN_FILE = "run.json"                    # in a run's folder: {"id": 7, "name": "..."}
+RUN_ID, RUN_NAME = "id", "name"
+NAME_LENGTH = 60                         # the longest name a run can be given
+DATE_LENGTH = 10                         # "2026-11-21" of "2026-11-21-7"
 SAVED_FILES = [PICKS_CSV, PICKS_PORTFOLIO, RESULTS_CSV, LOG_FILE, SCREENED_WITH_FILE]
 SCREENING, FINISHED, FAILED = "screening", "finished", "failed"
 STALE_AFTER = timedelta(minutes=30)      # a screen that hasn't moved for this long has died
@@ -64,11 +70,80 @@ def picks_root(project: Project) -> Path:
 
 
 def saved_runs(project: Project) -> list[str]:
-    """The dates of the saved weekly picks, newest first."""
+    """The saved runs' folder names, newest first (by date, then id)."""
     root = picks_root(project)
     if not root.is_dir():
         return []
-    return sorted((run.name for run in root.iterdir() if (run / PICKS_PORTFOLIO).exists()), reverse=True)
+    runs = [run.name for run in root.iterdir() if (run / PICKS_PORTFOLIO).exists()]
+    _number_runs(project, runs)
+    return sorted(runs, key=lambda run: (run_date(run), _saved_id(project, run)), reverse=True)
+
+
+def run_date(run: str) -> str:
+    return run[:DATE_LENGTH]
+
+
+def _run_details(project: Project, run: str) -> dict:
+    try:
+        details = json.loads((picks_root(project) / run / RUN_FILE).read_text())
+        return details if isinstance(details, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def run_id(project: Project, run: str) -> int:
+    """The run's number, given one (with every other unnumbered run) the first time it's asked for."""
+    number = int(_run_details(project, run).get(RUN_ID) or 0)
+    if not number and (picks_root(project) / run / PICKS_PORTFOLIO).exists():
+        saved_runs(project)
+        number = int(_run_details(project, run).get(RUN_ID) or 0)
+    return number
+
+
+def run_name(project: Project, run: str) -> str:
+    return str(_run_details(project, run).get(RUN_NAME) or "")
+
+
+def run_label(project: Project, run: str) -> str:
+    """"2026-11-21 #7  defensive RSI": the run's date, id and name, as the picks drop-down shows it."""
+    name = run_name(project, run)
+    return f"{run_date(run)} #{run_id(project, run)}" + (f"  {name}" if name else "")
+
+
+def _saved_id(project: Project, run: str) -> int:
+    return int(_run_details(project, run).get(RUN_ID) or 0)
+
+
+def _save_details(project: Project, run: str, details: dict) -> None:
+    (picks_root(project) / run / RUN_FILE).write_text(json.dumps(details))
+
+
+def _number_runs(project: Project, runs: list[str]) -> None:
+    """Give runs saved before ids existed one each, oldest first, after the highest id there is."""
+    unnumbered = sorted(run for run in runs if not _saved_id(project, run))
+    highest = max((_saved_id(project, run) for run in runs), default=0)
+    for run in unnumbered:
+        highest += 1
+        _save_details(project, run, {**_run_details(project, run), RUN_ID: highest})
+
+
+def next_run_id(project: Project) -> int:
+    return max((_saved_id(project, run) for run in saved_runs(project)), default=0) + 1
+
+
+def name_run(project: Project, run: str, name: str) -> str:
+    """Give a saved run a name (an empty one clears it). Returns what happened."""
+    if run not in saved_runs(project):
+        return f"No saved run {run}"
+    name = " ".join((name or "").split())[:NAME_LENGTH]
+    _save_details(project, run, {**_run_details(project, run), RUN_NAME: name})
+    return f"Named {run_date(run)} #{run_id(project, run)} \"{name}\"" if name else "Name cleared"
+
+
+def matching_runs(project: Project, search: str | None) -> list[str]:
+    """The saved runs whose label (date, #id, name) contains `search`, ignoring case; all of them for none."""
+    wanted = (search or "").strip().lower()
+    return [run for run in saved_runs(project) if wanted in run_label(project, run).lower()]
 
 
 def picks_for_day(project: Project, day: str) -> str | None:
@@ -166,6 +241,13 @@ def picks_portfolio(project: Project, run: str) -> list[dict] | None:
     return portfolio if isinstance(portfolio, list) else None
 
 
+def held_outside(project: Project, portfolio: list[dict]) -> list[str]:
+    """The stocks the live account holds that `portfolio` doesn't trade: a restarted trader wouldn't manage them."""
+    trading = {block.get("ticker") for block in portfolio}
+    held = records.positions(project.live_records)
+    return sorted(ticker for ticker in held["ticker"] if ticker not in trading) if len(held) else []
+
+
 def describe_portfolio(portfolio: list[dict]) -> str:
     """[{"ticker": "KO", "strategy": {"name": "RSI"}}, ...] -> "KO RSI, ..."."""
     def names(block: dict) -> str:
@@ -180,19 +262,19 @@ def trade_picks(project: Project, run: str) -> str:
     portfolio = picks_portfolio(project, run)
     if not portfolio:
         return f"Can't read the picks from {run}"
-    saved = {SOURCE: picks_source(run), CHOSEN_AT: datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    saved = {SOURCE: picks_source(run_label(project, run)), CHOSEN_AT: datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
              RUN: run, PORTFOLIO: portfolio}
     path = chosen_portfolio_file(project)
     partial = path.with_suffix(".partial")
     partial.write_text(json.dumps(saved, indent=2))
     partial.replace(path)   # whole, or not at all: the trader may read it at any Start
-    return f"The trader will trade the {picks_source(run)} (a running one once the market's closed and it's flat)"
+    return f"The trader will trade the {picks_source(run_label(project, run))}"
 
 
 def trade_config(project: Project) -> str:
     """Go back to config/strategy.json's portfolio from the trader's next Start."""
     chosen_portfolio_file(project).unlink(missing_ok=True)
-    return f"The trader will trade {CONFIG_PORTFOLIO}'s portfolio (a running one once the market's closed and it's flat)"
+    return f"The trader will trade {CONFIG_PORTFOLIO}'s portfolio"
 
 
 # ---------- Running the screen ----------
@@ -290,14 +372,14 @@ class ScreenControl:
             self.process_running = False
 
     def save_run(self, date: str) -> Path:
-        """Keep this screen's picks, results and output as data/picks/<date>/."""
-        folder = picks_root(self.project) / date
+        """Keep this screen's picks, results and output as data/picks/<date>-<id>/, with its id."""
+        number = next_run_id(self.project)
+        folder = picks_root(self.project) / f"{date}-{number}"
         folder.mkdir(parents=True, exist_ok=True)
         for name in SAVED_FILES:
             if (self.results / name).exists():
                 shutil.copy2(self.results / name, folder / name)
-            else:   # a rerun the same day: don't keep the earlier run's files
-                (folder / name).unlink(missing_ok=True)
+        _save_details(self.project, folder.name, {RUN_ID: number, RUN_NAME: ""})
         return folder
 
 
@@ -314,7 +396,7 @@ def weekend_screen_due(project: Project, now: datetime) -> bool:
     if now < saturday:
         return False
     runs = saved_runs(project)
-    return not runs or runs[0] < saturday.strftime("%Y-%m-%d")
+    return not runs or run_date(runs[0]) < saturday.strftime("%Y-%m-%d")
 
 
 # ---------- Picks against live, day by day ----------

@@ -106,10 +106,11 @@ def test_trading_a_weeks_picks_and_going_back_to_the_config(project):
     assert picks.portfolio_list(project)[0]["ticker"] == "SBUX"
 
     message = picks.trade_picks(project, "2026-11-07")
-    assert "picks from 2026-11-07" in message
+    assert "picks from 2026-11-07 #1" in message
     saved = json.loads(picks.chosen_portfolio_file(project).read_text())
-    assert saved[picks.PORTFOLIO] == week and saved[picks.SOURCE] == "picks from 2026-11-07"
-    assert picks.next_portfolio(project) == "picks from 2026-11-07"
+    assert saved[picks.PORTFOLIO] == week and saved[picks.SOURCE] == "picks from 2026-11-07 #1"
+    assert saved[picks.RUN] == "2026-11-07"
+    assert picks.next_portfolio(project) == "picks from 2026-11-07 #1"
     assert picks.portfolio_list(project) == week
     assert picks.describe_portfolio(week) == "KO RSI, PEP SCALP + VWAP"
     assert json.loads((project.root / "config" / "strategy.json").read_text())["portfolio"][0]["ticker"] == "SBUX"
@@ -147,7 +148,39 @@ def test_screening_just_one_strategy_is_recorded_with_the_run(project):
 
     assert screen.run() == "Screening started"                       # all of them again, the same day
     assert wait_for(lambda: not screen.running())
-    assert picks.screened_with(project, run) == []
+    newest, first = picks.saved_runs(project)                         # both kept
+    assert first == run and picks.screened_with(project, first) == ["SCALP"]
+    assert picks.screened_with(project, newest) == []
+    assert picks.run_id(project, newest) == picks.run_id(project, first) + 1
+
+
+def test_runs_are_numbered_named_and_searched(project):
+    save_picks(project, "2026-11-07", [{"ticker": "KO", "strategy": {"name": "RSI"}}])   # saved before ids
+    save_picks(project, "2026-10-31", [{"ticker": "PEP", "strategy": {"name": "SCALP"}}])
+    assert picks.saved_runs(project) == ["2026-11-07", "2026-10-31"]
+    assert picks.run_label(project, "2026-10-31") == "2026-10-31 #1"   # the oldest gets the first number
+    assert picks.run_label(project, "2026-11-07") == "2026-11-07 #2"
+    assert picks.next_run_id(project) == 3
+
+    assert picks.name_run(project, "2026-10-31", "  scalping   only ") == 'Named 2026-10-31 #1 "scalping only"'
+    assert picks.run_label(project, "2026-10-31") == "2026-10-31 #1  scalping only"
+    assert picks.matching_runs(project, "SCALP") == ["2026-10-31"]
+    assert picks.matching_runs(project, "#2") == ["2026-11-07"]
+    assert picks.matching_runs(project, "") == ["2026-11-07", "2026-10-31"]
+    assert picks.name_run(project, "2026-10-31", "") == "Name cleared"
+    assert picks.run_name(project, "2026-10-31") == ""
+    assert picks.name_run(project, "2026-01-01", "x").startswith("No saved run")
+    assert len(picks.run_name(project, "2026-11-07") or "") == 0
+    picks.name_run(project, "2026-11-07", "x" * 200)
+    assert len(picks.run_name(project, "2026-11-07")) == picks.NAME_LENGTH
+
+
+def test_what_a_restart_onto_new_picks_would_leave_behind(project):
+    project.live_records.mkdir(parents=True, exist_ok=True)
+    (project.live_records / records.POSITIONS_FILE).write_text("ticker,quantity,avg_price\nKO,10,58.2\nWMT,5,90\n")
+    portfolio = [{"ticker": "KO", "strategy": {"name": "RSI"}}]
+    assert picks.held_outside(project, portfolio) == ["WMT"]
+    assert picks.held_outside(project, portfolio + [{"ticker": "WMT", "strategy": {"name": "RSI"}}]) == []
 
 
 def test_the_strategies_the_screen_can_tune(project):

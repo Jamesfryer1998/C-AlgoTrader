@@ -95,6 +95,14 @@ def test_start_then_stop(control):
     assert wait_for(lambda: control.running_pid() is None)
 
 
+def test_restart_stops_then_starts_again(control):
+    assert control.restart() == "Starting"                           # stopped: just starts
+    assert wait_for(lambda: control.running_pid() is not None), what_happened(control)
+    first = control.running_pid()
+    assert control.restart() == "Restarting"
+    assert wait_for(lambda: control.running_pid() not in (None, first)), what_happened(control)
+
+
 def test_flatten_sends_its_own_signal(control):
     control.start()
     assert wait_for(lambda: control.running_pid() is not None), what_happened(control)

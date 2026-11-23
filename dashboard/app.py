@@ -143,11 +143,17 @@ def key(label: str, id_: str, tone: str) -> html.Button:
     return html.Button(label, id=id_, className=f"key {tone}", n_clicks=0)
 
 
-def confirm(id_: str, title: str, body: str, button: str, tone: str) -> dbc.Modal:
+def confirm(id_: str, title: str, body: str, button: str, tone: str,
+            also: tuple[str, str, str] | None = None) -> dbc.Modal:
+    """A yes/no box: CANCEL and `button` (id <id_>-confirm), and `also` (label, id suffix, tone) between them."""
+    keys = [key("CANCEL", f"{id_}-cancel", views.MUTED)]
+    if also:
+        label, suffix, also_tone = also
+        keys.append(key(label.upper(), f"{id_}-{suffix}", also_tone))
+    keys.append(key(button.upper(), f"{id_}-confirm", tone))
     return dbc.Modal([html.Div(title.upper(), className="panel-tab"),
                       html.Div(body, id=f"{id_}-body", className="modal-text"),
-                      html.Div([key("CANCEL", f"{id_}-cancel", views.MUTED),
-                                key(button.upper(), f"{id_}-confirm", tone)], className="modal-keys")],
+                      html.Div(keys, className="modal-keys")],
                      id=f"{id_}-modal", is_open=False, centered=True, content_class_name="terminal-modal")
 
 
@@ -157,7 +163,8 @@ WIDE_COLUMNS, SIDE_COLUMNS = 7, 5   # of Bootstrap's 12: every tab's chart and t
 REPORT_CHARTS = ["growth", "drawdown", "monthly", "daily", "distribution", "qq", "rolling"]
 LOADED = "LOADED"
 ALL_STRATEGIES = "ALL STRATEGIES"
-TRADE_PICKS = "trade-picks"   # each saved week's "Trade these" button: {"type": TRADE_PICKS, "run": its date}
+TRADE_PICKS = "trade-picks"   # each saved run's "Trade these" button: {"type": TRADE_PICKS, "run": its folder}
+RESTART_LATER = "later"       # TRADE THESE's other choice: the running trader switches once it's closed and flat
 
 
 def trade_picks_button(run: str) -> html.Button:
@@ -172,15 +179,27 @@ def screened_note(project: Project, run: str) -> str:
 
 
 def picks_heading(project: Project, run: str, loaded: str | None) -> list:
-    """A week's date, and TRADE THESE, or LOADED if they're what the trader's next Start trades."""
+    """A run's note (if it was limited to some strategies), and TRADE THESE, or LOADED if they're what's traded."""
     action = html.Span(LOADED, className=f"loaded {views.POSITIVE}") if run == loaded else trade_picks_button(run)
-    return [html.Span(f"SCREENED {run}{screened_note(project, run)}", className="panel-note"), action]
+    return [html.Span(screened_note(project, run).strip(), className="panel-note"), action]
 
 
 def current_picks(project: Project) -> html.Div:
     """The stocks and strategies the trader's next Start trades: config/strategy.json's, or a chosen week's."""
     source = html.Span(f"{LOADED}  {picks.next_portfolio(project)}", className=f"loaded {views.POSITIVE}")
     return html.Div([html.Div(source, className="picks-heading"), table(views.portfolio_table(project))])
+
+
+def picks_runs() -> html.Div:
+    """Any saved run (newest first, searchable by date, #id or name), its picks, and a name for it."""
+    choose = html.Div([dbc.Select(id="picks-run-select", className="day-picker run-picker"),
+                       dbc.Input(id="picks-run-search", placeholder="SEARCH", debounce=True,
+                                 className="day-picker run-search")], className="controls")
+    name = html.Div([dbc.Input(id="picks-run-name", placeholder="NAME THIS RUN", maxLength=picks.NAME_LENGTH,
+                               debounce=False, className="day-picker run-name"),
+                     key("SAVE NAME", "picks-run-name-save", views.MUTED),
+                     html.Span(id="picks-run-named", className="muted")], className="controls")
+    return html.Div([choose, html.Div(id="picks-table"), name])
 
 
 def picks_tab() -> html.Div:
@@ -196,7 +215,7 @@ def picks_tab() -> html.Div:
         portfolio,
         html.Div(id="picks-stats", className="stat-line"),
         side_by_side(panel(1, "P&L added up: live vs picks", graph("picks-pnl")),
-                     [panel(2, "This week's picks", html.Div(id="picks-table"),
+                     [panel(2, "Picks runs", picks_runs(),
                             extra=html.Div(id="picks-run", className="panel-actions")),
                       panel(3, "Current picks", html.Div(id="current-picks"))]),
         panel(4, "Day by day", html.Div(id="picks-days")),
@@ -204,9 +223,10 @@ def picks_tab() -> html.Div:
                  "bars and keeps up to five that held up in both the training years and the final month it never "
                  "saw, and beat buying and holding that stock (fewer when fewer pass). After each traded day's "
                  "close, those picks are backtested on the day from the live account's money, starting flat. "
-                 "TRADE THESE makes a week's picks the trader's portfolio (saved as data/portfolio.json, so "
-                 "deploys don't undo it): a running trader switches once the market's closed and it holds "
-                 "nothing, a stopped one from its next Start. config/strategy.json itself is never changed.",
+                 "Every run is kept, numbered (#id), and can be named; pick one from the list or search for it. "
+                 "TRADE THESE makes a run's picks the trader's portfolio (saved as data/portfolio.json, so "
+                 "deploys don't undo it): restart the trader to trade them now, or a running one switches once "
+                 "the market's closed and it holds nothing. config/strategy.json itself is never changed.",
                  className="empty"),
     ], id="picks-tab", style={"display": "none"})
 
@@ -315,7 +335,8 @@ def layout() -> html.Div:
         research_tab(),
         html.Div(id="system-tab", style={"display": "none"}),
         confirm("start", "Start trading", "", "Start", views.POSITIVE),
-        confirm("trade-picks", "Trade these picks", "", "Trade them", views.POSITIVE),
+        confirm("trade-picks", "Trade these picks", "", "Trade them and restart now", views.POSITIVE,
+                also=("Trade them", RESTART_LATER, views.MUTED)),
         dcc.Store(id="trade-picks-choice"),
         dcc.Store(id="portfolio-loaded"),   # changes when TRADE THESE or BACK TO CONFIG changes what's loaded
         confirm("research-clear", "Clear research results",
@@ -610,18 +631,39 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         choices = [ALL_STRATEGIES, *picks.screen_strategies(project)]
         return [{"label": choice, "value": choice} for choice in choices], chosen or ALL_STRATEGIES
 
+    @app.callback(Output("picks-run-select", "options"), Output("picks-run-select", "value"),
+                  Output("picks-run-named", "children"),
+                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("picks-run-search", "value"),
+                  Input("picks-run-name-save", "n_clicks"), State("picks-run-select", "value"),
+                  State("picks-run-name", "value"))
+    def picks_run_choices(active, _, search, __, chosen, name):
+        """Every saved run as "date #id  name", those matching the search; SAVE NAME names the one showing."""
+        if active != PICKS:
+            return no_update, no_update, no_update
+        named = ""
+        if ctx.triggered_id == "picks-run-name-save" and chosen:
+            named = picks.name_run(project, chosen, name or "")
+        runs = picks.matching_runs(project, search)
+        options = [{"label": picks.run_label(project, run), "value": run} for run in runs]
+        return options, chosen if chosen in runs else (runs[0] if runs else None), named
+
+    @app.callback(Output("picks-run-name", "value"), Input("picks-run-select", "value"))
+    def picks_run_name(run):
+        """The name field shows the chosen run's name, ready to change."""
+        return picks.run_name(project, run) if run else ""
+
     @app.callback(Output("picks-stats", "children"), Output("picks-pnl", "figure"), Output("picks-table", "children"),
                   Output("picks-run", "children"), Output("current-picks", "children"),
                   Output("picks-days", "children"), Output("picks-sent", "data"),
                   Input("tabs", "active_tab"), Input("slow", "n_intervals"), Input("portfolio-loaded", "data"),
-                  State("picks-sent", "data"))
-    def refresh_picks(active, _, __, sent_before):
+                  Input("picks-run-select", "value"), State("picks-sent", "data"))
+    def refresh_picks(active, _, __, selected, sent_before):
         if active != PICKS:
             return (*[no_update] * 6, sent_before)
         sent = SentParts(sent_before)
         days = picks.comparison(project, comparison.traded_days(project.live_records))
         runs = picks.saved_runs(project)
-        latest = runs[0] if runs else None
+        latest = selected if selected in runs else (runs[0] if runs else None)
         chosen = picks.picks_table(project, latest) if latest else pd.DataFrame()
         loaded = (picks.loaded_run(project), picks.next_portfolio(project), picks.portfolio_list(project))
         return (sent.update("stats", views.picks_kpis(days), lambda kpis: segments([kpi_segment(k) for k in kpis])),
@@ -637,23 +679,22 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
                   Output("trade-picks-choice", "data"), Output("portfolio-status", "children"),
                   Output("trade-config", "disabled"), Output("portfolio-loaded", "data"),
                   Input({"type": TRADE_PICKS, "run": ALL}, "n_clicks"), Input("trade-picks-cancel", "n_clicks"),
-                  Input("trade-picks-confirm", "n_clicks"), Input("trade-config", "n_clicks"),
-                  Input("tabs", "active_tab"), Input("slow", "n_intervals"), State("trade-picks-choice", "data"))
-    def choose_portfolio(_, __, ___, ____, active, _____, choice):
-        """TRADE THESE asks first, then saves those picks as the next Start's portfolio; BACK TO CONFIG undoes it."""
+                  Input("trade-picks-confirm", "n_clicks"), Input(f"trade-picks-{RESTART_LATER}", "n_clicks"),
+                  Input("trade-config", "n_clicks"), Input("tabs", "active_tab"), Input("slow", "n_intervals"),
+                  State("trade-picks-choice", "data"))
+    def choose_portfolio(_, __, ___, ____, _____, active, ______, choice):
+        """TRADE THESE asks whether to restart the trader to trade them now, or let it switch once it's closed
+        and flat; BACK TO CONFIG undoes it."""
         clicked = ctx.triggered_id
         pressed = bool(ctx.triggered and ctx.triggered[0]["value"])   # not just buttons appearing on the page
         is_open, body, done = no_update, no_update, ""
         if isinstance(clicked, dict) and pressed:
             run = clicked["run"]
-            stocks = picks.describe_portfolio(picks.picks_portfolio(project, run) or [])
-            body = (f"Trade the picks from {run} ({stocks})? A running trader switches to them as soon as the "
-                    f"market's closed and it holds nothing (straight away outside market hours, when it's flat); "
-                    f"a stopped one trades them from its next Start. config/strategy.json isn't changed: BACK TO "
-                    f"CONFIG/STRATEGY.JSON undoes this.")
-            return True, body, run, no_update, no_update, no_update
-        if clicked == "trade-picks-confirm" and pressed and choice:
+            return True, trade_picks_question(run), run, no_update, no_update, no_update
+        if clicked in ("trade-picks-confirm", f"trade-picks-{RESTART_LATER}") and pressed and choice:
             done = picks.trade_picks(project, choice) + ". "
+            if clicked == "trade-picks-confirm" and picks.loaded_run(project) == choice:   # saved: trade them now
+                done += control.restart() + ". "
             is_open = False
         elif clicked == "trade-picks-cancel" and pressed:
             is_open = False
@@ -667,6 +708,21 @@ def create_app(project: Project, end_of_day_backtests: bool = False) -> Dash:
         upcoming = picks.next_portfolio(project)
         return (is_open, body, no_update, done + views.portfolio_status(running, upcoming),
                 upcoming == picks.CONFIG_PORTFOLIO, upcoming if done else no_update)   # only on a change
+
+    def trade_picks_question(run: str) -> str:
+        """What TRADE THESE asks: the picks, and what restarting now would leave behind."""
+        portfolio = picks.picks_portfolio(project, run) or []
+        question = f"Trade the picks from {picks.run_label(project, run)} ({picks.describe_portfolio(portfolio)})? "
+        if not control.running_pid():
+            return question + ("The trader is stopped: TRADE THEM AND RESTART NOW starts it with them, TRADE "
+                               "THEM leaves them for its next Start.")
+        question += ("TRADE THEM AND RESTART NOW stops the trader and starts it again with them; TRADE THEM lets it "
+                     "switch by itself once the market's closed and it holds nothing.")
+        left = picks.held_outside(project, portfolio)
+        if left:
+            question += (f" It holds {', '.join(left)}, which these picks don't trade: a restarted trader wouldn't "
+                         f"manage or close them, so FLATTEN first, or let it switch after the close.")
+        return question
 
     # ----- Report -----
 

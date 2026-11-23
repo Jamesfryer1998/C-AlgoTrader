@@ -23,6 +23,8 @@ from .project import Project
 
 TRADER_PROCESS_NAME = "algo_trader_app"
 BACKTEST_TIMEOUT_SECONDS = 600
+RESTART_WAIT_SECONDS = 120   # how long a restart waits for the trader to stop (it saves its records first)
+RESTART_POLL_SECONDS = 1
 QUIET = "--quiet"
 BACKTEST = "--backtest"
 CAPITAL = "--capital"
@@ -117,6 +119,21 @@ class TraderControl:
 
     def stop(self) -> str:
         return self._signal(signal.SIGINT, "Stopping")
+
+    def restart(self) -> str:
+        """Stop the trader and start it again (it then loads data/portfolio.json); just start it if it's stopped."""
+        if not self.running_pid():
+            return self.start()
+        self.stop()
+        threading.Thread(target=self._start_once_stopped, daemon=True).start()
+        return "Restarting"
+
+    def _start_once_stopped(self) -> None:
+        deadline = time.time() + RESTART_WAIT_SECONDS
+        while self.running_pid() and time.time() < deadline:
+            time.sleep(RESTART_POLL_SECONDS)
+        if not self.running_pid():
+            self.start()
 
     def flatten(self) -> str:
         return self._signal(signal.SIGUSR1, "Closing every position, then stopping")
